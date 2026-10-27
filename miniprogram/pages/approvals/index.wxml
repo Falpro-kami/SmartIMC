@@ -1,0 +1,18 @@
+<view class="approvals-page imc-theme">
+  <view class="approval-tabs">
+    <button wx:for="{{tabs}}" wx:key="id" class="approval-tab {{activeTab === item.id ? 'approval-tab-selected' : ''}}" data-id="{{item.id}}" bindtap="switchTab">{{item.label}}</button>
+  </view>
+  <view wx:if="{{loading}}" class="state">正在读取…</view>
+  <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadApprovals">重试</button></view>
+  <view wx:if="{{!loading && !error && !requests.length}}" class="state">{{emptyText}}</view>
+  <block wx:for="{{requests}}" wx:key="id">
+    <button wx:if="{{activeTab === 'pending'}}" class="request-row" data-id="{{item.id}}" bindtap="openApproval">
+      <view class="request-info"><text class="request-name">{{item.title}}</text><text class="request-type">{{item.type}}</text><text wx:if="{{item.dateLabel}}" class="request-date">{{item.dateLabel}}</text></view>
+      <text class="request-status status-{{item.statusTone}}">{{item.statusLabel}}</text><text class="arrow">›</text>
+    </button>
+    <view wx:else class="request-row">
+      <view class="request-info"><text class="request-name">{{item.title}}</text><text class="request-type">{{item.type}}</text><text wx:if="{{item.dateLabel}}" class="request-date">{{item.dateLabel}}</text></view>
+      <text class="request-status status-{{item.statusTone}}">{{item.statusLabel}}</text>
+    </view>
+  </block>
+</view>

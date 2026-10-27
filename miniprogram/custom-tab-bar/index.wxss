@@ -1,0 +1,23 @@
+.tab-bar { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; background: #fff; border-top: 1px solid #dde3ec; padding-bottom: env(safe-area-inset-bottom); }
+.tab-item { flex: 1; min-width: 0; margin: 0; padding: 8px 0 6px; border-radius: 0; background: #fff; color: #526173; line-height: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; height: 60px; box-sizing: border-box; }
+.tab-item::after { border: 0; }
+.tab-selected { color: #005bac; font-weight: 600; }
+.tab-pressed { opacity: .7; }
+.tab-label { font-size: 13px; line-height: 1.2; }
+.tab-icon { position: relative; width: 48rpx; height: 48rpx; flex-shrink: 0; }
+.home-roof { position: absolute; top: 5rpx; left: 9rpx; width: 29rpx; height: 29rpx; border-top: 3rpx solid currentColor; border-left: 3rpx solid currentColor; transform: rotate(45deg); border-radius: 2rpx; box-sizing: border-box; }
+.home-body { position: absolute; left: 8rpx; top: 21rpx; width: 32rpx; height: 24rpx; border-left: 3rpx solid currentColor; border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; border-radius: 0 0 3rpx 3rpx; box-sizing: border-box; }
+.home-door { position: absolute; left: 19rpx; top: 29rpx; width: 10rpx; height: 16rpx; border: 3rpx solid currentColor; border-bottom: 0; background: #fff; box-sizing: border-box; }
+.workbench-icon { display: flex; flex-wrap: wrap; gap: 6rpx; padding: 5rpx; box-sizing: border-box; width: 48rpx; height: 48rpx; }
+.workbench-icon view { flex: 0 0 16rpx; width: 16rpx; height: 16rpx; border: 3rpx solid currentColor; border-radius: 2rpx; box-sizing: border-box; }
+.profile-head { position: absolute; left: 15rpx; top: 3rpx; width: 19rpx; height: 19rpx; border: 3rpx solid currentColor; border-radius: 50%; box-sizing: border-box; }
+.profile-body { position: absolute; left: 7rpx; top: 27rpx; width: 35rpx; height: 17rpx; border: 3rpx solid currentColor; border-radius: 20rpx 20rpx 4rpx 4rpx; box-sizing: border-box; }
+/* Selected states are explicit inside this isolated component. */
+.tab-label { color: #526173; }
+.tab-selected .tab-icon, .tab-selected .tab-label { color: #005bac; }
+.tab-selected .tab-label { font-weight: 600; }
+.tab-selected .home-roof { background: #005bac; border-color: #005bac; }
+.tab-selected .home-body { background: #005bac; border-color: #005bac; }
+.tab-selected .home-door { background: #ffffff; border-color: #ffffff; }
+.tab-selected .workbench-icon view { background: #005bac; border-color: #005bac; }
+.tab-selected .profile-head, .tab-selected .profile-body { background: #005bac; border-color: #005bac; }

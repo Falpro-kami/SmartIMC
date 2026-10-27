@@ -1,0 +1,9 @@
+<view class="detail-page imc-theme">
+  <view wx:if="{{loading}}" class="detail-state"><text>正在读取设备详情…</text></view>
+  <view wx:elif="{{error}}" class="detail-state"><text>{{error}}</text><button class="detail-retry" bindtap="retry">重新加载</button></view>
+  <block wx:elif="{{record}}">
+    <view class="detail-hero"><view class="detail-illustration"><image wx:if="{{record.imageUrl}}" class="detail-photo" src="{{record.imageUrl}}" mode="aspectFit" binderror="imageFailed" /><block wx:else><image src="/assets/workbench/lab-equipment.png" mode="aspectFit" /><text>-</text></block></view><view class="detail-title-row"><text class="detail-name">{{record.nameLabel}}</text><text class="detail-status status-{{record.statusClass}}">{{record.statusLabel}}</text></view><text class="detail-subtitle">设备位置：{{record.locationLabel}}</text></view>
+    <view wx:for="{{groups}}" wx:key="title" wx:for-item="group" class="detail-section"><text class="section-title">{{group.title}}</text><view wx:for="{{group.rows}}" wx:key="label" wx:for-item="row" class="detail-row"><text class="detail-label">{{row.label}}</text><view class="detail-value-area"><text class="detail-value">{{row.value}}</text><button wx:if="{{row.copy}}" class="copy-button" data-value="{{row.value}}" bindtap="copyValue">复制</button></view></view></view>
+    <view class="detail-section"><text class="section-title">情况说明</text><text class="notes-text {{record.notes ? '' : 'notes-empty'}}">{{record.notes || '-'}}</text></view>
+  </block>
+</view>

@@ -1,0 +1,16 @@
+<view class="members-page imc-theme">
+  <view class="heading"><text>IMC 成员与权限</text></view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{loading}}" class="state">正在读取成员…</view>
+  <view wx:if="{{!loading && !error && !members.length}}" class="state">暂无成员申请</view>
+  <button wx:for="{{members}}" wx:key="id" class="member-row" data-id="{{item.id}}" bindtap="openEditor"><view class="row-main"><text class="member-name">{{item.name}}</text><text class="role-text">{{item.roleText}}</text></view><text class="member-status">{{item.statusLabel}}</text><text class="arrow">›</text></button>
+  <button wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</button>
+  <view wx:if="{{editor}}" class="overlay" bindtap="closeEditor" catchtouchmove="stopTap"><view class="sheet" catchtap="stopTap">
+    <view class="sheet-heading"><text>{{editor.name}}</text><button bindtap="closeEditor" disabled="{{saving}}">×</button></view>
+    <scroll-view scroll-y class="sheet-scroll">
+      <text class="label">成员状态</text><radio-group bindchange="changeStatus"><label class="status-option"><radio value="pending" checked="{{editor.status === 'pending'}}" disabled="{{saving}}" color="#005bac" />待审核</label><label class="status-option"><radio value="active" checked="{{editor.status === 'active'}}" disabled="{{saving}}" color="#005bac" />已加入</label><label class="status-option"><radio value="disabled" checked="{{editor.status === 'disabled'}}" disabled="{{saving}}" color="#005bac" />已停用</label></radio-group>
+      <text class="label">管理角色（可多选）</text><checkbox-group bindchange="changeRoles"><label wx:for="{{editor.options}}" wx:key="value" class="role-option"><checkbox value="{{item.value}}" checked="{{item.selected}}" disabled="{{saving}}" color="#005bac" /><text>{{item.label}}</text></label></checkbox-group>
+    </scroll-view>
+    <text wx:if="{{formError}}" class="error">{{formError}}</text><button class="save" bindtap="saveMember" loading="{{saving}}" disabled="{{saving}}">保存成员与权限</button>
+  </view></view>
+</view>

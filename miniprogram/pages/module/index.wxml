@@ -1,0 +1,40 @@
+<view class="module-page imc-theme {{entries.length ? 'settings-page' : ''}}">
+  <block wx:if="{{adminMode}}">
+    <view wx:if="{{adminLoading}}" class="admin-state">正在读取…</view>
+    <view wx:elif="{{adminError}}" class="admin-error"><text>{{adminError}}</text><button bindtap="loadAdminData">重试</button></view>
+    <block wx:elif="{{billing}}">
+      <view wx:if="{{adminMode === 'expiry'}}" class="admin-card">
+        <text class="admin-title">云服务</text>
+        <view class="admin-field"><text>当前套餐</text><text>{{billing.packageName}}</text></view>
+        <view class="admin-field"><text>到期时间</text><text>{{billing.expiresAt || '-'}}</text></view>
+        <view class="admin-field"><text>到期提醒</text><text class="{{expiryWarning ? 'admin-warning' : ''}}">{{expiryLabel}}</text></view>
+        <view class="admin-field"><text>服务状态</text><text>{{billing.status === 'NORMAL' ? '正常' : '需处理'}}</text></view>
+        <view class="admin-field"><text>自动续费</text><text>{{billing.autoRenew ? '已开启' : '未开启'}}</text></view>
+      </view>
+      <block wx:if="{{adminMode === 'backup'}}">
+        <view class="admin-card">
+          <text class="admin-title">创建备份</text>
+          <text class="backup-label">备份密码</text>
+          <input class="backup-password" password maxlength="128" value="{{password}}" bindinput="onBackupPassword" placeholder="12至128个字符" disabled="{{creating}}" />
+          <text class="backup-label password-confirm-label">确认密码</text>
+          <input class="backup-password" password maxlength="128" value="{{passwordConfirm}}" bindinput="onBackupPasswordConfirm" placeholder="再次输入备份密码" disabled="{{creating}}" />
+          <button class="admin-primary" bindtap="createBackup" disabled="{{creating || downloading}}" loading="{{creating}}">{{creating ? '正在创建' : '创建加密备份'}}</button>
+        </view>
+        <view class="admin-card">
+          <text class="admin-title">备份记录</text>
+          <text wx:if="{{!backups.length}}" class="admin-empty">暂无备份</text>
+          <view wx:for="{{backups}}" wx:key="id" class="backup-record">
+            <view class="backup-record-head"><text>{{item.dateLabel}}</text><text class="backup-size">{{item.sizeLabel}}</text></view>
+            <text class="backup-count">{{item.collectionCount}} 个集合 · {{item.documentCount}} 条记录 · {{item.fileCount}} 个文件</text>
+            <button wx:if="{{exportedId === item.id}}" class="admin-secondary" data-id="{{item.id}}" bindtap="exportBackup" disabled="{{creating || downloading}}">导出备份</button>
+            <button wx:else class="admin-secondary" data-id="{{item.id}}" bindtap="downloadBackup" disabled="{{creating || downloading}}" loading="{{downloading === item.id}}">{{downloading === item.id ? '下载中 ' + progress + '%' : '下载备份'}}</button>
+          </view>
+        </view>
+      </block>
+    </block>
+  </block>
+  <view wx:elif="{{entries.length}}" class="settings-card">
+    <button wx:for="{{entries}}" wx:key="id" class="settings-row" data-id="{{item.id}}" bindtap="openEntry" hover-class="row-pressed"><text>{{item.title}}</text><text class="arrow">›</text></button>
+  </view>
+  <view wx:else class="module-card"><image wx:if="{{icon}}" src="/assets/workbench/{{icon}}.png" mode="aspectFit" /><text class="module-title">{{title}}</text><text class="module-status">功能筹备中</text></view>
+</view>

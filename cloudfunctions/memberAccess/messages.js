@@ -1,0 +1,74 @@
+const { createHash } = require('node:crypto');
+const collection = 'teamMessages';
+function key(value) { return 'msg_' + createHash('sha256').update(value).digest('hex').slice(0, 32); }
+function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
+
+module.exports = function messages(db, access) {
+  function filter(id, member, unreadOnly = false) {
+    const recipients = [id];
+    if (access.allowed(member, 'members.manage')) recipients.push('role:super_admin');
+    return { teamId: access.TEAM_ID, recipientKey: db.command.in(recipients),
+      ...(unreadOnly ? { readBy: db.command.nin([id]) } : {}) };
+  }
+  async function unread(id, member) {
+    const result = await db.collection(collection).where(filter(id, member, true)).limit(1).get();
+    return result.data.length > 0;
+  }
+  function present(message, id) {
+    return { id: message._id, title: message.title, body: message.body,
+      createdMs: message.createdMs, read: (message.readBy || []).includes(id),
+      resolved: message.state === 'resolved' };
+  }
+  async function list(id, event) {
+    const offset = event.offset === undefined ? 0 : event.offset;
+    if (!Number.isSafeInteger(offset) || offset < 0) return { ok: false, code: 'INVALID_INPUT', message: '分页参数不正确。' };
+    const member = await access.readMember(db, id);
+    const result = await db.collection(collection).where(filter(id, member))
+      .orderBy('createdMs', 'desc').orderBy('_id', 'desc').skip(offset).limit(51).get();
+    const rows = result.data.slice(0, 50);
+    return { ok: true, messages: rows.map(row => present(row, id)), nextOffset: offset + rows.length, hasMore: result.data.length > 50 };
+  }
+  async function read(id, event, markRead = true) {
+    if (typeof event.id !== 'string' || !/^msg_[a-f0-9]{32}$/.test(event.id)) return { ok: false, code: 'INVALID_INPUT', message: '消息参数不正确。' };
+    const result = await db.runTransaction(async transaction => {
+      let url = '';
+      const member = document(await transaction.collection('teamMembers').doc(id).get());
+      const reference = transaction.collection(collection).doc(event.id);
+      const message = document(await reference.get());
+      const canManage = access.allowed(member, 'members.manage');
+      if (!message || message.teamId !== access.TEAM_ID ||
+        (message.recipientKey !== id && !(message.recipientKey === 'role:super_admin' && canManage))) {
+        return { ok: false, code: 'FORBIDDEN', message: '无法访问这条消息。' };
+      }
+      if (message.kind === 'member_application' && message.state === 'open' && canManage) {
+        url = '/pages/members/index?id=' + encodeURIComponent(message.subjectId);
+      }
+      if (markRead) await reference.update({ data: { readBy: db.command.addToSet(id) } });
+      return { ok: true, url };
+    });
+    // wx-server-sdk resolves the callback value directly; accept node-sdk's result wrapper as well.
+    return result && result.result || result;
+  }
+  function applicationData(id, name, createdMs = Date.now()) {
+    return { _id: key('application:' + id), teamId: access.TEAM_ID, recipientKey: 'role:super_admin',
+      kind: 'member_application', subjectId: id, title: '成员申请', body: name + '申请加入 IMC',
+      createdMs, state: 'open', readBy: [] };
+  }
+  function changeData(auditId, id, before, after, createdMs = Date.now()) {
+    let title = '身份已更新';
+    let body = '当前身份：' + access.present({ ...after, teamId: access.TEAM_ID }).roleLabels.join('、');
+    if (before.status === 'pending' && after.status === 'active') { title = '入组申请已通过'; body = '你已加入 IMC'; }
+    else if (before.status === 'pending' && after.status === 'disabled') { title = '入组申请未通过'; body = '你的 IMC 入组申请未通过'; }
+    else if (after.status === 'disabled') { title = '账号已停用'; body = '你的 IMC 成员账号已停用'; }
+    else if (after.status === 'pending') { title = '成员状态已更新'; body = '你的 IMC 成员状态为待审核'; }
+    else if (before.status === 'disabled' && after.status === 'active') { title = '账号已恢复'; body = '你的 IMC 成员账号已恢复'; }
+    return { _id: key('change:' + auditId), teamId: access.TEAM_ID, recipientKey: id,
+      kind: 'member_change', subjectId: id, title, body, createdMs, state: 'open', readBy: [] };
+  }
+  async function put(transaction, message) {
+    const { _id, ...data } = message;
+    await transaction.collection(collection).doc(_id).set({ data });
+  }
+  return { unread, list, read, open: (id, event) => read(id, event, false), applicationData, changeData, put,
+    applicationId: id => key('application:' + id) };
+};

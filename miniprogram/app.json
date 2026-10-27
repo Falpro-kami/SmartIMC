@@ -1,0 +1,46 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/workbench/index",
+    "pages/profile/index",
+    "pages/equipment/index",
+    "pages/equipment/detail",
+    "pages/module/index",
+    "pages/members/index",
+    "pages/team-members/index",
+    "pages/profile/edit",
+    "pages/messages/index",
+    "pages/approvals/index"
+  ],
+  "lazyCodeLoading": "requiredComponents",
+  "window": {
+    "navigationStyle": "custom",
+    "navigationBarTitleText": "智慧IMC",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#ffffff"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#526173",
+    "selectedColor": "#005bac",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "position": "bottom",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/workbench/index",
+        "text": "工作台"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

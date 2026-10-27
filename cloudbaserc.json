@@ -1,0 +1,46 @@
+{
+  "envId": "well-leopon-d5glrufc6e4fd4413",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "adminData",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 512,
+      "timeout": 60,
+      "installDependency": true
+    },
+    {
+      "name": "memberAccess",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256,
+      "timeout": 10,
+      "installDependency": true
+    },
+    {
+      "name": "checkDatabase",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256,
+      "timeout": 3,
+      "installDependency": true
+    },
+    {
+      "name": "equipmentQuery",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256,
+      "timeout": 10,
+      "installDependency": true
+    },
+    {
+      "name": "userProfile",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 256,
+      "timeout": 10,
+      "installDependency": true
+    }
+  ]
+}

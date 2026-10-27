@@ -1,0 +1,40 @@
+:host { display: block; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+.user-header { padding: 24px 16px 20px; background: #fff; color: #101b2b; }
+.header-nav { display: flex; align-items: center; justify-content: center; }
+.page-title { display: block; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 28px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.header-main { display: flex; align-items: center; gap: 12px; padding-top: 8px; }
+.identity { display: inline-flex; align-items: center; flex: 1; min-width: 0; gap: 14px; padding: 0; margin: 0; background: transparent; text-align: left; line-height: 1.4; border-radius: 8px; font-family: inherit; }
+.identity::after, .drawer-close::after, .drawer-entry::after, .notification-button::after { border: 0; }
+.identity-pressed { opacity: .7; }
+.avatar { width: 64px; height: 64px; background: #f5f6f8; color: #101b2b; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; font-size: 18px; font-weight: 600; }
+.avatar image { width: 100%; height: 100%; }
+.identity-text { flex: 1; min-width: 0; }
+.user-name { display: block; font-size: 22px; font-weight: 600; color: #101b2b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-name { display: block; font-size: 14px; color: #526173; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.role-tag { display: block; flex-shrink: 0; padding: 2px 5px; border-radius: 3px; font-size: 13px; line-height: 1.4; color: #526173; background: #f0f3f5; white-space: nowrap; }
+.role-leader { color: #805e1e; background: #faf0d8; }
+.role-academic_admin { color: #31618e; background: #eaf2fb; }
+.role-five_s_admin { color: #276c60; background: #e7f4ee; }
+.role-finance_admin { color: #8a572c; background: #fbefe5; }
+.role-weekly_admin { color: #4a5f96; background: #edf0fa; }
+.role-super_admin { color: #715094; background: #f2ebf8; }
+.notification-button { flex-shrink: 0; width: 48px; height: 64px; margin: 0; padding: 6px 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 8px; color: #101b2b; font-family: inherit; line-height: 20px; }
+.notification-label { display: block; color: #526173; font-size: 14px; font-weight: 400; line-height: 20px; white-space: nowrap; }
+.bell-icon { position: relative; flex-shrink: 0; width: 22px; height: 26px; }
+.bell-body { position: absolute; left: 2px; right: 2px; top: 4px; height: 16px; border: 1.5px solid currentColor; border-bottom: 0; border-radius: 10px 10px 0 0; box-sizing: border-box; }
+.bell-body::before { content: ''; position: absolute; width: 2px; height: 3px; left: 50%; top: -5px; transform: translateX(-50%); background: currentColor; border-radius: 2px; }
+.bell-body::after { content: ''; position: absolute; height: 1.5px; bottom: -1px; left: -3px; right: -3px; background: currentColor; border-radius: 2px; }
+.bell-clapper { position: absolute; width: 5px; height: 3px; bottom: 1px; left: 9px; background: currentColor; border-radius: 0 0 3px 3px; }
+.notification-dot { position: absolute; width: 7px; height: 7px; top: 0; right: -4px; border-radius: 50%; background: #d84740; border: 2px solid white; }
+.profile-error { display: block; margin-top: 12px; color: #ad4037; font-size: 14px; line-height: 1.6; }
+.drawer-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(24,33,47,.3); }
+.team-drawer { box-sizing: border-box; width: 310px; max-width: 86vw; height: 100%; padding: 0 20px calc(20px + env(safe-area-inset-bottom)); overflow-y: auto; background: #fff; color: #101b2b; animation: drawer-enter .18s ease-out; }
+.drawer-heading { display: flex; align-items: flex-start; gap: 8px; padding-bottom: 24px; }
+.drawer-identity { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.drawer-close { flex-shrink: 0; width: 44px; height: 44px; padding: 0; margin: 0 -10px 0 0; font-size: 28px; color: #526173; background: transparent; line-height: 44px; }
+.drawer-entry { display: flex; box-sizing: border-box; width: 100%; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 16px; border: 1px solid #dde3ec; background: white; color: #101b2b; border-radius: 10px; font-size: 16px; line-height: 1.5; text-align: left; font-family: inherit; }
+.drawer-arrow { color: #637083; font-size: 24px; }
+@keyframes drawer-enter { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@media (max-width: 350px) { .user-header .avatar { width: 52px; height: 52px; } .user-header .identity { gap: 12px; } .user-header .role-tag { font-size: 12px; } }
+@media (max-width: 350px) { .user-header { padding-left: 12px; padding-right: 12px; } }

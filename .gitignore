@@ -1,0 +1,21 @@
+.local/
+node_modules/
+cloudfunctions/**/node_modules/
+cloudfunctions/**/package-lock.json
+*.log
+
+# Local configuration, credentials and private exports
+project.private.config.json
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.imcbak
+IMC-backups/
+
+# Internal design references and Office source material
+/*.docx
+~$*
+design/equipment-ui-options/
+design/approved-four-column-light-cards.png

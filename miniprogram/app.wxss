@@ -1,0 +1,13 @@
+page {
+  background: #ffffff;
+  color: #101b2b;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font-family: inherit; }
+button { box-sizing: border-box; font-weight: 400; }
+button::after { border: 0; }
+button[disabled] { opacity: .5; }
+.tab-page { min-height: 100vh; box-sizing: border-box; padding-bottom: calc(64px + env(safe-area-inset-bottom)); background: #ffffff; }

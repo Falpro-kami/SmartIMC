@@ -1,0 +1,34 @@
+.module-page { padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
+.module-card { padding: 40px 20px; border: 1px solid #dde3ec; border-radius: 10px; display: flex; flex-direction: column; align-items: center; text-align: center; background: white; }
+.module-card image { width: 48px; height: 48px; margin-bottom: 20px; }
+.module-title { color: #101b2b; font-size: 20px; font-weight: 600; }
+.module-status { color: #526173; font-size: 14px; margin-top: 12px; }
+.settings-page { padding-top: 20px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); color: #101b2b; }
+.settings-card { padding: 0 16px; border: 1px solid #dde3ec; border-radius: 9px; background: #fff; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 60px; margin: 0; padding: 16px 0; border-bottom: 1px solid #dde3ec; border-radius: 0; color: #101b2b; background: #fff; text-align: left; font-size: 16px; line-height: 26px; }
+.settings-row:last-child { border-bottom: 0; }
+.arrow { color: #101b2b; font-size: 24px; font-weight: 400; line-height: 1; }
+.row-pressed { background: #f5f6f8; }
+.admin-card { margin-bottom: 14px; padding: 18px 16px; border: 1px solid #dde3ec; border-radius: 9px; background: #fff; color: #101b2b; }
+.admin-title { display: block; margin-bottom: 16px; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 28px; }
+.admin-field { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid #dde3ec; font-size: 16px; line-height: 26px; }
+.admin-field:last-child { border-bottom: 0; padding-bottom: 0; }
+.admin-field > text:first-child { color: #526173; flex-shrink: 0; }
+.admin-field > text:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.admin-warning { color: #ad4037; }
+.backup-label { display: block; margin-bottom: 10px; color: #526173; font-size: 16px; line-height: 24px; }
+.password-confirm-label { margin-top: 16px; }
+.backup-password { box-sizing: border-box; width: 100%; height: 48px; padding: 0 12px; border: 1px solid #dde3ec; border-radius: 8px; color: #101b2b; background: #fff; font-size: 16px; }
+.admin-primary, .admin-secondary { min-height: 44px; border-radius: 8px; font-size: 16px; line-height: 26px; padding: 10px 16px; }
+.admin-primary { width: 100%; margin: 16px 0 0; color: #fff; background: #005bac; }
+.admin-secondary { margin: 12px 0 0 auto; color: #005bac; background: #edf3f8; }
+.admin-primary[disabled], .admin-secondary[disabled] { opacity: .55; }
+.backup-record { padding: 16px 0; border-bottom: 1px solid #dde3ec; }
+.backup-record:last-child { border-bottom: 0; padding-bottom: 0; }
+.backup-record-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 16px; font-weight: 500; line-height: 26px; }
+.backup-size { flex-shrink: 0; color: #637083; font-size: 14px; font-weight: 400; }
+.backup-count { display: block; margin-top: 6px; color: #526173; font-size: 14px; line-height: 24px; }
+.admin-state, .admin-empty { display: block; padding: 24px 0; color: #526173; font-size: 14px; text-align: center; line-height: 24px; }
+.admin-error { padding: 16px; border: 1px solid #ecd4d0; border-radius: 9px; color: #ad4037; font-size: 16px; line-height: 26px; background: #fffaf9; }
+.admin-error button { min-height: 44px; margin-top: 12px; color: #005bac; background: #edf3f8; border-radius: 8px; font-size: 16px; }
+@media (max-width: 350px) { .module-page { padding-left: 12px; padding-right: 12px; } }

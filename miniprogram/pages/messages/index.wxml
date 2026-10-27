@@ -1,0 +1,7 @@
+<view class="messages-page imc-theme">
+  <view wx:if="{{loading}}" class="state">正在读取消息…</view>
+  <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadMessages">重试</button></view>
+  <view wx:if="{{!loading && !error && !messages.length}}" class="state">暂无消息</view>
+  <view wx:for="{{messages}}" wx:key="id" class="message-row" data-id="{{item.id}}" bindtap="openMessage"><view class="message-heading"><text class="message-title">{{item.title}}</text><view wx:if="{{!item.read}}" class="unread-dot" /></view><text class="message-body">{{item.body}}</text><view class="message-footer"><text>{{item.timeLabel}}</text><view class="message-actions"><text wx:if="{{item.resolved}}">已处理</text><button wx:if="{{!item.read}}" class="mark-read" data-id="{{item.id}}" catchtap="markRead">标记已读</button></view></view></view>
+  <button wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</button>
+</view>

@@ -1,0 +1,9 @@
+{
+  "navigationStyle": "default",
+  "navigationBarTitleText": "实验室设备",
+  "navigationBarBackgroundColor": "#ffffff",
+  "backgroundColor": "#ffffff",
+  "backgroundTextStyle": "dark",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 160
+}

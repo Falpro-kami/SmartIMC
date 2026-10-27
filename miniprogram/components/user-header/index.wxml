@@ -1,0 +1,24 @@
+<view class="user-header imc-theme" style="padding-top: {{statusBarHeight}}px;">
+  <view class="header-nav" style="height: {{navHeight}}px;"><text wx:if="{{title}}" class="page-title" style="max-width: {{titleWidth}}px;">{{title}}</text></view>
+  <view class="header-main">
+  <button class="identity" bindtap="openDrawer" hover-class="identity-pressed" aria-label="打开团队侧边栏">
+    <view class="avatar"><image wx:if="{{avatar}}" src="{{avatar}}" mode="aspectFill" binderror="avatarFailed" /><text wx:else>{{initials}}</text></view>
+    <view class="identity-text"><text class="user-name">{{name}}</text><text class="team-name">{{teamName}}</text><view wx:if="{{roleTags.length}}" class="role-tags"><text wx:for="{{roleTags}}" wx:key="value" class="role-tag role-{{item.value}}">{{item.label}}</text></view></view>
+  </button>
+  <button class="notification-button" bindtap="openMessages" hover-class="identity-pressed" aria-label="消息通知">
+    <view class="bell-icon"><view class="bell-body" /><view class="bell-clapper" /><view wx:if="{{hasUnread}}" class="notification-dot" /></view>
+    <text class="notification-label">消息</text>
+  </button>
+  </view>
+  <text wx:if="{{error}}" class="profile-error" bindtap="retryProfile">{{error}}</text>
+</view>
+
+<view wx:if="{{drawerOpen}}" class="drawer-overlay imc-theme" bindtap="closeDrawer" catchtouchmove="stopTap">
+  <view class="team-drawer" style="padding-top: {{top}}px;" catchtap="stopTap">
+    <view class="drawer-heading">
+      <view class="drawer-identity"><view class="avatar"><image wx:if="{{avatar}}" src="{{avatar}}" mode="aspectFill" binderror="avatarFailed" /><text wx:else>{{initials}}</text></view><view class="identity-text"><text class="user-name">{{name}}</text><text class="team-name">{{teamName}}</text><view wx:if="{{roleTags.length}}" class="role-tags"><text wx:for="{{roleTags}}" wx:key="value" class="role-tag role-{{item.value}}">{{item.label}}</text></view></view></view>
+      <button class="drawer-close" bindtap="closeDrawer" aria-label="关闭侧边栏">×</button>
+    </view>
+    <button class="drawer-entry" bindtap="openTeamMembers"><text>查看团队成员</text><text class="drawer-arrow">›</text></button>
+  </view>
+</view>

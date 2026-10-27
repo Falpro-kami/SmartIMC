@@ -1,0 +1,66 @@
+<view class="equipment-page imc-theme">
+  <view class="controls">
+    <view class="search-row">
+      <view class="search-box">
+        <view class="search-icon" />
+        <input class="search-input" value="{{keyword}}" placeholder="搜索设备名称、编号" placeholder-class="search-placeholder" maxlength="80" confirm-type="search" bindinput="onSearch" />
+        <button wx:if="{{keyword}}" class="clear-search" aria-label="清空搜索" bindtap="clearSearch">×</button>
+      </view>
+      <button class="browse-button" bindtap="chooseView" aria-label="选择浏览方式"><view class="browse-icon browse-icon-{{viewMode}}"><view /><view /><view /></view><text class="browse-label">浏览方式</text></button>
+      <button class="filter-button {{filterCount ? 'filter-active' : ''}}" bindtap="openFilter">
+        <view class="filter-icon"><view /></view><text>筛选{{filterCount ? '·' + filterCount : ''}}</text>
+      </button>
+    </view>
+  </view>
+
+  <view class="active-filters" wx:if="{{status || locationLabel}}">
+    <text wx:if="{{status}}" class="active-chip">{{status}}</text>
+    <text wx:if="{{locationLabel}}" class="active-chip">设备位置 {{locationLabel}}</text>
+    <button class="reset-link" bindtap="resetFilters">清除筛选</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-panel"><view class="loading-ring" /><text class="state-title">正在读取设备清单</text></view>
+  <view wx:if="{{error}}" class="error-panel"><text>{{loaded ? '刷新失败，当前显示上次读取的数据。' : error}}</text><button bindtap="retry">重新加载</button></view>
+  <text wx:if="{{refreshing}}" class="refresh-note">正在刷新…</text>
+
+  <block wx:if="{{loaded}}">
+    <view wx:if="{{viewMode === 'card'}}" class="card-list">
+      <button wx:for="{{visibleRecords}}" wx:key="_id" class="equipment-card" data-id="{{item._id}}" bindtap="openDetail" hover-class="row-pressed">
+        <view class="card-main">
+          <view class="card-identity"><text class="device-name">{{item.nameLabel}}</text><text class="field-label number-label">设备编号</text><text class="asset-number">{{item.equipmentNumberLabel}}</text></view>
+          <view class="device-photo">
+            <image wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFit" data-id="{{item._id}}" binderror="imageFailed" />
+            <view wx:else class="photo-placeholder"><view class="photo-symbol"><view /></view><text>-</text></view>
+          </view>
+          <view class="card-status"><text class="status-tag status-{{item.statusClass}}">{{item.statusLabel}}</text><text class="chevron">›</text></view>
+        </view>
+        <view class="card-fields">
+          <view class="card-field"><text class="field-label">设备型号</text><text class="field-value">{{item.modelLabel}}</text></view>
+          <view class="card-field"><text class="field-label">设备位置</text><text class="field-value">{{item.locationLabel}}</text></view>
+          <view class="card-field"><text class="field-label">使用人</text><text class="field-value">{{item.userLabel}}</text></view>
+        </view>
+      </button>
+    </view>
+
+    <view wx:else class="equipment-table">
+      <view class="table-grid table-header"><text>设备名称</text><text>设备编号</text><text>设备位置</text><text>使用情况</text><text /></view>
+      <button wx:for="{{visibleRecords}}" wx:key="_id" class="table-grid table-row" data-id="{{item._id}}" bindtap="openDetail" hover-class="row-pressed">
+        <text class="table-name">{{item.nameLabel}}</text><text class="table-number">{{item.equipmentNumberLabel}}</text><text class="table-location">{{item.locationLabel}}</text><view class="table-status table-status-{{item.statusClass}}"><view wx:if="{{item.statusClass === 'using'}}" class="status-dot" /><text>{{item.statusLabel}}</text></view><text class="chevron">›</text>
+      </button>
+    </view>
+
+    <view wx:if="{{!visibleRecords.length}}" class="state-panel"><text class="state-title">{{total ? '没有找到符合条件的设备' : '暂无设备记录'}}</text><button wx:if="{{hasFilters}}" class="empty-reset" bindtap="resetFilters">清除筛选</button></view>
+    <button wx:if="{{hasMore}}" class="load-more" bindtap="loadMore">继续加载</button><text wx:elif="{{visibleRecords.length}}" class="list-end">已到底</text>
+  </block>
+
+  <view wx:if="{{filterOpen}}" class="filter-overlay" bindtap="closeFilter" catchtouchmove="stopTap">
+    <view class="filter-sheet" catchtap="stopTap">
+      <view class="sheet-heading"><text>筛选设备</text><button class="sheet-close" aria-label="关闭筛选" bindtap="closeFilter">×</button></view>
+      <scroll-view class="filter-scroll" scroll-y>
+        <text class="filter-label">使用情况</text><view class="filter-options"><button wx:for="{{statusOptions}}" wx:key="value" class="option {{draftStatus === item.value ? 'option-selected' : ''}}" data-value="{{item.value}}" bindtap="setDraftStatus">{{item.label}}</button></view>
+        <text class="filter-label">设备位置</text><view class="filter-options"><button wx:for="{{locationOptions}}" wx:key="value" class="option {{draftLocation === item.value ? 'option-selected' : ''}}" data-value="{{item.value}}" bindtap="setDraftLocation">{{item.label}}</button></view>
+      </scroll-view>
+      <view class="sheet-actions"><button class="reset-button" bindtap="resetDraft">重置</button><button class="apply-button" bindtap="applyFilter">确定</button></view>
+    </view>
+  </view>
+</view>

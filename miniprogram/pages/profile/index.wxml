@@ -1,0 +1,19 @@
+<view class="tab-page imc-theme"><user-header title="我的" />
+  <view class="account-panel">
+    <button class="manage-link standalone" bindtap="openProfile"><text>个人资料</text><text class="arrow">›</text></button>
+    <view class="profile-section">
+      <view class="panel-heading"><text>我的事务</text></view>
+      <button wx:for="{{personalEntries}}" wx:key="id" class="section-link" data-id="{{item.id}}" bindtap="openPersonal" hover-class="row-pressed"><text>{{item.title}}</text><text class="arrow">›</text></button>
+    </view>
+    <text wx:if="{{error}}" class="error">{{error}}</text>
+    <button wx:if="{{!loading && !error && status === 'not_joined'}}" class="primary" bindtap="applyJoin" loading="{{applying}}" disabled="{{applying}}">申请加入 IMC</button>
+    <button class="manage-link standalone" bindtap="openTeamMembers"><text>团队成员</text><text class="arrow">›</text></button>
+    <button wx:if="{{!loading && !error && canManage}}" class="manage-link standalone" bindtap="openMembers"><text>成员与权限</text><text class="arrow">›</text></button>
+    <view wx:if="{{!loading && !error && canManage}}" class="profile-section">
+      <view class="panel-heading"><text>数据与服务</text></view>
+      <button class="section-link" bindtap="openDataBackup" hover-class="row-pressed"><text>数据备份</text><text class="arrow">›</text></button>
+      <button class="section-link" bindtap="openServiceExpiry" hover-class="row-pressed"><text>到期提醒</text><view class="admin-row-end"><text class="expiry-label {{expiryWarning ? 'expiry-warning' : ''}}">{{expiryLabel}}</text><text class="arrow">›</text></view></button>
+    </view>
+    <button class="manage-link standalone" bindtap="openSettings"><text>设置与帮助</text><text class="arrow">›</text></button>
+  </view>
+</view>

@@ -1,0 +1,18 @@
+/* Design palette reference only. Runtime WXSS uses explicit values. */
+.imc-theme {
+  --imc-text: #101b2b;
+  --imc-secondary: #526173;
+  --imc-muted: #637083;
+  --imc-line: #dde3ec;
+  --imc-surface: #f5f6f8;
+  --imc-accent: #005bac;
+  --imc-accent-soft: #edf3f8;
+  --imc-success: #087f58;
+  --imc-success-soft: #eaf6f0;
+  --imc-danger: #ad4037;
+  --imc-radius: 10px;
+  --imc-gutter: 16px;
+}
+@media (max-width: 350px) {
+  .imc-theme { --imc-gutter: 12px; }
+}
