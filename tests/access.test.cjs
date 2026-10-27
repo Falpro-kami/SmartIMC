@@ -10,7 +10,7 @@ const active = roles => ({ teamId: 'IMC', status: 'active', roles, revision: 0 }
 
 function harness(options = {}) {
   let context = { APPID, OPENID: 'owner' };
-  let tables = { teamMembers: new Map(), teamSecurity: new Map(), memberAudit: new Map(), userProfiles: new Map(), equipment: new Map(), teamMessages: new Map(), workbenchUsage: new Map(), teamAnnouncements: new Map() };
+  let tables = { teamMembers: new Map(), teamSecurity: new Map(), memberAudit: new Map(), userProfiles: new Map(), equipment: new Map(), teamMessages: new Map(), workbenchUsage: new Map(), teamAnnouncements: new Map(), weeklyPeriods: new Map(), weeklyReports: new Map() };
   const makeCollection = (store, name) => {
     const table = store[name];
     let filter = {};
@@ -20,7 +20,7 @@ function harness(options = {}) {
     return {
       where(value) { filter = value; return this; }, field() { return this; }, orderBy(field, direction) { if (options.sort) order.push([field, direction]); return this; }, skip(value) { offset = value; return this; }, limit(value) { limit = value; return this; },
       async get() { if (options.onRead) options.onRead(name); return { data: [...table].map(([id, value]) => ({ ...structuredClone(value), _id: id })).filter(row => Object.entries(filter).every(([key, value]) => {
-        if (Array.isArray(value)) return value.includes(row[key]);
+        if (Array.isArray(value)) return (Array.isArray(row[key]) ? row[key] : [row[key]]).some(item => value.includes(item));
         if (value && value.$nin) return !(Array.isArray(row[key]) ? row[key] : [row[key]]).some(item => value.$nin.includes(item));
         return row[key] === value;
       })).sort((a, b) => { for (const [key, direction] of order) { if (a[key] < b[key]) return direction === 'desc' ? 1 : -1; if (a[key] > b[key]) return direction === 'desc' ? -1 : 1; } return 0; }).slice(offset, offset + limit) }; },
@@ -613,6 +613,38 @@ test('home rechecks permissions before returning sensitive pending applicants', 
   const result = await app.member({ action: 'home' });
   assert.equal(result.todos.length, 0);
   assert.equal(result.canManage, false);
+});
+
+test('weekly messages use targeted recipients, never auto-read on opening or submission, and route to the actual period', async () => {
+  const app = harness({ sort: true }), owner = userId('owner'), other = userId('other');
+  app.table('teamMembers').set(owner, active([])); app.table('teamMembers').set(other, active(['super_admin']));
+  const mid = 'msg_' + 'd'.repeat(32), periodId = 'wp_' + 'a'.repeat(32);
+  app.table('teamMessages').set(mid, { teamId: 'IMC', kind: 'weekly', recipientKey: [owner], subjectId: periodId, readBy: [], createdMs: 1 });
+  assert.equal((await app.member({ action: 'get' })).hasUnread, true);
+  assert.equal((await app.member({ action: 'messages' })).messages.length, 1);
+  assert.equal((await app.member({ action: 'openMessage', id: mid })).url, '/pages/module/index?id=weekly&period=' + periodId);
+  assert.equal((await app.member({ action: 'get' })).hasUnread, true);
+  await app.member({ action: 'readMessage', id: mid });
+  assert.equal((await app.member({ action: 'get' })).hasUnread, false);
+  app.as('other');
+  assert.equal((await app.member({ action: 'messages' })).messages.length, 0);
+  assert.equal((await app.member({ action: 'openMessage', id: mid })).code, 'FORBIDDEN');
+});
+
+test('home includes own real weekly tasks and excludes submitted, exempt, closed and unassigned work', async () => {
+  const app = harness({ sort: true }), owner = userId('owner');
+  app.table('teamMembers').set(owner, active([]));
+  const date = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  for (let n = 0; n < 7; n++) {
+    const periodId = 'wp_' + String(n).repeat(32);
+    app.table('weeklyPeriods').set(periodId, { teamId: 'IMC', title: '周报' + n, startDate: date, status: n === 4 ? 'closed' : 'open', deadlineMs: Date.now() + 86400000,
+      roster: n === 5 ? [] : [{ id: owner, exempt: n === 3 ? '免交' : '' }], allowLateSubmit: true });
+    if (n === 1 || n === 2) app.table('weeklyReports').set('wr_' + n, { teamId: 'IMC', ownerId: owner, periodId, status: n === 1 ? 'draft' : 'submitted' });
+  }
+  const result = await app.member({ action: 'home' });
+  assert.equal(result.todos.length, 3);
+  assert.deepEqual(result.todos.map(t => t.statusLabel).sort(), ['未提交', '未提交', '草稿'].sort());
+  assert.ok(result.todos.every(t => t.type === '周报提交' && t.periodId));
 });
 
 test('all business endpoints reject unjoined, pending, disabled, removed and other-team identities', async () => {

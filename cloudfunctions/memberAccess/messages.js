@@ -38,11 +38,14 @@ module.exports = function messages(db, access) {
       const message = document(await reference.get());
       const canManage = access.allowed(member, 'members.manage');
       if (!message || message.teamId !== access.TEAM_ID ||
-        (message.recipientKey !== id && !(message.recipientKey === 'role:super_admin' && canManage))) {
+        (message.recipientKey !== id && !(Array.isArray(message.recipientKey) && message.recipientKey.includes(id)) && !(message.recipientKey === 'role:super_admin' && canManage))) {
         return { ok: false, code: 'FORBIDDEN', message: '无法访问这条消息。' };
       }
       if (message.kind === 'member_application' && message.state === 'open' && canManage) {
         url = '/pages/members/index?id=' + encodeURIComponent(message.subjectId);
+      }
+      if (message.kind === 'weekly' && /^wp_[a-f0-9]{32}$/.test(message.subjectId || '')) {
+        url = '/pages/module/index?id=weekly&period=' + message.subjectId;
       }
       if (markRead) await reference.update({ data: { readBy: db.command.addToSet(id) } });
       return { ok: true, url };

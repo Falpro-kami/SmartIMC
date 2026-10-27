@@ -4,5 +4,6 @@ module.exports = {
   equipmentFunction: 'equipmentQuery',
   profileFunction: 'userProfile',
   adminDataFunction: 'adminData',
-  accessFunction: 'memberAccess'
+  accessFunction: 'memberAccess',
+  weeklyFunction: 'weeklyReport'
 };

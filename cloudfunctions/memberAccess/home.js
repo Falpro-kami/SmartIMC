@@ -1,4 +1,5 @@
 const TABLE = 'teamAnnouncements';
+const weeklyTodos = require('./weekly-home');
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
 module.exports = function home(db, access, approvals) {
@@ -24,18 +25,25 @@ module.exports = function home(db, access, approvals) {
     return { ok: true, announcements: rows.map(row => present(row)), nextOffset: offset + rows.length,
       hasMore: result.data.length > 20, canManage: access.allowed(actor, 'announcements.manage') && access.allowed(current, 'announcements.manage') };
   }
-  async function dashboard(id) {
+  async function dashboard(id, event = {}) {
     const actor = await authorize(id);
     let todos = [];
     if (access.allowed(actor, 'members.manage')) {
-      const pending = await approvals.list(id, { scope: 'pending', offset: 0 });
-      if (!pending.ok) reject(pending.code, pending.message);
-      todos = pending.requests.slice(0, 5).map(row => ({ id: row.id, memberId: row.memberId,
-        title: row.title, type: '成员入组申请', createdMs: row.createdMs }));
+      let offset = 0;
+      do {
+        const pending = await approvals.list(id, { scope: 'pending', offset });
+        if (!pending.ok) reject(pending.code, pending.message);
+        todos.push(...pending.requests.map(row => ({ id: row.id, memberId: row.memberId,
+          title: row.title, type: '成员入组申请', statusLabel: '待审批', createdMs: row.createdMs })));
+        if (!pending.hasMore) break;
+        offset = pending.nextOffset;
+      } while (true);
     }
     const result = await list(id, { offset: 0 });
     if (!access.allowed(await authorize(id), 'members.manage')) todos = [];
-    return { ok: true, todos, announcements: result.announcements.slice(0, 3), canManage: result.canManage };
+    const weekly = await weeklyTodos(db, id);
+    await authorize(id);
+    return { ok: true, todos: todos.concat(weekly), announcements: result.announcements.slice(0, 3), canManage: result.canManage };
   }
   async function get(id, event) {
     await authorize(id);

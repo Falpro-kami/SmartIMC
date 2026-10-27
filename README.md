@@ -145,7 +145,15 @@ npx.cmd --yes --package @cloudbase/cli@3.8.9 tcb fn deploy equipmentQuery -e wel
 
 导入脚本的 CLI 包装器默认使用本机 npm 缓存中的官方 CLI，也可通过 `TCB_CLI_PATH` 指定官方 `cli.js` 的完整路径。凭据由官方 CLI 管理，不保存到项目内。
 
-## 验证
+## 周报（文件提交）
+
+工作台「周报」已接入文件上传，不使用模板。普通成员查看本人周期、上传附件（自动保存草稿）、提交、预览/导出文件及查看提交版本；提交完成即为已提交，不经过审批。已提交后修改附件先保存为待重新提交内容，原提交版本继续保留。最多5个附件，单个5MiB、合计10MiB，支持 PDF、Word、Excel、PowerPoint、JPG、PNG。
+
+周报管理员/超级管理员可发布和修改周期、选择应交成员、填写免交原因、设置北京时间截止时间及逾期补交/修改规则，关闭或归档周期，查看提交统计、手动催交、导出 CSV 统计。领导可查看团队已提交周报；其他业务管理员不因此获得周报管理权。新加入成员由管理员加入指定周期的应交名单，历史名单不会随当前成员变化自动改写。催交通知每日幂等，处理业务不清除未读，仍需手动标记已读。首页显示本人应交且未提交的周报。
+
+部署前执行 `node scripts/sync-access.cjs`、`node scripts/setup-weekly.cjs`（仅创建缺失私有集合和索引，不生成业务数据），然后部署 `weeklyReport` 与更新后的 `memberAccess` 云函数。前端复用 `pages/module/index?id=weekly`。附件由服务端验证后另存为私有原件，读取通过已授权的记录换取临时链接；微信下载域名未配置时，自动使用逐块校验权限的云函数传输，数据库和存储规则不放宽。详见 `design/data-protection.md` 的备份容量限制。
+
+## 自动验证
 
 ```powershell
 node --test tests/*.test.cjs
