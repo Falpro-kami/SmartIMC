@@ -1,4 +1,5 @@
 const config = require('../config/cloud');
+const cache = require('./session-cache');
 async function call(data) {
   if (!getApp().globalData.cloudReady) throw new Error('云开发尚未准备好，请重新打开小程序。');
   const response = await wx.cloud.callFunction({ name: config.adminDataFunction, data, config: { timeout: 60000 } });
@@ -43,5 +44,6 @@ async function download(record, onProgress = () => {}) {
     throw error;
   }
 }
-module.exports = { status: () => call({ action: 'status' }), create: password => call({ action: 'create', password }), download,
+async function create(password) { const result = await call({ action: 'create', password }); cache.invalidate('admin:'); return result; }
+module.exports = { peek: () => cache.peek('admin:status'), status: (force = false) => cache.load('admin:status', () => call({ action: 'status' }), 60000, force), create, download,
   expiryLabel, present, dateLabel };

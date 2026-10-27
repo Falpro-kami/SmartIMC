@@ -57,4 +57,4 @@ async function getDetail(id) {
   return result.record;
 }
 
-module.exports = { loadAll, getDetail };
+module.exports = { loadAll, getDetail, peek: () => cache };

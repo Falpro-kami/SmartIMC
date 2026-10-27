@@ -27,16 +27,21 @@ Component({
         identityWidth: Math.max(160, capsuleLeft - 32)
       });
       this._unsubscribe = profiles.subscribe(result => this.renderProfile(result));
+      if (access.subscribeUnread) this._unsubscribeUnread = access.subscribeUnread(value => { if (!this._detached) this.setData({ hasUnread: value }); });
       this.loadProfile();
       this.startNotifications();
     },
-    detached() { this._detached = true; this.stopNotifications(); if (this._unsubscribe) this._unsubscribe(); }
+    detached() { this._detached = true; this.stopNotifications(); if (this._unsubscribe) this._unsubscribe(); if (this._unsubscribeUnread) this._unsubscribeUnread(); }
   },
   pageLifetimes: { show() { this.loadProfile(); this.startNotifications(); }, hide() { this.closeDrawer(); this.stopNotifications(); } },
   methods: {
     startNotifications() {
       const loading = this.loadIdentity();
-      if (!this._notificationTimer) this._notificationTimer = setInterval(() => this.loadIdentity(true), 30000);
+      if (access.notifications) access.notifications().then(value => { if (!this._detached && typeof value === 'boolean') this.setData({ hasUnread: value }); }).catch(() => {});
+      if (!this._notificationTimer) this._notificationTimer = setInterval(() => {
+        if (access.notifications) access.notifications(true).catch(() => {});
+        if (!this._lastIdentityCheck || Date.now() - this._lastIdentityCheck >= 30000) this.loadIdentity(true);
+      }, 10000);
       return loading;
     },
     stopNotifications() { clearInterval(this._notificationTimer); this._notificationTimer = null; },
@@ -45,6 +50,7 @@ Component({
       this._identityLoading = true;
       try {
         const result = await access.get(force);
+        if (force) this._lastIdentityCheck = Date.now();
         if (this._detached) return;
         membership.accept(result);
         const member = result.member;
@@ -53,7 +59,8 @@ Component({
           roleTags = (result.roleOptions || []).filter(role => member.roles.includes(role.value));
           if (!roleTags.length) roleTags = [{ value: 'member', label: '普通成员' }];
         } else if (member) roleTags = [{ value: 'inactive', label: { pending: '待审核', disabled: '已停用', removed: '已移出' }[member.status] || '-' }];
-        this.setData({ roleTags, hasUnread: result.hasUnread === true });
+        const currentUnread = access.notificationCurrent ? access.notificationCurrent() : result.hasUnread;
+        this.setData({ roleTags, hasUnread: currentUnread === true });
       } catch (_) { /* Keep the last server-confirmed identity; avoid extra header explanatory text. */ }
       finally { this._identityLoading = false; }
     },

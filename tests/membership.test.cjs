@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 function moduleAt(file, dependencies, globals = {}) {
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => dependencies[name], ...globals });
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => name === './session-cache' ? require('../miniprogram/services/session-cache') : dependencies[name], ...globals });
   return module.exports;
 }
 const active = { teamId: 'IMC', status: 'active', permissions: ['equipment.read'] };

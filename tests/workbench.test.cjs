@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { rankTools } = require('../miniprogram/utils/workbench');
 function load(file, dependencies, globals) {
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => name === '../../utils/member-page' ? value => value : dependencies[name], ...globals });
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => name === '../../utils/member-page' ? value => value : (name === './session-cache' ? require('../miniprogram/services/session-cache') : dependencies[name]), ...globals });
   return module.exports;
 }
 test('common apps rank by frequency, recent use and default order, ignoring invalid stats and unknown apps', () => {
@@ -60,7 +60,7 @@ test('usage reads wait for pending writes and a failed write does not block subs
   release();
   await write;
   await read;
-  assert.deepEqual(calls, ['recordToolOpen:finance', 'workbenchUsage:']);
+  assert.deepEqual(calls, ['recordToolOpen:finance']);
   await assert.rejects(service.record('weekly'), /offline/);
   await service.record('approvals');
   assert.equal(calls.at(-1), 'recordToolOpen:approvals');

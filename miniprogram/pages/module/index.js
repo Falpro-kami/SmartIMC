@@ -41,22 +41,29 @@ Page(require('../../utils/member-page')({
   },
   onUnload() { this._unloaded = true; this._downloads = {}; },
   onShow() { if (this.data.adminMode && !this.data.creating && !this.data.downloading) return this.loadAdminData(); },
+  async onPullDownRefresh() { try {
+    const weekly = this.data.weeklyMode && this.selectComponent('#weekly-panel');
+    if (weekly) await weekly.refresh(true);
+    else if (this.data.adminMode) await this.loadAdminData(true);
+  } finally { wx.stopPullDownRefresh(); } },
   openEntry(event) {
     const entry = this.data.entries.find(item => item.id === event.currentTarget.dataset.id);
     if (entry) wx.navigateTo({ url: '/pages/module/index?id=' + entry.id });
   },
-  async loadAdminData() {
+  async loadAdminData(force = false) {
     if (!this.data.adminMode || this.data.adminLoading) return;
-    this.setData({ adminLoading: true, adminError: '', billing: null, backups: [] });
+    const cached = adminData.peek && adminData.peek();
+    if (cached) this.renderAdmin(cached);
+    this.setData({ adminLoading: !cached && !this.data.billing, adminError: '' });
     try {
-      const result = await adminData.status();
+      const result = await adminData.status(force === true);
       if (this._unloaded) return;
-      this.setData({ billing: result.billing, expiryLabel: adminData.expiryLabel(result.billing),
-        expiryWarning: result.billing.daysRemaining !== null && result.billing.daysRemaining <= 14,
-        backups: result.backups.map(adminData.present) });
+      this.renderAdmin(result);
     } catch (error) { if (!this._unloaded) this.setData({ adminError: error.message }); }
     finally { if (!this._unloaded) this.setData({ adminLoading: false }); }
   },
+  renderAdmin(result) { this.setData({ billing: result.billing, expiryLabel: adminData.expiryLabel(result.billing),
+    expiryWarning: result.billing.daysRemaining !== null && result.billing.daysRemaining <= 14, backups: result.backups.map(adminData.present) }); },
   onBackupPassword(event) { this.setData({ password: event.detail.value }); },
   onBackupPasswordConfirm(event) { this.setData({ passwordConfirm: event.detail.value }); },
   async createBackup() {

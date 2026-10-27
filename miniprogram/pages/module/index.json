@@ -3,5 +3,6 @@
   "navigationBarTitleText": "工作台",
   "navigationBarBackgroundColor": "#ffffff",
   "backgroundColor": "#ffffff",
+  "enablePullDownRefresh": true,
   "usingComponents": { "team-announcements": "/components/team-announcements/index", "weekly-reports": "/components/weekly-reports/index" }
 }

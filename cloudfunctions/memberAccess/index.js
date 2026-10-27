@@ -26,6 +26,7 @@ exports.main = async (event = {}) => {
       if (!access.allowed(viewer, 'equipment.read')) reject('MEMBERSHIP_REQUIRED', '通过 IMC 成员审核后才能访问。');
     }
     if (event.action === 'home') return await home.dashboard(id);
+    if (event.action === 'notificationState') return { ok: true, hasUnread: await messages.unread(id, await access.readMember(db, id)) };
     if (event.action === 'announcements') return await home.list(id, event);
     if (event.action === 'announcement') return await home.get(id, event);
     if (event.action === 'saveAnnouncement') return await home.save(id, event);

@@ -3,6 +3,10 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
+      "name": "weeklyPublish", "runtime": "Nodejs20.19", "handler": "index.main", "memorySize": 256, "timeout": 60, "installDependency": true,
+      "triggers": [{ "name": "weekly-publish-minute", "type": "timer", "config": "0 * * * * * *" }]
+    },
+    {
       "name": "weeklyReport",
       "runtime": "Nodejs20.19",
       "handler": "index.main",

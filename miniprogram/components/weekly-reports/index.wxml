@@ -21,6 +21,8 @@
       <text class="meta">{{selected.startDate}} 至 {{selected.endDate}}</text>
       <view class="field"><text>截止时间</text><text>{{selected.deadlineLabel}}</text></view>
       <view class="field"><text>周期状态</text><text>{{selected.periodLabel}}</text></view>
+      <view wx:if="{{selected.status === 'scheduled'}}" class="field"><text>发布时间</text><text>{{selected.publishLabel}}</text></view>
+      <view wx:if="{{selected.publishError}}" class="error">{{selected.publishError}}</view>
       <view wx:if="{{!own}}" class="field"><text>提交人</text><text>{{ownerName}}</text></view>
       <view wx:if="{{own && selected.exemption}}" class="field"><text>免交原因</text><text>{{selected.exemption}}</text></view>
       <view wx:if="{{report && report.submittedMs}}" class="field"><text>最后提交</text><text>{{submittedLabel}}</text></view>
@@ -63,17 +65,20 @@
     <view class="card">
       <text class="section-title">周期设置</text>
       <text class="label">周报名称</text><input class="input" value="{{form.title}}" data-field="title" bindinput="formInput" maxlength="60" disabled="{{busy}}" />
+      <view wx:if="{{form.canSchedule}}" class="field"><text>定时发布</text><switch checked="{{form.scheduled}}" bindchange="scheduleInput" color="#005bac" disabled="{{busy}}" /></view>
+      <block wx:if="{{form.scheduled}}"><text class="label">发布时间（北京时间）</text><view class="date-time"><picker mode="date" value="{{form.publishDate}}" data-field="publishDate" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.publishDate}} ›</view></picker><picker mode="time" value="{{form.publishTime}}" data-field="publishTime" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.publishTime}} ›</view></picker></view></block>
       <view class="field"><text>开始日期</text><picker mode="date" value="{{form.startDate}}" data-field="startDate" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.startDate}} ›</view></picker></view>
       <view class="field"><text>结束日期</text><picker mode="date" value="{{form.endDate}}" data-field="endDate" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.endDate}} ›</view></picker></view>
       <text class="label">提交截止时间</text><view class="date-time"><picker mode="date" value="{{form.deadlineDate}}" data-field="deadlineDate" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.deadlineDate}} ›</view></picker><picker mode="time" value="{{form.deadlineTime}}" data-field="deadlineTime" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.deadlineTime}} ›</view></picker></view>
       <view class="field"><text>允许逾期补交</text><switch checked="{{form.allowLateSubmit}}" data-field="allowLateSubmit" bindchange="formInput" color="#005bac" disabled="{{busy}}" /></view>
       <view class="field"><text>允许逾期修改</text><switch checked="{{form.allowLateEdit}}" data-field="allowLateEdit" bindchange="formInput" color="#005bac" disabled="{{busy}}" /></view>
-      <view wx:if="{{form.revision}}" class="field"><text>周期状态</text><picker range="{{['开放中', '已关闭', '已归档']}}" value="{{form.statusIndex}}" bindchange="statusInput" disabled="{{busy}}"><view class="picker-value">{{form.statusIndex === 0 ? '开放中' : form.statusIndex === 1 ? '已关闭' : '已归档'}} ›</view></picker></view>
+      <view wx:if="{{form.revision && !form.canSchedule}}" class="field"><text>周期状态</text><picker range="{{['开放中', '已关闭', '已归档']}}" value="{{form.statusIndex}}" bindchange="statusInput" disabled="{{busy}}"><view class="picker-value">{{form.statusIndex === 0 ? '开放中' : form.statusIndex === 1 ? '已关闭' : '已归档'}} ›</view></picker></view>
     </view>
     <view class="card"><text class="section-title">应交成员</text><input class="input member-search" value="{{memberQuery}}" bindinput="searchMembers" placeholder="搜索成员" />
       <view wx:for="{{shownMembers}}" wx:key="id" class="member-item"><button class="member-select" data-id="{{item.id}}" bindtap="toggleMember" disabled="{{busy}}"><text class="check {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</text><text>{{item.name}}</text></button><input wx:if="{{item.selected}}" class="input exemption" value="{{item.exempt}}" data-id="{{item.id}}" bindinput="exemptionInput" maxlength="80" placeholder="免交原因（选填）" disabled="{{busy}}" /></view>
     </view>
-    <button class="primary wide" bindtap="savePeriod" disabled="{{busy}}" loading="{{busy}}">{{form.revision ? '更新周期' : '发布周报'}}</button>
+    <button class="primary wide" bindtap="savePeriod" disabled="{{busy}}" loading="{{busy}}">{{form.scheduled ? '保存定时发布' : form.revision ? '更新周期' : '发布周报'}}</button>
+    <button wx:if="{{form.revision && form.status === 'scheduled'}}" class="secondary wide danger" bindtap="cancelScheduled" disabled="{{busy}}">取消定时发布</button>
   </block>
   <view wx:if="{{actionError}}" class="error action-error">{{actionError}}</view>
 </view>

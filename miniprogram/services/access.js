@@ -1,4 +1,8 @@
 const config = require('../config/cloud');
+const cache = require('./session-cache');
+const unreadListeners = new Set();
+let unread = null, unreadAt = 0, unreadRequest = null, unreadVersion = 0;
+let scope = '';
 let identity = null;
 let identityRequest = null;
 let identityEpoch = 0;
@@ -21,22 +25,59 @@ function get(force = false) {
   if (!force && identity) return Promise.resolve(identity);
   if (identityRequest) return identityRequest;
   const epoch = identityEpoch;
-  identityRequest = call({ action: 'get' }).then(result => { if (epoch === identityEpoch) identity = result; return result; })
+  const version = ++unreadVersion;
+  identityRequest = call({ action: 'get' }).then(result => {
+    if (epoch === identityEpoch) {
+      const nextScope = JSON.stringify([result.accountCode, result.member && result.member.status, result.member && result.member.revision, result.member && result.member.roles]);
+      if (scope && scope !== nextScope) cache.clear();
+      scope = nextScope; identity = { ...result, hasUnread: version !== unreadVersion && unread !== null ? unread : result.hasUnread };
+      if (version === unreadVersion) publishUnread(result.hasUnread === true);
+    }
+    return result;
+  })
     .finally(() => { identityRequest = null; });
   return identityRequest;
 }
 async function mutate(data) {
   const result = await call(data);
   identityEpoch++;
+  unreadVersion++;
   identity = data.action === 'apply' ? result : null;
+  if (data.action === 'readMessage') cache.invalidate('access:messages'); else cache.clear();
+  if (typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread);
+  else unreadAt = 0;
   return result;
 }
+function publishUnread(value) {
+  unread = value; unreadAt = Date.now();
+  if (identity) identity = { ...identity, hasUnread: value };
+  unreadListeners.forEach(listener => listener(value));
+  return value;
+}
+function notifications(force = false) {
+  if (!force && unread !== null && Date.now() - unreadAt < 5000) return Promise.resolve(unread);
+  if (unreadRequest) return unreadRequest;
+  const epoch = identityEpoch;
+  const version = ++unreadVersion;
+  unreadRequest = call({ action: 'notificationState' }).then(result => {
+    if (epoch === identityEpoch && version === unreadVersion) return publishUnread(result.hasUnread === true);
+    return unread;
+  }).finally(() => { unreadRequest = null; });
+  return unreadRequest;
+}
+function subscribeUnread(listener) { unreadListeners.add(listener); if (unread !== null) listener(unread); return () => unreadListeners.delete(listener); }
+function read(action, data, force = false) { return cache.load('access:' + action + ':' + JSON.stringify(data), () => call({ ...data, action }), 30000, force); }
 module.exports = { get, apply: () => mutate({ action: 'apply' }),
-  approvals: (scope, offset) => call({ action: 'approvals', scope, offset }),
-  directory: offset => call({ action: 'directory', offset }),
-  messages: offset => call({ action: 'messages', offset }),
+  notifications, subscribeUnread, notificationCurrent: () => unread,
+  peek: (action, data) => cache.peek('access:' + action + ':' + JSON.stringify(data)),
+  approvals: (scope, offset, force) => read('approvals', { scope, offset }, force),
+  directory: (offset, force) => read('directory', { offset }, force),
+  messages: async offset => { const epoch = identityEpoch, version = ++unreadVersion;
+    const result = await call({ action: 'messages', offset });
+    if (epoch === identityEpoch && version === unreadVersion && typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread);
+    return result; },
   readMessage: id => mutate({ action: 'readMessage', id }),
   openMessage: id => call({ action: 'openMessage', id }),
-  list: offset => call({ action: 'list', offset }),
+  list: (offset, force) => read('list', { offset }, force),
   member: id => call({ action: 'member', id }),
   set: member => mutate({ action: 'set', id: member.id, status: member.status, roles: member.roles, revision: member.revision }), can };

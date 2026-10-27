@@ -26,7 +26,8 @@ module.exports = function messages(db, access) {
     const result = await db.collection(collection).where(filter(id, member))
       .orderBy('createdMs', 'desc').orderBy('_id', 'desc').skip(offset).limit(51).get();
     const rows = result.data.slice(0, 50);
-    return { ok: true, messages: rows.map(row => present(row, id)), nextOffset: offset + rows.length, hasMore: result.data.length > 50 };
+    return { ok: true, messages: rows.map(row => present(row, id)), nextOffset: offset + rows.length, hasMore: result.data.length > 50,
+      hasUnread: rows.some(row => !(row.readBy || []).includes(id)) || await unread(id, member) };
   }
   async function read(id, event, markRead = true) {
     if (typeof event.id !== 'string' || !/^msg_[a-f0-9]{32}$/.test(event.id)) return { ok: false, code: 'INVALID_INPUT', message: '消息参数不正确。' };
@@ -51,7 +52,12 @@ module.exports = function messages(db, access) {
       return { ok: true, url };
     });
     // wx-server-sdk resolves the callback value directly; accept node-sdk's result wrapper as well.
-    return result && result.result || result;
+    const response = result && result.result || result;
+    if (response.ok && markRead) {
+      const member = await access.readMember(db, id);
+      response.hasUnread = access.allowed(member, 'equipment.read') ? await unread(id, member) : false;
+    }
+    return response;
   }
   function applicationData(id, name, createdMs = Date.now()) {
     return { _id: key('application:' + id), teamId: access.TEAM_ID, recipientKey: 'role:super_admin',

@@ -2,7 +2,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const TEAM = 'IMC';
 const PREFIX = 'cloud://well-leopon-d5glrufc6e4fd4413.7765-well-leopon-d5glrufc6e4fd4413-1516940081/';
 const FILE_LIMIT = 5 * 1024 * 1024, TOTAL_LIMIT = 10 * 1024 * 1024, COUNT_LIMIT = 5;
-const EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
+const EXTENSIONS = ['pdf', 'doc', 'docx'];
 const hash = (prefix, value) => prefix + createHash('sha256').update(value).digest('hex').slice(0, 32);
 const reportId = (period, owner) => hash('wr_', period + ':' + owner);
 const document = result => Array.isArray(result.data) ? result.data[0] : result.data;
@@ -66,16 +66,17 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     try { editable(p, id, report); } catch (_) { canEdit = false; }
     return { id: p._id, title: p.title, startDate: p.startDate, endDate: p.endDate, deadlineMs: p.deadlineMs,
       status: p.status, revision: p.revision, allowLateSubmit: p.allowLateSubmit, allowLateEdit: p.allowLateEdit,
+      publishAtMs: p.publishAtMs || 0, publishError: p.publishError || '',
       required: !!person && !person.exempt, exemption: person && person.exempt || '', canEdit,
       ownStatus: person && person.exempt ? 'exempt' : !person ? 'outside' : report ? report.status : 'unsubmitted' };
   }
   function rights(member) { return { canManage: access.allowed(member, 'weekly.manage'), canReadTeam: access.allowed(member, 'weekly.read.team'),
     canRemind: access.allowed(member, 'weekly.remind'), canExport: access.allowed(member, 'weekly.export') }; }
   async function list(id, event) {
-    await authorize(id);
+    const actor = await authorize(id);
     const offset = event.offset === undefined ? 0 : event.offset;
     if (!Number.isSafeInteger(offset) || offset < 0) reject('INVALID_INPUT', '分页参数不正确。');
-    const periods = (await db.collection('weeklyPeriods').where({ teamId: TEAM }).orderBy('startDate', 'desc').orderBy('_id', 'desc').skip(offset).limit(21).get()).data;
+    const periods = (await db.collection('weeklyPeriods').where({ teamId: TEAM, ...(access.allowed(actor, 'weekly.manage') ? {} : { status: db.command.in(['open', 'closed', 'archived']) }) }).orderBy('startDate', 'desc').orderBy('_id', 'desc').skip(offset).limit(21).get()).data;
     const rows = periods.slice(0, 20);
     const own = rows.length ? (await db.collection('weeklyReports').where({ teamId: TEAM, ownerId: id, periodId: db.command.in(rows.map(p => p._id)) }).limit(20).get()).data : [];
     const reports = new Map(own.map(r => [r.periodId, r]));
@@ -86,7 +87,8 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   async function get(id, event) {
     const p = await period(db, event.periodId);
     const ownerId = event.ownerId || id;
-    await authorize(id, ownerId === id ? 'weekly.read.own' : 'weekly.read.team');
+    const viewer = await authorize(id, ownerId === id ? 'weekly.read.own' : 'weekly.read.team');
+    if (['scheduled', 'cancelled'].includes(p.status) && !access.allowed(viewer, 'weekly.manage')) reject('NOT_FOUND', '周报周期尚未发布。');
     const r = await read(db, 'weeklyReports', reportId(p._id, ownerId));
     if (ownerId !== id && (!r || r.status !== 'submitted')) reject('NOT_FOUND', '该成员尚未提交周报。');
     const versions = (await db.collection('weeklyVersions').where({ teamId: TEAM, reportId: reportId(p._id, ownerId) }).orderBy('version', 'desc').limit(100).get()).data;
@@ -127,9 +129,10 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     await authorize(id, 'weekly.manage');
     const title = typeof e.title === 'string' ? e.title.trim() : '';
     const deadlineMs = typeof e.deadline === 'string' && /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(e.deadline) ? Date.parse(e.deadline + ':00+08:00') : NaN;
+    const publishAtMs = e.status === 'scheduled' && typeof e.publishAt === 'string' && /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(e.publishAt) ? Date.parse(e.publishAt + ':00+08:00') : 0;
     if (!validId(e.id, 'wp') || !Number.isSafeInteger(e.revision) || e.revision < 0 || !title || title.length > 60 || /[\r\n\u0000-\u001f]/.test(title) ||
       !Number.isFinite(dateMs(e.startDate)) || !Number.isFinite(dateMs(e.endDate)) || e.endDate < e.startDate || !Number.isFinite(deadlineMs) || !Number.isFinite(dateMs((e.deadline || '').slice(0, 10))) || deadlineMs < dateMs(e.startDate) ||
-      !['open', 'closed', 'archived'].includes(e.status) || typeof e.allowLateSubmit !== 'boolean' || typeof e.allowLateEdit !== 'boolean' ||
+      !['scheduled', 'cancelled', 'open', 'closed', 'archived'].includes(e.status) || (e.status === 'scheduled' && (!publishAtMs || !Number.isFinite(dateMs(e.publishAt.slice(0, 10))) || publishAtMs <= clock() || publishAtMs >= deadlineMs)) || typeof e.allowLateSubmit !== 'boolean' || typeof e.allowLateEdit !== 'boolean' ||
       !Array.isArray(e.roster) || !e.roster.length || e.roster.length > 300 || new Set(e.roster.map(r => r.id)).size !== e.roster.length ||
       e.roster.some(r => !validId(r.id, 'user') || typeof r.exempt !== 'string' || r.exempt.length > 80)) reject('INVALID_INPUT', '请检查周期名称、日期、截止时间和应交成员。');
     const active = await roster(id), names = new Map(active.members.map(m => [m.id, m.name]));
@@ -138,7 +141,8 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       const previous = await read(tx, 'weeklyPeriods', e.id);
       if (previous && previous.teamId !== TEAM) reject('NOT_FOUND', '周报周期不存在。');
       if ((previous ? previous.revision : 0) !== e.revision) reject('CONFLICT', '周期已更新，请重新打开后编辑。');
-      if (!previous && e.status !== 'open') reject('INVALID_INPUT', '新周期应为开放状态。');
+      if (!previous && !['open', 'scheduled'].includes(e.status)) reject('INVALID_INPUT', '请选择立即发布或定时发布。');
+      if (previous && !['scheduled', 'cancelled'].includes(previous.status) && ['scheduled', 'cancelled'].includes(e.status)) reject('INVALID_INPUT', '已发布的周期不能改回定时发布。');
       const oldNames = new Map((previous ? previous.roster : []).map(r => [r.id, r.name]));
       const selected = e.roster.map(r => {
         if (!names.has(r.id) && !oldNames.has(r.id)) reject('INVALID_INPUT', '应交成员已变更，请重新选择。');
@@ -146,12 +150,13 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       });
       const p = { _id: e.id, teamId: TEAM, title, startDate: e.startDate, endDate: e.endDate, deadlineMs, status: e.status,
         allowLateSubmit: e.allowLateSubmit, allowLateEdit: e.allowLateEdit, roster: selected,
+        publishAtMs, publishError: '', publishedMs: ['scheduled', 'cancelled'].includes(e.status) ? 0 : previous && previous.publishedMs || clock(),
         revision: e.revision + 1, createdMs: previous ? previous.createdMs : clock(), updatedMs: clock(), updatedBy: id };
-      const newRecipients = selected.filter(r => !r.exempt && !(previous && previous.roster.some(old => old.id === r.id && !old.exempt))).map(r => r.id);
+      const newRecipients = selected.filter(r => !r.exempt && !(previous && !['scheduled', 'cancelled'].includes(previous.status) && previous.roster.some(old => old.id === r.id && !old.exempt))).map(r => r.id);
       if (e.status === 'open') await notice(tx, p, newRecipients, 'publish:' + p.revision, '周报待提交');
       const { _id, ...data } = p;
       await tx.collection('weeklyPeriods').doc(e.id).set({ data });
-      await audit(tx, id, previous ? 'period.update' : 'period.publish', e.id, { before: previous || null, after: p });
+      await audit(tx, id, previous ? 'period.update' : e.status === 'scheduled' ? 'period.schedule' : 'period.publish', e.id, { before: previous || null, after: p });
     });
     return { ok: true, id: e.id };
   }
@@ -159,7 +164,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     await authorize(id, 'weekly.submit.own');
     const ext = typeof e.name === 'string' ? e.name.split('.').pop().toLowerCase() : '';
     if (typeof e.name !== 'string' || !e.name.trim() || e.name.length > 160 || /[\\/\u0000-\u001f]/.test(e.name) || !EXTENSIONS.includes(ext) ||
-      !Number.isSafeInteger(e.size) || e.size < 1 || e.size > FILE_LIMIT) reject('INVALID_FILE', '支持 PDF、Office 文档和图片，单个文件不超过5MB。');
+      !Number.isSafeInteger(e.size) || e.size < 1 || e.size > FILE_LIMIT) reject('INVALID_FILE', '支持 Word、PDF 文档，单个文件不超过5MB。');
     const fid = hash('wf_', randomUUID()), path = 'weekly/' + id + '/' + e.periodId + '/' + fid + '.' + ext;
     await db.runTransaction(async tx => {
       await authorize(id, 'weekly.submit.own', tx);
@@ -237,8 +242,9 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     return get(id, { periodId: e.periodId });
   }
   async function team(id, e, permission = 'weekly.read.team') {
-    await authorize(id, permission);
+    const actor = await authorize(id, permission);
     const p = await period(db, e.periodId), reports = await all('weeklyReports', { teamId: TEAM, periodId: p._id });
+    if (['scheduled', 'cancelled'].includes(p.status) && !access.allowed(actor, 'weekly.manage')) reject('NOT_FOUND', '周报周期尚未发布。');
     const map = new Map(reports.map(r => [r.ownerId, r]));
     const rows = p.roster.map(person => {
       const r = map.get(person.id);

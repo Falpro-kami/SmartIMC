@@ -18,13 +18,13 @@ function fixture() {
     const table = store[name], order = []; let query = {}, skip = 0, limit = 100;
     return { where(q) { query = q; return this; }, orderBy(k, d) { order.push([k, d]); return this; }, skip(n) { skip = n; return this; }, limit(n) { limit = n; return this; },
       async get() { return { data: [...table].map(([key, row]) => ({ ...structuredClone(row), _id: key })).filter(row => Object.entries(query).every(([key, val]) =>
-        Array.isArray(val) ? (Array.isArray(row[key]) ? row[key] : [row[key]]).some(v => val.includes(v)) : row[key] === val))
+        Array.isArray(val) ? (Array.isArray(row[key]) ? row[key] : [row[key]]).some(v => val.includes(v)) : val && typeof val === 'object' && '$lte' in val ? row[key] <= val.$lte : row[key] === val))
         .sort((a, b) => { for (const [key, direction] of order) { if (a[key] < b[key]) return direction === 'desc' ? 1 : -1; if (a[key] > b[key]) return direction === 'desc' ? -1 : 1; } return 0; }).slice(skip, skip + limit) }; },
       doc(key) { return { get: async () => ({ data: table.has(key) ? { ...structuredClone(table.get(key)), _id: key } : null }),
         set: async ({ data }) => table.set(key, structuredClone(data)), update: async ({ data }) => { assert.ok(table.has(key)); table.set(key, { ...table.get(key), ...structuredClone(data) }); } }; }
     };
   }
-  const db = { collection: name => collection(tables, name), command: { in: values => values },
+  const db = { collection: name => collection(tables, name), command: { in: values => values, lte: value => ({ $lte: value }) },
     async runTransaction(cb) { const next = structuredClone(tables); const result = await cb({ collection: name => collection(next, name) }); tables = next; return result; } };
   const cloud = { async getTempFileURL({ fileList }) { return { fileList: fileList.map(fileID => ({ fileID, tempFileURL: 'https://private.example/signed', status: 0 })) }; },
     async deleteFile({ fileList }) { fileList.forEach(f => objects.delete(f)); } };
@@ -43,7 +43,7 @@ function fixture() {
     const result = await send(owner, 'finishUpload', { fileId: p.id, fileID: sourceId(file) });
     return result.file;
   }
-  return { send, period, upload, db, cloud, objects, table: name => tables[name], time: value => { now = value; },
+  return { send, period, upload, db, cloud, objects, table: name => tables[name], time: value => { now = value; }, clock: () => now,
     get reads() { return reads; }, get copies() { return copies; } };
 }
 const denied = (promise, code) => assert.rejects(promise, error => error.businessCode === code);
@@ -78,6 +78,75 @@ test('periods validate dates and revisions, snapshot names, preserve exemptions 
   assert.equal(a.table('weeklyAudit').size, 1);
   await denied(a.upload(id(3)), 'NOT_REQUIRED');
   await denied(a.upload(id(1)), 'NOT_REQUIRED');
+});
+
+test('scheduled periods stay private until the cloud timer publishes them once, with an audited notification', async () => {
+  const a = fixture();
+  const publishAt = '2026-10-27T10:02';
+  await denied(a.period({ status: 'scheduled', publishAt: '2026-10-27T09:59' }), 'INVALID_INPUT');
+  await a.period({ status: 'scheduled', publishAt });
+  assert.equal(a.table('teamMessages').size, 0);
+  assert.equal((await a.send(id(2), 'list')).periods.length, 0);
+  assert.equal((await a.send(id(1), 'list')).periods[0].status, 'scheduled');
+  await denied(a.send(id(2), 'get', { periodId: pid(1) }), 'NOT_FOUND');
+  await denied(a.send(id(4), 'team', { periodId: pid(1) }), 'NOT_FOUND');
+  const publish = require('../cloudfunctions/weeklyReport/publisher')(a.db, access, a.clock);
+  assert.equal((await publish()).published, 0);
+  a.time(Date.parse(publishAt + ':00+08:00'));
+  assert.equal((await publish()).published, 1);
+  assert.equal((await publish()).published, 0);
+  assert.equal(a.table('teamMessages').size, 1);
+  assert.equal(a.table('weeklyPeriods').get(pid(1)).status, 'open');
+  assert.equal((await a.send(id(2), 'list')).periods.length, 1);
+  assert.equal([...a.table('weeklyAudit').values()].filter(row => row.action === 'period.scheduledPublish').length, 1);
+  await denied(a.period({ revision: 2, status: 'scheduled', publishAt: '2026-10-27T11:00' }), 'INVALID_INPUT');
+});
+
+test('timer rechecks the scheduling administrator and client-forged timer events never run the worker', async () => {
+  const a = fixture();
+  await a.period({ status: 'scheduled', publishAt: '2026-10-27T10:02' });
+  a.table('teamMembers').set(id(1), active([]));
+  a.time(Date.parse('2026-10-27T10:03:00+08:00'));
+  const publish = require('../cloudfunctions/weeklyReport/publisher')(a.db, access, a.clock);
+  assert.equal((await publish()).blocked, 1);
+  assert.equal(a.table('weeklyPeriods').get(pid(1)).status, 'scheduled');
+  assert.equal(a.table('teamMessages').size, 0);
+  assert.match(a.table('weeklyPeriods').get(pid(1)).publishError, /权限/);
+  let context = { APPID: access.APP_ID, OPENID: 'client' }, runs = 0;
+  const module = { exports: {} };
+  vm.runInNewContext(fs.readFileSync('cloudfunctions/weeklyPublish/index.js', 'utf8'), { module, exports: module.exports,
+    require: name => name === 'wx-server-sdk' ? { init() {}, database: () => ({}), getWXContext: () => context } : name === './publisher' ? () => async () => { runs++; return { ok: true }; } : access });
+  const event = { Type: 'Timer', TriggerName: 'weekly-publish-minute' };
+  assert.equal((await module.exports.main(event)).code, 'TRIGGER_ONLY'); assert.equal(runs, 0);
+  context = {};
+  assert.equal((await module.exports.main({ action: 'publishDue' })).code, 'TRIGGER_ONLY');
+  assert.equal((await module.exports.main(event)).ok, true); assert.equal(runs, 1);
+});
+
+test('scheduled publishing can be cancelled or moved without notifying members early', async () => {
+  const a = fixture();
+  await a.period({ status: 'scheduled', publishAt: '2026-10-27T10:02' });
+  await a.period({ revision: 1, status: 'cancelled' });
+  a.time(Date.parse('2026-10-27T10:03:00+08:00'));
+  const publish = require('../cloudfunctions/weeklyReport/publisher')(a.db, access, a.clock);
+  assert.equal((await publish()).published, 0);
+  assert.equal((await a.send(id(2), 'list')).periods.length, 0);
+  await a.period({ revision: 2, status: 'scheduled', publishAt: '2026-10-27T10:05' });
+  assert.equal(a.table('teamMessages').size, 0);
+  a.time(Date.parse('2026-10-27T10:05:00+08:00'));
+  assert.equal((await publish()).published, 1);
+  assert.equal(a.table('teamMessages').size, 1);
+});
+
+test('weekly document chooser accepts Word/PDF only; images fail server validation', async () => {
+  const a = fixture(); await a.period();
+  for (const name of ['report.jpg', 'report.png', 'report.xlsx']) await denied(a.send(id(2), 'prepareUpload', { periodId: pid(1), name, size: 10 }), 'INVALID_FILE');
+  let options;
+  const p = component(uiService(), { chooseMessageFile: async value => { options = value; return { tempFiles: [] }; } });
+  p.accept(uiResult(0, [])); await p.addFiles();
+  assert.equal(options.type, 'file'); assert.deepEqual(Array.from(options.extension), ['doc', 'docx', 'pdf']);
+  const code = fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8');
+  assert.ok(!code.includes('chooseMedia')); assert.ok(!code.includes('拍照'));
 });
 
 test('file reports auto-save a draft, submit without approval, version replacements and hide private draft changes', async () => {

@@ -4,7 +4,8 @@ const api = (action, body = {}) => run(['api', 'tcb', action, '--body', JSON.str
 const env = api('DescribeEnvs').EnvList.find(item => item.EnvId === ENV);
 const Tag = env.Databases[0].InstanceId;
 const tables = {
-  weeklyPeriods: [ ['team_start_id', [['teamId', '1'], ['startDate', '-1'], ['_id', '-1']]], ['team_status_id', [['teamId', '1'], ['status', '1'], ['_id', '1']]] ],
+  weeklyPeriods: [ ['team_start_id', [['teamId', '1'], ['startDate', '-1'], ['_id', '-1']]], ['team_status_id', [['teamId', '1'], ['status', '1'], ['_id', '1']]],
+    ['team_status_publish_id', [['teamId', '1'], ['status', '1'], ['publishAtMs', '1'], ['_id', '1']]] ],
   weeklyReports: [ ['team_owner_period', [['teamId', '1'], ['ownerId', '1'], ['periodId', '1']]], ['team_period_id', [['teamId', '1'], ['periodId', '1'], ['_id', '1']]] ],
   weeklyVersions: [ ['team_report_version', [['teamId', '1'], ['reportId', '1'], ['version', '-1']]] ],
   weeklyFiles: [], weeklyAudit: []

@@ -1,4 +1,5 @@
 const config = require('../config/cloud');
+const cache = require('./session-cache');
 let pendingWrites = Promise.resolve();
 async function call(data) {
   if (!getApp().globalData.cloudReady) throw new Error('云开发尚未准备好。');
@@ -9,10 +10,10 @@ async function call(data) {
 }
 async function load() {
   await pendingWrites;
-  return call({ action: 'workbenchUsage' });
+  return cache.load('workbench:usage', () => call({ action: 'workbenchUsage' }), 60000);
 }
 function record(toolId) {
-  const write = pendingWrites.then(() => call({ action: 'recordToolOpen', toolId }));
+  const write = pendingWrites.then(() => call({ action: 'recordToolOpen', toolId })).then(value => { cache.set('workbench:usage', value); return value; });
   pendingWrites = write.catch(() => {});
   return write;
 }

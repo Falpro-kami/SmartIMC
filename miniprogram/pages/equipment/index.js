@@ -26,6 +26,8 @@ Page(require('../../utils/member-page')({
 
   async loadRecords(force = false) {
     if (this._loading) return this._loading;
+    const cached = equipment.peek && equipment.peek();
+    if (cached && !this.data.loaded) { this._records = cached; this.setData({ loaded: true }); this.updateView(); }
     this.setData({ loading: !this.data.loaded, refreshing: this.data.loaded, error: '' });
     this._loading = (async () => {
       try {

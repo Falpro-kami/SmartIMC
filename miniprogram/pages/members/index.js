@@ -6,7 +6,9 @@ Page(require('../../utils/member-page')({
   async loadMembers() {
     if (this._loading) return;
     this._loading = true;
-    this.setData({ loading: true, error: '', editor: null, members: [], hasMore: false });
+    const cached = access.peek && access.peek('list', { offset: 0 });
+    if (cached) this.setData({ members: this.present(cached.members), hasMore: cached.hasMore });
+    this.setData({ loading: !cached && !this.data.members.length, error: '', editor: null });
     try {
       const current = await access.get();
       if (!access.can(current.member, 'members.manage')) throw new Error('仅超级管理员可以访问成员与权限。');
@@ -25,7 +27,7 @@ Page(require('../../utils/member-page')({
         }
         this.openEditor({ currentTarget: { dataset: { id } } });
       }
-    } catch (error) { if (!this._unloaded) this.setData({ error: error.message }); }
+    } catch (error) { if (!this._unloaded) this.setData({ error: error.message, members: [], hasMore: false }); }
     finally { this._loading = false; if (!this._unloaded) this.setData({ loading: false }); }
   },
   present(members) {

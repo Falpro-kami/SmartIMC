@@ -9,16 +9,19 @@ Page(require('../../utils/member-page')({
   onShareAppMessage() {
     return { title: '邀请你加入 IMC', path: '/pages/profile/index' };
   },
-  async loadMembers() {
+  async loadMembers(force = false) {
     if (this._loading) return;
     this._loading = true;
-    this.setData({ loading: true, error: '', members: [], hasMore: false });
+    const cached = access.peek && access.peek('directory', { offset: 0 });
+    if (cached) { this._offset = cached.nextOffset; this.setData({ members: this.present(cached.members), hasMore: cached.hasMore }); }
+    this.setData({ loading: !cached && !this._loaded, error: '' });
     try {
-      const result = await access.directory(0);
+      const result = await access.directory(0, force === true);
       if (this._unloaded) return;
       this._offset = result.nextOffset;
+      this._loaded = true;
       this.setData({ members: this.present(result.members), hasMore: result.hasMore });
-    } catch (error) { if (!this._unloaded) this.setData({ error: error.message }); }
+    } catch (error) { if (!this._unloaded) this.setData({ error: error.message, members: [], hasMore: false }); }
     finally { this._loading = false; if (!this._unloaded) this.setData({ loading: false }); }
   },
   present(members) {

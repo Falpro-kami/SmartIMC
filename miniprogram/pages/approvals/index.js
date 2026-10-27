@@ -24,13 +24,16 @@ Page(require('../../utils/member-page')({
     const epoch = this._epoch = (this._epoch || 0) + 1;
     const tab = this.data.activeTab;
     const currentRequest = () => !this._unloaded && this._epoch === epoch;
-    this.setData({ loading: true, error: '', requests: [], canReviewMembers: false });
+    this._views = this._views || {};
+    const first = access.peek && access.peek('approvals', { scope: tab, offset: 0 });
+    const view = this._views[tab] || (first && !first.hasMore ? first.requests.map(row => ({ ...row, dateLabel: dateLabel(row.createdMs) })) : null);
+    this.setData({ loading: !view, error: '', requests: view || [], canReviewMembers: false });
     try {
       const current = await access.get();
       if (!currentRequest()) return;
       const canReviewMembers = access.can(current.member, 'members.manage');
       this.setData({ canReviewMembers });
-      if (tab !== 'mine' && !canReviewMembers) return;
+      if (tab !== 'mine' && !canReviewMembers) { delete this._views[tab]; this.setData({ requests: [] }); return; }
       const requests = new Map();
       let offset = 0;
       let hasMore = true;
@@ -45,8 +48,9 @@ Page(require('../../utils/member-page')({
         offset = result.nextOffset;
         hasMore = result.hasMore === true;
       }
-      this.setData({ requests: Array.from(requests.values()) });
-    } catch (error) { if (currentRequest()) this.setData({ error: error.message }); }
+      this._views[tab] = Array.from(requests.values());
+      this.setData({ requests: this._views[tab] });
+    } catch (error) { if (currentRequest()) { delete this._views[tab]; this.setData({ error: error.message, requests: [], canReviewMembers: false }); } }
     finally { if (currentRequest()) this.setData({ loading: false }); }
   },
   openApproval(event) {

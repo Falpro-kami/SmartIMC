@@ -1,5 +1,8 @@
 const config = require('../config/cloud');
-async function call(action, data = {}) {
+const cache = require('./session-cache');
+const READS = ['list', 'get', 'roster', 'configuration', 'team'];
+const cacheKey = (action, data) => 'weekly:' + action + ':' + JSON.stringify(data);
+async function request(action, data = {}) {
   if (!getApp().globalData.cloudReady) throw new Error('云开发尚未准备好，请重新打开小程序。');
   let response;
   try { response = await wx.cloud.callFunction({ name: config.weeklyFunction, data: { ...data, action }, config: { timeout: 60000 } }); }
@@ -10,7 +13,15 @@ async function call(action, data = {}) {
     error.code = result && result.code;
     throw error;
   }
+  if (['savePeriod', 'saveDraft', 'submit'].includes(action)) { cache.invalidate('weekly:'); cache.invalidate('home:'); }
+  if (['savePeriod', 'remind'].includes(action)) {
+    const access = require('./access');
+    if (access.notifications) access.notifications(true).catch(() => {});
+  }
   return result;
+}
+function call(action, data = {}, force = false) {
+  return READS.includes(action) ? cache.load(cacheKey(action, data), () => request(action, data), 30000, force) : request(action, data);
 }
 const newId = prefix => prefix + '_' + Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 function dateLabel(ms) {
@@ -20,8 +31,8 @@ function dateLabel(ms) {
 }
 const statusLabel = status => ({ unsubmitted: '未提交', draft: '草稿', submitted: '已提交', exempt: '免交', outside: '无需提交' }[status] || '-');
 const fileView = f => ({ ...f, sizeLabel: f.size < 1024 * 1024 ? Math.ceil(f.size / 1024) + ' KB' : (f.size / 1024 / 1024).toFixed(1) + ' MB' });
-const periodView = p => ({ ...p, deadlineLabel: dateLabel(p.deadlineMs), statusLabel: statusLabel(p.ownStatus),
-  periodLabel: { open: '开放中', closed: '已关闭', archived: '已归档' }[p.status] || '-' });
+const periodView = p => ({ ...p, deadlineLabel: dateLabel(p.deadlineMs), publishLabel: dateLabel(p.publishAtMs), statusLabel: p.status === 'scheduled' ? '待发布' : p.status === 'cancelled' ? '已取消' : statusLabel(p.ownStatus),
+  periodLabel: { scheduled: '待发布', cancelled: '已取消发布', open: '开放中', closed: '已关闭', archived: '已归档' }[p.status] || '-' });
 async function upload(file, periodId) {
   const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size });
   const uploaded = await wx.cloud.uploadFile({ cloudPath: prepared.cloudPath, filePath: file.path });
@@ -60,4 +71,4 @@ async function exportStats(periodId) {
   await fsCall('writeFile', { filePath, data: result.csv, encoding: 'utf8' });
   return { filePath, fileName: result.name };
 }
-module.exports = { call, upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView };
+module.exports = { call, peek: (action, data = {}) => cache.peek(cacheKey(action, data)), upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView };

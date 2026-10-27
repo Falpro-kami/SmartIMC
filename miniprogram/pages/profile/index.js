@@ -16,18 +16,19 @@ Page(require('../../utils/member-page')({
   onUnload() { this._unloaded = true; },
   async loadAccess() {
     const epoch = this._accessEpoch = (this._accessEpoch || 0) + 1;
-    this.setData({ loading: true, error: '', canManage: false, expiryLabel: '-', expiryWarning: false });
+    this.setData({ loading: !this._loaded, error: '' });
     try {
       const result = await access.get();
       if (this._unloaded || epoch !== this._accessEpoch) return;
       const member = result.member;
       const status = member ? member.status : 'not_joined';
+      this._loaded = true;
       this.setData({ status,
         statusLabel: { active: '已加入', pending: '待审核', disabled: '已停用', not_joined: '未加入' }[status] || '-',
         roleText: member && member.status === 'active' ? member.roleLabels.join('、') : '-',
         canManage: access.can(member, 'members.manage') });
       if (this.data.canManage) this.loadAdminStatus(epoch);
-    } catch (error) { if (!this._unloaded && epoch === this._accessEpoch) this.setData({ error: error.message }); }
+    } catch (error) { if (!this._unloaded && epoch === this._accessEpoch) this.setData({ error: error.message, canManage: false, expiryLabel: '-', expiryWarning: false }); }
     finally { if (!this._unloaded && epoch === this._accessEpoch) this.setData({ loading: false }); }
   },
   async applyJoin() {
