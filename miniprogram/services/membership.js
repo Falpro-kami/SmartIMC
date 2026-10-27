@@ -24,7 +24,8 @@ function check() {
   return pending;
 }
 async function submit(value) {
-  if (submitting || state.phase !== 'apply') return state;
+  if (submitting || !['apply', 'removed'].includes(state.phase)) return state;
+  const startingPhase = state.phase;
   submitting = true;
   const request = ++epoch;
   try {
@@ -35,7 +36,7 @@ async function submit(value) {
     // A lost response can hide a committed application; recover its actual state before retrying.
     try {
       const result = await access.get(true);
-      if (request === epoch && result.member) return accept(result);
+      if (request === epoch && result.member && !(startingPhase === 'removed' && result.member.status === 'removed')) return accept(result);
     } catch (_) { /* Preserve the original save/application error. */ }
     throw error;
   } finally { submitting = false; }

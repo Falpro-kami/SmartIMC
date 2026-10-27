@@ -19,7 +19,7 @@ module.exports = function approvals(db, access, messages) {
     }
     if (scope === 'mine') {
       if (offset) return { ok: true, requests: [], nextOffset: offset, hasMore: false };
-      const application = document(await db.collection('teamMessages').doc(messages.applicationId(id)).get());
+      const application = document(await db.collection('teamMessages').doc(actor && actor.applicationId || messages.applicationId(id)).get());
       if (!application || application.teamId !== access.TEAM_ID || application.subjectId !== id || application.kind !== 'member_application') {
         return { ok: true, requests: [], nextOffset: 0, hasMore: false };
       }
@@ -28,7 +28,7 @@ module.exports = function approvals(db, access, messages) {
       let skip = 0;
       do {
         const result = await db.collection('memberAudit').where({ targetId: id }).orderBy('createdAt', 'asc').orderBy('_id', 'asc').skip(skip).limit(100).get();
-        decision = result.data.find(decided);
+        decision = result.data.find(row => decided(row) && (row.applicationId ? row.applicationId === application._id : application._id === messages.applicationId(id)));
         if (decision || result.data.length < 100) break;
         skip += result.data.length;
       } while (true);
@@ -59,7 +59,7 @@ module.exports = function approvals(db, access, messages) {
       title: names.get(pending ? row._id : row.targetId) || '-', type: '成员入组',
       ...(pending ? { memberId: row._id } : {}), statusLabel: pending ? '待审批' : outcome(row.after.status),
       statusTone: pending ? 'pending' : row.after.status === 'active' ? 'success' : 'rejected',
-      createdMs: milliseconds(row.createdAt) })), nextOffset: offset + page.length, hasMore: result.data.length > 50 };
+      createdMs: pending && row.appliedMs || milliseconds(row.createdAt) })), nextOffset: offset + page.length, hasMore: result.data.length > 50 };
   }
   return { list };
 };

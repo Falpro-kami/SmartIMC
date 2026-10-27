@@ -61,7 +61,7 @@ function harness(options = {}) {
     });
     return module.exports.main;
   };
-  return { member: load('memberAccess'), equipment: load('equipmentQuery'), check: load('checkDatabase'),
+  return { db, member: load('memberAccess'), equipment: load('equipmentQuery'), check: load('checkDatabase'),
     as: name => { context = { APPID, OPENID: name }; },
     table: name => tables[name] };
 }
@@ -512,11 +512,80 @@ test('only a super administrator can remove members; removal revokes access, hid
   assert.equal((await app.member({ action: 'get' })).member.permissions.length, 0);
   assert.equal((await app.equipment({ action: 'list' })).code, 'MEMBERSHIP_REQUIRED');
   assert.equal((await app.member({ action: 'directory' })).code, 'MEMBERSHIP_REQUIRED');
-  assert.equal((await app.member({ action: 'apply' })).code, 'MEMBERSHIP_REMOVED');
+  const reapplication = await app.member({ action: 'apply' });
+  assert.equal(reapplication.member.status, 'pending');
+  assert.equal(reapplication.member.roles.length, 0);
+  assert.equal(reapplication.member.permissions.length, 0);
   assert.equal((await app.member({ action: 'messages' })).code, 'MEMBERSHIP_REQUIRED');
   const message = [...app.table('teamMessages').values()][0];
   assert.equal(message.title, '已移出团队');
   assert.equal(message.readBy.length, 0);
+});
+
+test('removed members can reapply once; old approvals, read states and roles cannot carry into the new application', async () => {
+  const app = harness({ sort: true }), owner = userId('owner'), member = userId('returning');
+  app.table('teamMembers').set(owner, active(['super_admin']));
+  app.table('teamSecurity').set('IMC', { superAdminIds: [owner] });
+  app.table('userProfiles').set(member, { name: '重新申请的成员' });
+  app.as('returning'); await app.member({ action: 'apply' });
+  const initialId = app.table('teamMembers').get(member).applicationId;
+  app.as('owner');
+  await app.member({ action: 'readMessage', id: initialId });
+  await app.member({ action: 'set', id: member, status: 'active', roles: ['weekly_admin'], revision: 0 });
+  const originalMessage = structuredClone(app.table('teamMessages').get(initialId));
+  const originalCreation = app.table('teamMembers').get(member).createdAt;
+  // Existing installations have a fixed initial application and no audit/application linkage.
+  delete app.table('teamMembers').get(member).applicationId;
+  for (const row of app.table('memberAudit').values()) delete row.applicationId;
+  await app.member({ action: 'set', id: member, status: 'removed', roles: [], revision: 1 });
+  app.as('returning');
+  const reapply = await app.member({ action: 'apply', roles: ['super_admin'], status: 'active', id: owner });
+  assert.equal(reapply.member.status, 'pending'); assert.equal(reapply.member.revision, 3);
+  assert.equal(reapply.member.roles.length, 0); assert.equal(reapply.member.permissions.length, 0);
+  const next = app.table('teamMembers').get(member), latestId = next.applicationId;
+  assert.notEqual(latestId, initialId); assert.equal(next.createdAt, originalCreation);
+  assert.deepEqual(app.table('teamMessages').get(initialId), originalMessage);
+  assert.deepEqual(app.table('teamMessages').get(latestId).readBy, []);
+  assert.equal(app.table('teamMessages').get(latestId).state, 'open');
+  assert.equal(app.table('teamMessages').get(latestId).title, '重新入组申请');
+  assert.ok(app.table('memberAudit').size >= 3);
+  const auditCount = app.table('memberAudit').size, messageCount = app.table('teamMessages').size;
+  await app.member({ action: 'apply' });
+  assert.equal(app.table('memberAudit').size, auditCount); assert.equal(app.table('teamMessages').size, messageCount);
+  for (const action of ['home', 'directory', 'messages', 'list', 'notificationState']) assert.equal((await app.member({ action })).code, 'MEMBERSHIP_REQUIRED');
+  assert.equal((await app.equipment({ action: 'list' })).code, 'MEMBERSHIP_REQUIRED');
+  // Exercise the own-request projection separately from the entry point's membership gate.
+  const messages = require('../cloudfunctions/memberAccess/messages')(app.db, access);
+  const approvals = require('../cloudfunctions/memberAccess/approvals')(app.db, access, messages);
+  assert.equal((await approvals.list(member, { scope: 'mine' })).requests[0].statusLabel, '待审批');
+  app.as('owner');
+  assert.equal((await app.member({ action: 'get' })).hasUnread, true);
+  const pending = await app.member({ action: 'approvals', scope: 'pending' });
+  assert.ok(pending.requests.some(row => row.memberId === member));
+  assert.equal((await app.member({ action: 'set', id: member, status: 'active', roles: [], revision: 1 })).code, 'CONFLICT');
+  await app.member({ action: 'set', id: member, status: 'active', roles: [], revision: 3 });
+  assert.equal(app.table('teamMessages').get(latestId).state, 'resolved');
+  assert.equal(app.table('teamMessages').get(latestId).readBy.length, 0);
+  app.as('returning');
+  const mine = await app.member({ action: 'approvals', scope: 'mine' });
+  assert.equal(mine.requests[0].id, latestId); assert.equal(mine.requests[0].statusLabel, '已通过');
+  const self = await app.member({ action: 'get' });
+  assert.equal(self.member.roles.length, 0); assert.equal(access.allowed(app.table('teamMembers').get(member), 'weekly.manage'), false);
+  assert.equal((await app.equipment({ action: 'list' })).ok, true);
+});
+
+test('failed reapplication notification rolls back the pending state and audit; disabled or foreign-team users cannot rejoin', async () => {
+  const app = harness({ failMessageWrite: true }), owner = userId('owner');
+  app.table('teamMembers').set(owner, { ...active([]), status: 'removed', revision: 8 });
+  app.table('userProfiles').set(owner, { name: '测试成员' });
+  assert.equal((await app.member({ action: 'apply' })).code, 'ACCESS_FAILED');
+  assert.equal(app.table('teamMembers').get(owner).status, 'removed');
+  assert.equal(app.table('teamMembers').get(owner).revision, 8);
+  assert.equal(app.table('memberAudit').size, 0); assert.equal(app.table('teamMessages').size, 0);
+  app.table('teamMembers').set(owner, { ...active([]), status: 'disabled' });
+  assert.equal((await app.member({ action: 'apply' })).member.status, 'disabled');
+  app.table('teamMembers').set(owner, { ...active([]), status: 'removed', teamId: 'OTHER' });
+  assert.equal((await app.member({ action: 'apply' })).code, 'FORBIDDEN');
 });
 
 test('failed removal notification rolls back membership, security registry and the audit', async () => {

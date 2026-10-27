@@ -8,7 +8,7 @@ Component({
       this._unsubscribe = membership.subscribe(state => {
         if (this._detached) return;
         this.setData({ phase: state.phase, error: state.error || '' });
-        if (state.phase === 'apply' && !this._profileRequested) this.loadProfile();
+        if (['apply', 'removed'].includes(state.phase) && !this._profileRequested) this.loadProfile();
       });
     },
     detached() { this._detached = true; if (this._unsubscribe) this._unsubscribe(); }
@@ -18,14 +18,14 @@ Component({
       this._profileRequested = true;
       try {
         const result = await profiles.load(true);
-        if (!this._detached && this.data.phase === 'apply' && result.profile) this.setData({ ...(!this._nameEdited ? { name: result.profile.name } : {}), avatar: result.profile.avatarFileId || '' });
+        if (!this._detached && ['apply', 'removed'].includes(this.data.phase) && result.profile) this.setData({ ...(!this._nameEdited ? { name: result.profile.name } : {}), avatar: result.profile.avatarFileId || '' });
       } catch (error) { if (!this._detached) this.setData({ error: error.message }); }
     },
     changeName(event) { if (!this.data.saving) { this._nameEdited = true; this.setData({ name: event.detail.value, error: '' }); } },
     chooseAvatar(event) { if (!this.data.saving) this.setData({ draftAvatar: event.detail.avatarUrl || '' }); },
     avatarFailed() { this.setData({ avatar: '', draftAvatar: '' }); },
     async submitApplication() {
-      if (this.data.saving || this.data.phase !== 'apply') return;
+      if (this.data.saving || !['apply', 'removed'].includes(this.data.phase)) return;
       const name = this.data.name.trim();
       if (!name) { this.setData({ error: '请填写姓名' }); return; }
       this.setData({ saving: true, error: '' });

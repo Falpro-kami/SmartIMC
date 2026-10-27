@@ -67,15 +67,24 @@ exports.main = async (event = {}) => {
     if (event.action === 'apply') {
       const profile = await db.collection('userProfiles').where({ _id: id }).limit(1).get();
       if (!profile.data[0] || !profile.data[0].name) reject('PROFILE_REQUIRED', '请先填写姓名后提交加入申请。');
+      const appliedMs = Date.now(), reapplicationAuditId = randomUUID();
       // Fixed document identity and transaction prevent applying from overwriting an existing role.
       await db.runTransaction(async transaction => {
         const reference = transaction.collection('teamMembers').doc(id);
         const previous = document(await reference.get());
-        if (previous && previous.status === 'removed') reject('MEMBERSHIP_REMOVED', '你已被移出团队，请联系管理员。');
-        if (previous) return;
-        await reference.set({ data: { teamId: access.TEAM_ID, status: 'pending', roles: [], revision: 0,
-          createdAt: db.serverDate(), updatedAt: db.serverDate(), updatedBy: id } });
-        await messages.put(transaction, messages.applicationData(id, profile.data[0].name));
+        if (previous && previous.teamId !== access.TEAM_ID) reject('FORBIDDEN', '当前账号不能提交此团队的加入申请。');
+        if (previous && previous.status !== 'removed') return;
+        const revision = previous ? (previous.revision || 0) + 1 : 0;
+        const application = messages.applicationData(id, profile.data[0].name, appliedMs, revision);
+        const data = { status: 'pending', roles: [], revision, applicationId: application._id, appliedMs,
+          updatedAt: db.serverDate(), updatedBy: id };
+        if (previous) {
+          await reference.update({ data });
+          await transaction.collection('memberAudit').doc(reapplicationAuditId).set({ data: { actorId: id, targetId: id,
+            action: 'member.reapply', applicationId: application._id,
+            before: { status: previous.status, roles: previous.roles || [] }, after: { status: 'pending', roles: [] }, createdAt: db.serverDate() } });
+        } else await reference.set({ data: { ...data, teamId: access.TEAM_ID, createdAt: db.serverDate() } });
+        await messages.put(transaction, application);
       });
       return await self(id);
     }
@@ -115,7 +124,8 @@ exports.main = async (event = {}) => {
       const target = document(await targetRef.get());
       const securityRef = transaction.collection('teamSecurity').doc(access.TEAM_ID);
       const security = document(await securityRef.get());
-      const applicationRef = transaction.collection('teamMessages').doc(messages.applicationId(event.id));
+      const applicationId = target && target.applicationId || messages.applicationId(event.id);
+      const applicationRef = transaction.collection('teamMessages').doc(applicationId);
       const application = document(await applicationRef.get());
       if (!access.allowed(currentActor, 'members.manage') || !security || !security.superAdminIds.includes(id)) {
         reject('FORBIDDEN', '管理权限已失效，请刷新页面。');
@@ -131,6 +141,7 @@ exports.main = async (event = {}) => {
         revision: event.revision + 1, updatedAt: db.serverDate(), updatedBy: id } });
       await securityRef.update({ data: { superAdminIds: Array.from(superIds), updatedAt: db.serverDate() } });
       await transaction.collection('memberAudit').doc(auditId).set({ data: { actorId: id, targetId: event.id,
+        applicationId,
         before: { status: target.status, roles: target.roles || [] }, after: { status: event.status, roles: event.roles },
         createdAt: db.serverDate() } });
       if (application && event.status !== 'pending') await applicationRef.update({ data: { state: 'resolved' } });

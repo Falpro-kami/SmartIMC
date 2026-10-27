@@ -59,9 +59,10 @@ module.exports = function messages(db, access) {
     }
     return response;
   }
-  function applicationData(id, name, createdMs = Date.now()) {
-    return { _id: key('application:' + id), teamId: access.TEAM_ID, recipientKey: 'role:super_admin',
-      kind: 'member_application', subjectId: id, title: '成员申请', body: name + '申请加入 IMC',
+  function applicationId(id, cycle = 0) { return key('application:' + id + (cycle ? ':' + cycle : '')); }
+  function applicationData(id, name, createdMs = Date.now(), cycle = 0) {
+    return { _id: applicationId(id, cycle), teamId: access.TEAM_ID, recipientKey: 'role:super_admin',
+      kind: 'member_application', subjectId: id, title: cycle ? '重新入组申请' : '成员申请', body: name + (cycle ? '申请重新加入 IMC' : '申请加入 IMC'),
       createdMs, state: 'open', readBy: [] };
   }
   function changeData(auditId, id, before, after, createdMs = Date.now()) {
@@ -81,5 +82,5 @@ module.exports = function messages(db, access) {
     await transaction.collection(collection).doc(_id).set({ data });
   }
   return { unread, list, read, open: (id, event) => read(id, event, false), applicationData, changeData, put,
-    applicationId: id => key('application:' + id) };
+    applicationId };
 };

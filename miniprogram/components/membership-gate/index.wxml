@@ -1,15 +1,15 @@
 <view class="membership-screen imc-theme" style="padding-top: {{top}}px;">
   <text class="brand-title">智慧IMC</text>
   <view class="membership-card">
-    <block wx:if="{{phase === 'apply'}}">
-      <text class="gate-title">申请加入 IMC</text>
+    <block wx:if="{{phase === 'apply' || phase === 'removed'}}">
+      <text class="gate-title">{{phase === 'removed' ? '重新申请加入 IMC' : '申请加入 IMC'}}</text>
       <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" disabled="{{saving}}" aria-label="选择微信头像"><image wx:if="{{draftAvatar || avatar}}" src="{{draftAvatar || avatar}}" mode="aspectFill" binderror="avatarFailed" /><text wx:else>头像</text></button>
       <text class="field-label">姓名</text><input class="name-input" value="{{name}}" maxlength="32" bindinput="changeName" disabled="{{saving}}" placeholder="请输入真实姓名" />
       <text wx:if="{{error}}" class="gate-error">{{error}}</text>
       <button class="gate-primary" bindtap="submitApplication" loading="{{saving}}" disabled="{{saving}}">提交加入申请</button>
     </block>
     <block wx:elif="{{phase === 'pending'}}"><text class="gate-title">申请已提交</text><text class="gate-state">等待管理员审核</text><button class="gate-secondary" bindtap="checkStatus">查询审核结果</button></block>
-    <block wx:elif="{{phase === 'disabled' || phase === 'removed'}}"><text class="gate-title">{{phase === 'removed' ? '已移出团队' : '账号未获准访问'}}</text><text class="gate-state">请联系管理员</text><button class="gate-secondary" bindtap="checkStatus">查询成员状态</button></block>
+    <block wx:elif="{{phase === 'disabled'}}"><text class="gate-title">账号未获准访问</text><text class="gate-state">请联系管理员</text><button class="gate-secondary" bindtap="checkStatus">查询成员状态</button></block>
     <block wx:elif="{{phase === 'error'}}"><text class="gate-title">身份验证失败</text><text class="gate-error">{{error}}</text><button class="gate-secondary" bindtap="checkStatus">重试</button></block>
     <text wx:else class="gate-state">正在验证身份…</text>
   </view>

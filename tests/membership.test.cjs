@@ -130,6 +130,48 @@ test('a lost application response recovers the pending state without granting ac
   await service.submit({ name: '测试成员' }); assert.equal(applications, 1);
 });
 
+test('removed users can submit a new request and lost responses recover pending without unlocking business pages', async () => {
+  let member = { ...active, status: 'removed' }, applications = 0;
+  const service = moduleAt('miniprogram/services/membership.js', {
+    './access': { can, get: async () => ({ member }), apply: async () => { applications++; member = { ...active, status: 'pending', permissions: [] }; throw new Error('网络超时'); } },
+    './profile': { save: async () => {} }
+  });
+  service.accept({ member });
+  assert.equal(service.current().phase, 'removed'); assert.equal(service.current().approved, false);
+  await service.submit({ name: '重新申请的成员' });
+  assert.equal(service.current().phase, 'pending'); assert.equal(service.current().approved, false);
+  await service.submit({ name: '重新申请的成员' }); assert.equal(applications, 1);
+  member = { ...active }; await service.check(); assert.equal(service.current().approved, true);
+});
+
+test('a rejected reapplication keeps its form usable and displays the error instead of hiding it as a removed state', async () => {
+  const member = { ...active, status: 'removed' };
+  const service = moduleAt('miniprogram/services/membership.js', {
+    './access': { can, get: async () => ({ member }), apply: async () => { throw new Error('申请暂时无法提交'); } }, './profile': { save: async () => {} }
+  });
+  service.accept({ member });
+  await assert.rejects(service.submit({ name: '测试成员' }), /暂时无法提交/);
+  assert.equal(service.current().phase, 'removed'); assert.equal(service.current().approved, false);
+});
+
+test('removed membership gate pre-fills the personal profile and submits the reapplication form', async () => {
+  let definition, submitted;
+  vm.runInNewContext(fs.readFileSync('miniprogram/components/membership-gate/index.js', 'utf8'), {
+    Component: value => { definition = value; }, require: name => name.endsWith('/membership') ? {
+      submit: async value => { submitted = value; }
+    } : { load: async () => ({ profile: { name: '原有姓名', avatarFileId: 'cloud://own/avatar' } }) }
+  });
+  const gate = { data: { ...definition.data, phase: 'removed' }, ...definition.methods };
+  gate.setData = values => Object.assign(gate.data, values);
+  await gate.loadProfile(); assert.equal(gate.data.name, '原有姓名');
+  assert.equal(gate.data.avatar, 'cloud://own/avatar');
+  await gate.submitApplication(); assert.equal(submitted.name, '原有姓名');
+  assert.equal(gate.data.saving, false);
+  const template = fs.readFileSync('miniprogram/components/membership-gate/index.wxml', 'utf8');
+  assert.ok(template.includes("phase === 'apply' || phase === 'removed'"));
+  assert.ok(template.includes('重新申请加入 IMC'));
+});
+
 test('enrollment validates the name, prevents duplicate submissions and does not request business data', async () => {
   let definition, resolve, calls = 0;
   vm.runInNewContext(fs.readFileSync('miniprogram/components/membership-gate/index.js', 'utf8'), {
