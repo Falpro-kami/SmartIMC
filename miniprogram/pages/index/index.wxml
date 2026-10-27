@@ -1,1 +1,19 @@
-<view class="tab-page imc-theme"><user-header title="首页" /></view>
+<view class="tab-page imc-theme"><user-header title="首页" />
+  <view class="home-content">
+    <view wx:if="{{loading}}" class="home-state">正在读取…</view>
+    <view wx:elif="{{error}}" class="home-error"><text>{{error}}</text><button bindtap="loadHome">重试</button></view>
+    <block wx:else>
+      <view class="home-section">
+        <view class="section-heading"><text>我的待办</text><button bindtap="openApprovals">全部<text class="home-arrow">›</text></button></view>
+        <text wx:if="{{!todos.length}}" class="home-empty">暂无待办</text>
+        <button wx:for="{{todos}}" wx:key="id" class="home-row" data-id="{{item.id}}" bindtap="openTodo"><view class="home-row-main"><text class="home-row-title">{{item.title}}</text><text class="home-row-meta">{{item.type}}<text wx:if="{{item.dateLabel}}"> · {{item.dateLabel}}</text></text></view><text class="todo-status">待审批</text><text class="home-arrow">›</text></button>
+      </view>
+      <view class="home-section">
+        <view class="section-heading"><text>团队公告</text><button bindtap="openAnnouncements">全部<text class="home-arrow">›</text></button></view>
+        <text wx:if="{{!announcements.length}}" class="home-empty">暂无公告</text>
+        <button wx:for="{{announcements}}" wx:key="id" class="home-row" data-id="{{item.id}}" bindtap="openAnnouncement"><view class="home-row-main"><view class="announcement-title-line"><text wx:if="{{item.pinned}}" class="pinned-tag">置顶</text><text class="home-row-title">{{item.title}}</text></view><text class="home-row-meta">{{item.authorName}} · {{item.dateLabel}}</text></view><text class="home-arrow">›</text></button>
+        <button wx:if="{{canManage}}" class="publish-link" bindtap="publishAnnouncement">发布公告</button>
+      </view>
+    </block>
+  </view>
+</view>

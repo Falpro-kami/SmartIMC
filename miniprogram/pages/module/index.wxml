@@ -1,5 +1,6 @@
 <view class="module-page imc-theme {{entries.length ? 'settings-page' : ''}}">
-  <block wx:if="{{adminMode}}">
+  <team-announcements wx:if="{{announcementsMode}}" initial-id="{{announcementId}}" compose="{{composeAnnouncement}}" />
+  <block wx:elif="{{adminMode}}">
     <view wx:if="{{adminLoading}}" class="admin-state">正在读取…</view>
     <view wx:elif="{{adminError}}" class="admin-error"><text>{{adminError}}</text><button bindtap="loadAdminData">重试</button></view>
     <block wx:elif="{{billing}}">

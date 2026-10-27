@@ -6,7 +6,7 @@ function milliseconds(value) {
 }
 module.exports = function approvals(db, access, messages) {
   const decided = row => row.before && row.before.status === 'pending' && row.after && ['active', 'disabled'].includes(row.after.status);
-  const outcome = status => status === 'active' ? '已通过' : status === 'disabled' ? '未通过' : '待审批';
+  const outcome = status => status === 'active' ? '已通过' : status === 'disabled' ? '未通过' : status === 'removed' ? '已终止' : '待审批';
   async function list(id, event) {
     const { scope } = event;
     const offset = event.offset === undefined ? 0 : event.offset;
@@ -32,9 +32,9 @@ module.exports = function approvals(db, access, messages) {
         if (decision || result.data.length < 100) break;
         skip += result.data.length;
       } while (true);
-      const status = decision ? decision.after.status : 'pending';
+      const status = decision ? decision.after.status : actor && actor.status === 'removed' ? 'removed' : 'pending';
       return { ok: true, requests: [{ id: application._id, title: '加入 IMC', type: '成员入组',
-        statusLabel: outcome(status), statusTone: status === 'active' ? 'success' : status === 'disabled' ? 'rejected' : 'pending',
+        statusLabel: outcome(status), statusTone: status === 'active' ? 'success' : ['disabled', 'removed'].includes(status) ? 'rejected' : 'pending',
         createdMs: application.createdMs || 0 }], nextOffset: 1, hasMore: false };
     }
     const pending = scope === 'pending';

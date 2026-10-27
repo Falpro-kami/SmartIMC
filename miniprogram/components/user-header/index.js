@@ -50,7 +50,7 @@ Component({
         if (member && member.status === 'active') {
           roleTags = (result.roleOptions || []).filter(role => member.roles.includes(role.value));
           if (!roleTags.length) roleTags = [{ value: 'member', label: '普通成员' }];
-        } else if (member) roleTags = [{ value: 'inactive', label: member.status === 'pending' ? '待审核' : '已停用' }];
+        } else if (member) roleTags = [{ value: 'inactive', label: { pending: '待审核', disabled: '已停用', removed: '已移出' }[member.status] || '-' }];
         this.setData({ roleTags, hasUnread: result.hasUnread === true });
       } catch (_) { /* Keep the last server-confirmed identity; avoid extra header explanatory text. */ }
       finally { this._identityLoading = false; }

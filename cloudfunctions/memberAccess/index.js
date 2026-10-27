@@ -6,6 +6,7 @@ const db = cloud.database({ throwOnNotFound: false });
 const messages = require('./messages')(db, access);
 const workbench = require('./workbench')(db);
 const approvals = require('./approvals')(db, access, messages);
+const home = require('./home')(db, access, approvals);
 
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
@@ -20,6 +21,11 @@ exports.main = async (event = {}) => {
   if (!id) return { ok: false, code: 'AUTH_REQUIRED', message: '请从 IMC 小程序中操作。' };
   try {
     if (event.action === 'get') return await self(id);
+    if (event.action === 'home') return await home.dashboard(id);
+    if (event.action === 'announcements') return await home.list(id, event);
+    if (event.action === 'announcement') return await home.get(id, event);
+    if (event.action === 'saveAnnouncement') return await home.save(id, event);
+    if (event.action === 'withdrawAnnouncement') return await home.withdraw(id, event);
     if (event.action === 'approvals') return await approvals.list(id, event);
     if (event.action === 'workbenchUsage') return await workbench.get(id);
     if (event.action === 'recordToolOpen') return await workbench.record(id, event);
@@ -60,6 +66,7 @@ exports.main = async (event = {}) => {
       await db.runTransaction(async transaction => {
         const reference = transaction.collection('teamMembers').doc(id);
         const previous = document(await reference.get());
+        if (previous && previous.status === 'removed') reject('MEMBERSHIP_REMOVED', '你已被移出团队，请联系管理员。');
         if (previous) return;
         await reference.set({ data: { teamId: access.TEAM_ID, status: 'pending', roles: [], revision: 0,
           createdAt: db.serverDate(), updatedAt: db.serverDate(), updatedBy: id } });
@@ -72,14 +79,14 @@ exports.main = async (event = {}) => {
     if (event.action === 'member') {
       if (typeof event.id !== 'string' || !/^user_[a-f0-9]{32}$/.test(event.id)) reject('INVALID_INPUT', '成员参数不正确。');
       const member = await access.readMember(db, event.id);
-      if (!member || member.teamId !== access.TEAM_ID) reject('NOT_FOUND', '成员不存在。');
+      if (!member || member.teamId !== access.TEAM_ID || member.status === 'removed') reject('NOT_FOUND', '成员不存在。');
       const profile = await db.collection('userProfiles').where({ _id: event.id }).limit(1).get();
       return { ok: true, member: { ...access.present(member), name: profile.data[0] && profile.data[0].name || '-' } };
     }
     if (event.action === 'list') {
       const offset = event.offset === undefined ? 0 : event.offset;
       if (!Number.isSafeInteger(offset) || offset < 0) reject('INVALID_INPUT', '分页参数不正确。');
-      const result = await db.collection('teamMembers').where({ teamId: access.TEAM_ID })
+      const result = await db.collection('teamMembers').where({ teamId: access.TEAM_ID, status: db.command.in(['pending', 'active', 'disabled']) })
         .orderBy('_id', 'asc').skip(offset).limit(51).get();
       const rows = result.data.slice(0, 50);
       const profiles = rows.length ? (await db.collection('userProfiles').where({ _id: db.command.in(rows.map(row => row._id)) }).limit(50).get()).data : [];
@@ -89,7 +96,8 @@ exports.main = async (event = {}) => {
     }
     if (event.action !== 'set') reject('INVALID_ACTION', '不支持的成员操作。');
     if (typeof event.id !== 'string' || !/^user_[a-f0-9]{32}$/.test(event.id) ||
-      !['pending', 'active', 'disabled'].includes(event.status) || !Array.isArray(event.roles) ||
+      !['pending', 'active', 'disabled', 'removed'].includes(event.status) || !Array.isArray(event.roles) ||
+      (event.status === 'removed' && event.roles.length !== 0) ||
       event.roles.some(role => !access.ROLES.some(option => option.value === role)) ||
       new Set(event.roles).size !== event.roles.length || !Number.isSafeInteger(event.revision) || event.revision < 0) {
       reject('INVALID_INPUT', '成员或角色参数不正确。');
@@ -108,6 +116,7 @@ exports.main = async (event = {}) => {
         reject('FORBIDDEN', '管理权限已失效，请刷新页面。');
       }
       if (!target || target.teamId !== access.TEAM_ID) reject('NOT_FOUND', '成员不存在。');
+      if (target.status === 'removed') reject('NOT_FOUND', '成员已移出团队。');
       if ((target.revision || 0) !== event.revision) reject('CONFLICT', '此成员权限已更新，请重新加载后操作。');
       const superIds = new Set(security.superAdminIds);
       if (event.status === 'active' && event.roles.includes('super_admin')) superIds.add(event.id);

@@ -1,5 +1,6 @@
 const adminData = require('../../services/admin-data');
 const MODULES = {
+  announcements: { title: '团队公告', announcementsMode: true },
   finance: { title: '财务报销', icon: 'finance', description: '报销申请与办理记录将在这里展示' },
   weekly: { title: '周报', icon: 'weekly', description: '团队周报与提交记录将在这里展示' },
   activities: { title: '文娱活动', icon: 'activities', description: '实验室活动与报名信息将在这里展示' },
@@ -27,12 +28,14 @@ const MODULES = {
   }
 };
 Page({
-  data: { title: '', icon: '', description: '', entries: [], adminMode: '', adminLoading: false, adminError: '',
+  data: { title: '', icon: '', description: '', entries: [], announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
     billing: null, expiryLabel: '-', expiryWarning: false, backups: [], password: '', passwordConfirm: '', creating: false, downloading: '', progress: 0, exportedId: '' },
   onLoad(options) {
     const module = Object.prototype.hasOwnProperty.call(MODULES, options.id) ? MODULES[options.id] : null;
     if (!module) { this.setData({ title: '页面不存在', description: '请返回工作台选择功能' }); return; }
-    this.setData(module);
+    this.setData({ ...module, ...(module.announcementsMode ? {
+      announcementId: /^ann_[a-f0-9]{32}$/.test(options.announcement || '') ? options.announcement : '', composeAnnouncement: options.compose === '1'
+    } : {}) });
     wx.setNavigationBarTitle({ title: module.title });
     if (module.adminMode) this.loadAdminData();
   },

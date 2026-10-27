@@ -59,6 +59,20 @@ Page({
       'editor.options': this.data.editor.options.map(option => ({ ...option, selected: roles.includes(option.value) })) });
   },
   changeStatus(event) { this.setData({ 'editor.status': event.detail.value }); },
+  async removeMember() {
+    if (this.data.saving || !this.data.editor) return;
+    const member = { ...this.data.editor, status: 'removed', roles: [] };
+    this.setData({ saving: true, formError: '' });
+    try {
+      const result = await wx.showModal({ title: '移出成员', content: '确定将“' + member.name + '”移出 IMC？', confirmText: '移出', confirmColor: '#ad4037' });
+      if (!result.confirm || this._unloaded) return;
+      await access.set(member);
+      if (this._unloaded) return;
+      wx.showToast({ title: '成员已移出', icon: 'success' });
+      await this.loadMembers();
+    } catch (error) { if (!this._unloaded) this.setData({ formError: error.message || '移出失败，请重试' }); }
+    finally { if (!this._unloaded) this.setData({ saving: false }); }
+  },
   async saveMember() {
     if (this.data.saving || !this.data.editor) return;
     this.setData({ saving: true, formError: '' });

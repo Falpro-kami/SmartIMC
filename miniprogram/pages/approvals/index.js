@@ -11,6 +11,7 @@ Page({
   data: { loading: true, error: '', requests: [], canReviewMembers: false,
     activeTab: 'mine', emptyText: EMPTY.mine,
     tabs: [{ id: 'mine', label: '我的申请' }, { id: 'pending', label: '待我审批' }, { id: 'done', label: '我已审批' }] },
+  onLoad(options = {}) { if (this.data.tabs.some(tab => tab.id === options.scope)) this.setData({ activeTab: options.scope, emptyText: EMPTY[options.scope] }); },
   onShow() { return this.loadApprovals(); },
   onUnload() { this._unloaded = true; this._epoch = (this._epoch || 0) + 1; },
   switchTab(event) {

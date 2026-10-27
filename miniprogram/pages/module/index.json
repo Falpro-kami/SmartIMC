@@ -2,5 +2,6 @@
   "navigationStyle": "default",
   "navigationBarTitleText": "工作台",
   "navigationBarBackgroundColor": "#ffffff",
-  "backgroundColor": "#ffffff"
+  "backgroundColor": "#ffffff",
+  "usingComponents": { "team-announcements": "/components/team-announcements/index" }
 }

@@ -45,6 +45,7 @@ test('custom tab state follows the active page and survives returning from a sec
     load('miniprogram/' + tab.pagePath + '.js', { Page: value => { page = value; } }, {
       '../../services/access': { get: async () => ({ member: null }), can: () => false },
       '../../services/admin-data': {},
+      '../../services/home': { dashboard: async () => ({ todos: [], announcements: [] }), present: value => value },
       '../../services/workbench': { load: async () => ({}) },
       '../../utils/workbench': require('../miniprogram/utils/workbench')
     });

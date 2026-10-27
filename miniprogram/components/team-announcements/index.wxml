@@ -1,0 +1,30 @@
+<view class="announcement-panel imc-theme">
+  <view class="announcement-toolbar">
+    <button wx:if="{{mode !== 'list'}}" class="text-action" bindtap="backToList" disabled="{{saving}}">返回列表</button>
+    <button wx:if="{{mode === 'list' && canManage && !error}}" class="primary-action" bindtap="newAnnouncement">发布公告</button>
+  </view>
+  <view wx:if="{{error}}" class="announcement-error"><text>{{error}}</text><button class="secondary-action" bindtap="loadAnnouncements">重试</button></view>
+  <block wx:elif="{{mode === 'edit' && draft}}">
+    <view class="announcement-card">
+      <text class="field-label">公告标题</text><input class="title-input" maxlength="80" value="{{draft.title}}" bindinput="onTitle" disabled="{{saving}}" placeholder="请输入公告标题" />
+      <text class="field-label body-label">正文</text><textarea class="body-input" maxlength="10000" value="{{draft.body}}" bindinput="onBody" disabled="{{saving}}" placeholder="请输入公告内容" auto-height />
+      <view class="pin-field"><text>置顶公告</text><switch checked="{{draft.pinned}}" bindchange="onPinned" disabled="{{saving}}" color="#005bac" /></view>
+    </view>
+    <text wx:if="{{formError}}" class="form-error">{{formError}}</text>
+    <button class="primary-action full-width" bindtap="saveAnnouncement" loading="{{saving}}" disabled="{{saving}}">{{draft.revision ? '保存修改' : '发布公告'}}</button>
+  </block>
+  <block wx:elif="{{mode === 'detail' && selected}}">
+    <view class="announcement-card">
+      <text wx:if="{{selected.pinned}}" class="pinned-tag">置顶</text>
+      <text class="detail-title">{{selected.title}}</text><text class="announcement-meta">{{selected.authorName}} · {{selected.dateLabel}}</text>
+      <text class="announcement-body" selectable>{{selected.body}}</text>
+    </view>
+    <view wx:if="{{canManage}}" class="detail-actions"><button class="secondary-action" bindtap="editAnnouncement" disabled="{{saving}}">编辑公告</button><button class="danger-action" bindtap="withdrawAnnouncement" disabled="{{saving}}">撤下公告</button></view>
+  </block>
+  <block wx:elif="{{mode === 'list'}}">
+    <text wx:if="{{!loading && !announcements.length}}" class="announcement-state">暂无公告</text>
+    <button wx:for="{{announcements}}" wx:key="id" class="announcement-card announcement-row" data-id="{{item.id}}" bindtap="selectAnnouncement"><view class="announcement-info"><view class="announcement-title-line"><text wx:if="{{item.pinned}}" class="pinned-tag">置顶</text><text class="announcement-title">{{item.title}}</text></view><text class="announcement-meta">{{item.authorName}} · {{item.dateLabel}}</text></view><text class="announcement-arrow">›</text></button>
+    <button wx:if="{{hasMore && !loading}}" class="secondary-action full-width" bindtap="loadMore">加载更多</button>
+  </block>
+  <text wx:if="{{loading}}" class="announcement-state">正在读取…</text>
+</view>

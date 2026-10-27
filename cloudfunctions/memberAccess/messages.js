@@ -60,6 +60,7 @@ module.exports = function messages(db, access) {
     if (before.status === 'pending' && after.status === 'active') { title = '入组申请已通过'; body = '你已加入 IMC'; }
     else if (before.status === 'pending' && after.status === 'disabled') { title = '入组申请未通过'; body = '你的 IMC 入组申请未通过'; }
     else if (after.status === 'disabled') { title = '账号已停用'; body = '你的 IMC 成员账号已停用'; }
+    else if (after.status === 'removed') { title = '已移出团队'; body = '你已被移出 IMC'; }
     else if (after.status === 'pending') { title = '成员状态已更新'; body = '你的 IMC 成员状态为待审核'; }
     else if (before.status === 'disabled' && after.status === 'active') { title = '账号已恢复'; body = '你的 IMC 成员账号已恢复'; }
     return { _id: key('change:' + auditId), teamId: access.TEAM_ID, recipientKey: id,

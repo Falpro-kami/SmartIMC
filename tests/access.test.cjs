@@ -10,19 +10,20 @@ const active = roles => ({ teamId: 'IMC', status: 'active', roles, revision: 0 }
 
 function harness(options = {}) {
   let context = { APPID, OPENID: 'owner' };
-  let tables = { teamMembers: new Map(), teamSecurity: new Map(), memberAudit: new Map(), userProfiles: new Map(), equipment: new Map(), teamMessages: new Map(), workbenchUsage: new Map() };
+  let tables = { teamMembers: new Map(), teamSecurity: new Map(), memberAudit: new Map(), userProfiles: new Map(), equipment: new Map(), teamMessages: new Map(), workbenchUsage: new Map(), teamAnnouncements: new Map() };
   const makeCollection = (store, name) => {
     const table = store[name];
     let filter = {};
     let offset = 0;
     let limit = 100;
+    const order = [];
     return {
-      where(value) { filter = value; return this; }, orderBy() { return this; }, skip(value) { offset = value; return this; }, limit(value) { limit = value; return this; },
-      async get() { return { data: [...table].map(([id, value]) => ({ ...structuredClone(value), _id: id })).filter(row => Object.entries(filter).every(([key, value]) => {
+      where(value) { filter = value; return this; }, orderBy(field, direction) { if (options.sort) order.push([field, direction]); return this; }, skip(value) { offset = value; return this; }, limit(value) { limit = value; return this; },
+      async get() { if (options.onRead) options.onRead(name); return { data: [...table].map(([id, value]) => ({ ...structuredClone(value), _id: id })).filter(row => Object.entries(filter).every(([key, value]) => {
         if (Array.isArray(value)) return value.includes(row[key]);
         if (value && value.$nin) return !(Array.isArray(row[key]) ? row[key] : [row[key]]).some(item => value.$nin.includes(item));
         return row[key] === value;
-      })).slice(offset, offset + limit) }; },
+      })).sort((a, b) => { for (const [key, direction] of order) { if (a[key] < b[key]) return direction === 'desc' ? 1 : -1; if (a[key] > b[key]) return direction === 'desc' ? -1 : 1; } return 0; }).slice(offset, offset + limit) }; },
       doc(id) { return {
         async get() { return { data: table.has(id) ? { ...structuredClone(table.get(id)), _id: id } : null }; },
         async set({ data }) {
@@ -56,7 +57,7 @@ function harness(options = {}) {
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(`cloudfunctions/${name}/index.js`, 'utf8'), {
       module, exports: module.exports, console, require: key => ({ 'wx-server-sdk': cloud, './access': access,
-        './messages': require('../cloudfunctions/memberAccess/messages'), './approvals': require('../cloudfunctions/memberAccess/approvals'), './workbench': require('../cloudfunctions/memberAccess/workbench'), 'node:crypto': crypto })[key]
+        './messages': require('../cloudfunctions/memberAccess/messages'), './approvals': require('../cloudfunctions/memberAccess/approvals'), './home': require('../cloudfunctions/memberAccess/home'), './workbench': require('../cloudfunctions/memberAccess/workbench'), 'node:crypto': crypto })[key]
     });
     return module.exports.main;
   };
@@ -483,4 +484,131 @@ test('workbench usage is stored per platform identity, accepts known tools only 
     assert.equal(usage[toolId].count, 1);
     assert.equal(usage.finance.count, 2);
   }
+});
+
+test('only a super administrator can remove members; removal revokes access, hides directory entries and retains audits', async () => {
+  const app = harness();
+  const owner = userId('owner'), member = userId('member');
+  app.table('teamMembers').set(owner, active(['super_admin']));
+  app.table('teamMembers').set(member, active(['weekly_admin']));
+  app.table('userProfiles').set(member, { name: '测试成员' });
+  app.table('teamSecurity').set('IMC', { superAdminIds: [owner] });
+  const event = { action: 'set', id: member, status: 'removed', roles: [], revision: 0 };
+  app.as('member');
+  assert.equal((await app.member(event)).code, 'FORBIDDEN');
+  app.as('owner');
+  assert.equal((await app.member({ ...event, id: owner })).code, 'LAST_SUPER_ADMIN');
+  assert.equal((await app.member({ ...event, roles: ['super_admin'] })).code, 'INVALID_INPUT');
+  assert.equal((await app.member(event)).ok, true);
+  assert.equal(app.table('teamMembers').get(member).status, 'removed');
+  assert.deepEqual(app.table('teamMembers').get(member).roles, []);
+  assert.equal(app.table('memberAudit').size, 1);
+  assert.equal([...app.table('memberAudit').values()][0].before.status, 'active');
+  assert.equal((await app.member({ action: 'list' })).members.some(row => row.id === member), false);
+  assert.equal((await app.member({ action: 'directory' })).members.some(row => row.id === member), false);
+  assert.equal((await app.member({ action: 'member', id: member })).code, 'NOT_FOUND');
+  app.as('member');
+  assert.equal((await app.member({ action: 'get' })).member.permissions.length, 0);
+  assert.equal((await app.equipment({ action: 'list' })).code, 'MEMBERSHIP_REQUIRED');
+  assert.equal((await app.member({ action: 'directory' })).code, 'MEMBERSHIP_REQUIRED');
+  assert.equal((await app.member({ action: 'apply' })).code, 'MEMBERSHIP_REMOVED');
+  const message = (await app.member({ action: 'messages' })).messages[0];
+  assert.equal(message.title, '已移出团队');
+  assert.equal(message.read, false);
+});
+
+test('failed removal notification rolls back membership, security registry and the audit', async () => {
+  const app = harness({ failMessageWrite: true });
+  const owner = userId('owner'), member = userId('member');
+  app.table('teamMembers').set(owner, active(['super_admin']));
+  app.table('teamMembers').set(member, active(['super_admin']));
+  app.table('teamSecurity').set('IMC', { superAdminIds: [owner, member] });
+  assert.equal((await app.member({ action: 'set', id: member, status: 'removed', roles: [], revision: 0 })).code, 'ACCESS_FAILED');
+  assert.equal(app.table('teamMembers').get(member).status, 'active');
+  assert.equal(app.table('teamSecurity').get('IMC').superAdminIds.length, 2);
+  assert.equal(app.table('memberAudit').size, 0);
+});
+
+test('announcements enforce membership, publisher permissions, content validation and revision conflicts', async () => {
+  const app = harness({ sort: true });
+  const owner = userId('owner'), reader = userId('reader');
+  const id = 'ann_' + 'a'.repeat(32);
+  const event = { action: 'saveAnnouncement', id, revision: 0, title: ' 实验室通知 ', body: '第一行\n第二行', pinned: true, authorName: '伪造发布者', teamId: 'OTHER' };
+  for (const status of [null, 'pending', 'disabled', 'removed']) {
+    if (status) app.table('teamMembers').set(owner, { ...active(['super_admin']), status });
+    for (const action of ['home', 'announcements', 'announcement', 'saveAnnouncement', 'withdrawAnnouncement']) {
+      assert.equal((await app.member({ ...event, action })).code, 'MEMBERSHIP_REQUIRED');
+    }
+  }
+  app.table('teamMembers').set(owner, { ...active(['super_admin']), teamId: 'OTHER' });
+  assert.equal((await app.member({ action: 'home' })).code, 'MEMBERSHIP_REQUIRED');
+  for (const roles of [[], ['leader'], ['academic_admin'], ['finance_admin'], ['weekly_admin'], ['five_s_admin']]) {
+    app.table('teamMembers').set(owner, active(roles));
+    assert.equal((await app.member(event)).code, 'FORBIDDEN');
+  }
+  app.table('teamMembers').set(owner, active(['super_admin']));
+  app.table('userProfiles').set(owner, { name: '真实发布者' });
+  assert.equal((await app.member({ ...event, title: '' })).code, 'INVALID_INPUT');
+  assert.equal((await app.member({ ...event, body: 'x'.repeat(10001) })).code, 'INVALID_INPUT');
+  assert.equal((await app.member(event)).ok, true);
+  assert.equal((await app.member(event)).code, 'CONFLICT');
+  assert.equal(app.table('teamAnnouncements').size, 1);
+  app.table('teamMembers').set(reader, active([]));
+  app.as('reader');
+  const list = await app.member({ action: 'announcements', id: owner });
+  assert.equal(list.canManage, false);
+  assert.equal(list.announcements[0].title, '实验室通知');
+  assert.equal(list.announcements[0].authorName, '真实发布者');
+  assert.equal('body' in list.announcements[0], false);
+  assert.equal('createdBy' in list.announcements[0], false);
+  assert.equal((await app.member({ action: 'announcement', id })).announcement.body, '第一行\n第二行');
+  assert.equal((await app.member({ action: 'withdrawAnnouncement', id, revision: 1 })).code, 'FORBIDDEN');
+  app.as('owner');
+  assert.equal((await app.member({ ...event, revision: 1, title: '新标题' })).ok, true);
+  assert.equal((await app.member({ action: 'withdrawAnnouncement', id, revision: 1 })).code, 'CONFLICT');
+  assert.equal((await app.member({ action: 'withdrawAnnouncement', id, revision: 2 })).ok, true);
+  assert.equal((await app.member({ action: 'announcements' })).announcements.length, 0);
+  assert.equal((await app.member({ action: 'announcement', id })).code, 'NOT_FOUND');
+  assert.equal(app.table('teamAnnouncements').get(id).status, 'withdrawn');
+});
+
+test('home shows actual pending applications without marking messages read; announcements paginate pinned first', async () => {
+  const app = harness({ sort: true });
+  const owner = userId('owner'), applicant = userId('applicant');
+  app.table('teamMembers').set(owner, active(['super_admin']));
+  app.table('teamSecurity').set('IMC', { superAdminIds: [owner] });
+  app.table('userProfiles').set(applicant, { name: '申请人' });
+  app.as('applicant'); await app.member({ action: 'apply' }); app.as('owner');
+  for (let i = 0; i < 25; i++) app.table('teamAnnouncements').set('ann_' + i.toString(16).padStart(32, '0'), {
+    teamId: 'IMC', status: 'published', title: '公告' + i, body: '正文', pinned: i === 0, publishedMs: 100 + i, revision: 1
+  });
+  const first = await app.member({ action: 'announcements' });
+  assert.equal(first.announcements[0].title, '公告0');
+  assert.equal(first.announcements[1].title, '公告24');
+  assert.equal(first.nextOffset, 20);
+  assert.equal(first.hasMore, true);
+  const second = await app.member({ action: 'announcements', offset: first.nextOffset });
+  assert.equal(second.announcements.length, 5);
+  assert.equal(second.hasMore, false);
+  const home = await app.member({ action: 'home' });
+  assert.equal(home.todos.length, 1);
+  assert.equal(home.todos[0].memberId, applicant);
+  assert.equal(home.announcements.length, 3);
+  await app.member({ action: 'set', id: applicant, status: 'active', roles: [], revision: 0 });
+  assert.equal((await app.member({ action: 'home' })).todos.length, 0);
+  assert.equal((await app.member({ action: 'get' })).hasUnread, true);
+  app.as('applicant');
+  assert.equal((await app.member({ action: 'home' })).canManage, false);
+  assert.equal((await app.member({ action: 'home' })).todos.length, 0);
+});
+
+test('home rechecks permissions before returning sensitive pending applicants', async () => {
+  const options = {};
+  const app = harness(options), owner = userId('owner');
+  app.table('teamMembers').set(owner, active(['super_admin']));
+  app.table('teamMembers').set(userId('applicant'), { ...active([]), status: 'pending' });
+  options.onRead = table => { if (table === 'teamAnnouncements') app.table('teamMembers').set(owner, active([])); };
+  const result = await app.member({ action: 'home' });
+  assert.equal(result.todos.length, 0);
+  assert.equal(result.canManage, false);
 });

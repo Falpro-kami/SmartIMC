@@ -12,5 +12,6 @@
       <text class="label">管理角色（可多选）</text><checkbox-group bindchange="changeRoles"><label wx:for="{{editor.options}}" wx:key="value" class="role-option"><checkbox value="{{item.value}}" checked="{{item.selected}}" disabled="{{saving}}" color="#005bac" /><text>{{item.label}}</text></label></checkbox-group>
     </scroll-view>
     <text wx:if="{{formError}}" class="error">{{formError}}</text><button class="save" bindtap="saveMember" loading="{{saving}}" disabled="{{saving}}">保存成员与权限</button>
+    <button class="remove-member" bindtap="removeMember" disabled="{{saving}}">移出成员</button>
   </view></view>
 </view>
