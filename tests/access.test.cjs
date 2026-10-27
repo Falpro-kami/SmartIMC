@@ -10,7 +10,7 @@ const active = roles => ({ teamId: 'IMC', status: 'active', roles, revision: 0 }
 
 function harness(options = {}) {
   let context = { APPID, OPENID: 'owner' };
-  let tables = { teamMembers: new Map(), teamSecurity: new Map(), memberAudit: new Map(), userProfiles: new Map(), equipment: new Map(), teamMessages: new Map(), workbenchUsage: new Map(), teamAnnouncements: new Map(), weeklyPeriods: new Map(), weeklyReports: new Map() };
+  let tables = { teamSync: new Map([['IMC', Object.fromEntries(['home', 'messages', 'approvals', 'weekly', 'members'].map(k => [k, 'initial']))]]), teamSyncAccess: new Map(), teamMembers: new Map(), teamSecurity: new Map(), memberAudit: new Map(), userProfiles: new Map(), equipment: new Map(), teamMessages: new Map(), workbenchUsage: new Map(), teamAnnouncements: new Map(), weeklyPeriods: new Map(), weeklyReports: new Map() };
   const makeCollection = (store, name) => {
     const table = store[name];
     let filter = {};
@@ -57,7 +57,7 @@ function harness(options = {}) {
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(`cloudfunctions/${name}/index.js`, 'utf8'), {
       module, exports: module.exports, console, require: key => ({ 'wx-server-sdk': cloud, './access': access,
-        './messages': require('../cloudfunctions/memberAccess/messages'), './approvals': require('../cloudfunctions/memberAccess/approvals'), './home': require('../cloudfunctions/memberAccess/home'), './workbench': require('../cloudfunctions/memberAccess/workbench'), 'node:crypto': crypto })[key]
+        './sync': require('../cloudfunctions/memberAccess/sync'), './messages': require('../cloudfunctions/memberAccess/messages'), './approvals': require('../cloudfunctions/memberAccess/approvals'), './home': require('../cloudfunctions/memberAccess/home'), './workbench': require('../cloudfunctions/memberAccess/workbench'), 'node:crypto': crypto })[key]
     });
     return module.exports.main;
   };
@@ -607,7 +607,7 @@ test('announcements enforce membership, publisher permissions, content validatio
   const event = { action: 'saveAnnouncement', id, revision: 0, title: ' 实验室通知 ', body: '第一行\n第二行', pinned: true, authorName: '伪造发布者', teamId: 'OTHER' };
   for (const status of [null, 'pending', 'disabled', 'removed']) {
     if (status) app.table('teamMembers').set(owner, { ...active(['super_admin']), status });
-    for (const action of ['home', 'announcements', 'announcement', 'saveAnnouncement', 'withdrawAnnouncement']) {
+    for (const action of ['syncConnect', 'syncState', 'home', 'announcements', 'announcement', 'saveAnnouncement', 'withdrawAnnouncement']) {
       assert.equal((await app.member({ ...event, action })).code, 'MEMBERSHIP_REQUIRED');
     }
   }
@@ -716,10 +716,45 @@ test('home includes own real weekly tasks and excludes submitted, exempt, closed
   assert.ok(result.todos.every(t => t.type === '周报提交' && t.periodId));
 });
 
+test('realtime registration is bound to platform identity, exposes opaque cursors only and revokes in the membership transaction', async () => {
+  const a = harness(), owner = userId('owner'), person = userId('person');
+  a.table('teamMembers').set(owner, active(['super_admin']));
+  a.table('teamMembers').set(person, active([]));
+  a.table('teamSecurity').set('IMC', { superAdminIds: [owner] });
+  a.as('person');
+  const result = await a.member({ action: 'syncConnect', id: owner, OPENID: 'owner' });
+  assert.equal(result.ok, true);
+  assert.equal(a.table('teamSyncAccess').get('person').memberId, person);
+  assert.equal(a.table('teamSyncAccess').has('owner'), false);
+  assert.equal(JSON.stringify(result).includes('memberId'), false);
+  assert.deepEqual(Object.keys(result.state).sort(), ['approvals', 'home', 'members', 'messages', 'weekly']);
+  a.as('owner');
+  const before = structuredClone(a.table('teamSync').get('IMC'));
+  assert.equal((await a.member({ action: 'set', id: person, status: 'removed', roles: [], revision: 0 })).ok, true);
+  assert.equal(a.table('teamSyncAccess').get('person').active, false);
+  for (const channel of ['home', 'messages', 'approvals', 'members', 'weekly']) assert.notEqual(a.table('teamSync').get('IMC')[channel], before[channel]);
+  a.as('person');
+  assert.equal((await a.member({ action: 'syncConnect' })).code, 'MEMBERSHIP_REQUIRED');
+  assert.equal((await a.member({ action: 'syncState' })).code, 'MEMBERSHIP_REQUIRED');
+});
+
+test('failed membership changes roll back their live cursor and grant as well as the member and notification', async () => {
+  const a = harness({ failMessageWrite: true }), owner = userId('owner'), person = userId('person');
+  a.table('teamMembers').set(owner, active(['super_admin']));
+  a.table('teamMembers').set(person, active([]));
+  a.table('teamSecurity').set('IMC', { superAdminIds: [owner] });
+  a.as('person'); await a.member({ action: 'syncConnect' }); a.as('owner');
+  const before = structuredClone(a.table('teamSync').get('IMC'));
+  assert.equal((await a.member({ action: 'set', id: person, status: 'removed', roles: [], revision: 0 })).ok, false);
+  assert.equal(a.table('teamMembers').get(person).status, 'active');
+  assert.equal(a.table('teamSyncAccess').get('person').active, true);
+  assert.deepEqual(a.table('teamSync').get('IMC'), before);
+});
+
 test('all business endpoints reject unjoined, pending, disabled, removed and other-team identities', async () => {
   const app = harness();
   const id = userId('owner');
-  const events = ['home', 'announcements', 'announcement', 'saveAnnouncement', 'withdrawAnnouncement', 'workbenchUsage', 'recordToolOpen', 'directory', 'messages', 'readMessage', 'openMessage', 'list', 'member', 'set']
+  const events = ['syncConnect', 'syncState', 'home', 'announcements', 'announcement', 'saveAnnouncement', 'withdrawAnnouncement', 'workbenchUsage', 'recordToolOpen', 'directory', 'messages', 'readMessage', 'openMessage', 'list', 'member', 'set']
     .map(action => ({ action, id: 'msg_' + 'a'.repeat(32), toolId: 'finance', roles: ['super_admin'], status: 'active', OPENID: 'spoof' }));
   for (const scope of ['mine', 'pending', 'done']) events.push({ action: 'approvals', scope });
   for (const member of [null, { ...active(['super_admin']), status: 'pending' }, { ...active(['super_admin']), status: 'disabled' },

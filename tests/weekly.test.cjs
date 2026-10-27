@@ -11,7 +11,8 @@ const token = (p, n) => p + '_' + n.toString(16).padStart(32, '0');
 const active = roles => ({ teamId: 'IMC', status: 'active', roles });
 const sourceId = file => 'cloud://well-leopon-d5glrufc6e4fd4413.7765-well-leopon-d5glrufc6e4fd4413-1516940081/' + file.path;
 function fixture() {
-  let tables = Object.fromEntries(['teamMembers', 'userProfiles', 'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'teamMessages'].map(t => [t, new Map()]));
+  let tables = Object.fromEntries(['teamSync', 'teamMembers', 'userProfiles', 'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'teamMessages'].map(t => [t, new Map()]));
+  tables.teamSync.set('IMC', Object.fromEntries(['home', 'messages', 'approvals', 'weekly', 'members'].map(k => [k, 'initial'])));
   let now = Date.parse('2026-10-27T10:00:00+08:00'), reads = 0, copies = 0;
   const objects = new Map();
   function collection(store, name) {
@@ -49,6 +50,29 @@ function fixture() {
 const denied = (promise, code) => assert.rejects(promise, error => error.businessCode === code);
 const saved = (a, fileIds, revision = 0, request = 1) => a.send(id(2), 'saveDraft', { periodId: pid(1), revision, fileIds, requestId: token('wd', request) });
 const submitted = (a, fileIds, revision = 0, request = 1) => a.send(id(2), 'submit', { periodId: pid(1), revision, fileIds, requestId: token('ws', request) });
+
+test('publication, submission and the scheduled worker commit live cursors without marking messages read', async () => {
+  const a = fixture();
+  await a.period();
+  const published = structuredClone(a.table('teamSync').get('IMC'));
+  for (const channel of ['home', 'messages', 'weekly']) assert.notEqual(published[channel], 'initial');
+  assert.equal(published.approvals, 'initial');
+  const file = await a.upload();
+  await submitted(a, [file.id]);
+  assert.notEqual(a.table('teamSync').get('IMC').home, published.home);
+  assert.notEqual(a.table('teamSync').get('IMC').weekly, published.weekly);
+  assert.equal(a.table('teamSync').get('IMC').messages, published.messages);
+  for (const message of a.table('teamMessages').values()) assert.deepEqual(message.readBy, []);
+  await a.period({ id: pid(2), status: 'scheduled', publishAt: '2026-10-27T11:00' });
+  const before = structuredClone(a.table('teamSync').get('IMC'));
+  a.time(Date.parse('2026-10-27T11:01:00+08:00'));
+  const publish = require('../cloudfunctions/weeklyReport/publisher')(a.db, access, a.clock);
+  assert.equal((await publish()).published, 1);
+  for (const channel of ['home', 'messages', 'weekly']) assert.notEqual(a.table('teamSync').get('IMC')[channel], before[channel]);
+  const after = structuredClone(a.table('teamSync').get('IMC'));
+  assert.equal((await publish()).published, 0);
+  assert.deepEqual(a.table('teamSync').get('IMC'), after);
+});
 
 test('weekly actions enforce real membership and business permissions before returning data', async () => {
   const a = fixture();

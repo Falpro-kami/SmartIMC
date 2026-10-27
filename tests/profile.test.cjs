@@ -211,7 +211,7 @@ test('personal profile editor validates the name and saves a selected avatar thr
   assert.equal(page.data.saving, false);
 });
 
-test('header shows actual role badges and unread status, polls only while visible and opens the message page', async () => {
+test('header shows actual role badges and unread status without creating a second polling loop', async () => {
   const policy = require('../cloudfunctions/_shared/access');
   let definition, interval, cleared = 0, navigation;
   let result = { member: { status: 'active', roles: ['weekly_admin', 'super_admin'] }, roleOptions: policy.ROLES, hasUnread: true };
@@ -228,10 +228,11 @@ test('header shows actual role badges and unread status, polls only while visibl
   assert.deepEqual(Array.from(header.data.roleTags, tag => tag.label), ['周报管理员', '超级管理员']);
   assert.equal(header.data.hasUnread, true);
   await header.startNotifications();
-  assert.equal(typeof interval, 'function');
+  assert.equal(interval, undefined);
+  assert.equal(header._visible, true);
   definition.pageLifetimes.hide.call(header);
-  assert.equal(header._notificationTimer, null);
-  assert.equal(cleared, 1);
+  assert.equal(header._visible, false);
+  assert.equal(cleared, 0);
   await Promise.resolve();
   result = { member: { status: 'active', roles: [] }, roleOptions: policy.ROLES, hasUnread: false };
   await header.loadIdentity();

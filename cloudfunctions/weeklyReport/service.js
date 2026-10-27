@@ -1,4 +1,5 @@
 const { createHash, randomUUID } = require('node:crypto');
+const sync = require('./sync');
 const TEAM = 'IMC';
 const PREFIX = 'cloud://well-leopon-d5glrufc6e4fd4413.7765-well-leopon-d5glrufc6e4fd4413-1516940081/';
 const FILE_LIMIT = 5 * 1024 * 1024, TOTAL_LIMIT = 10 * 1024 * 1024, COUNT_LIMIT = 5;
@@ -124,6 +125,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     if (await read(tx, 'teamMessages', messageId)) return;
     await tx.collection('teamMessages').doc(messageId).set({ data: { teamId: TEAM, kind: 'weekly', recipientKey: ids,
       subjectId: p._id, title, body: p.title, createdMs: clock(), state: 'open', readBy: [] } });
+    await sync.bump(tx, ['messages']);
   }
   async function savePeriod(id, e) {
     await authorize(id, 'weekly.manage');
@@ -157,6 +159,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       const { _id, ...data } = p;
       await tx.collection('weeklyPeriods').doc(e.id).set({ data });
       await audit(tx, id, previous ? 'period.update' : e.status === 'scheduled' ? 'period.schedule' : 'period.publish', e.id, { before: previous || null, after: p });
+      await sync.bump(tx, ['home', 'weekly']);
     });
     return { ok: true, id: e.id };
   }
@@ -238,6 +241,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
         await audit(tx, id, 'report.submit', rid, { version, fileIds: e.fileIds });
       }
       await tx.collection('weeklyReports').doc(rid).set({ data });
+      await sync.bump(tx, ['home', 'weekly']);
     });
     return get(id, { periodId: e.periodId });
   }

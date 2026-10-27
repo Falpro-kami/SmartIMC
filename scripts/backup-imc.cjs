@@ -84,6 +84,7 @@ async function main() {
     write.put(entry.path, JSON.stringify(data));
     collections.push(entry);
     const acl = api('DescribeDatabaseACL', { CollectionName: name });
+    if (name === 'teamSync') acl.safeRule = api('DescribeSafeRule', { CollectionName: name });
     const indexes = api('DescribeTable', { Tag: env.Databases[0].InstanceId, TableName: name });
     write.put('metadata/collections/' + name + '.json', JSON.stringify({ acl, indexes }));
   }

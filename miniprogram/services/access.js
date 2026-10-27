@@ -29,9 +29,11 @@ function get(force = false) {
   identityRequest = call({ action: 'get' }).then(result => {
     if (epoch === identityEpoch) {
       const nextScope = JSON.stringify([result.accountCode, result.member && result.member.status, result.member && result.member.revision, result.member && result.member.roles]);
-      if (scope && scope !== nextScope) cache.clear();
+      const changed = scope && scope !== nextScope;
+      if (changed) cache.clear();
       scope = nextScope; identity = { ...result, hasUnread: version !== unreadVersion && unread !== null ? unread : result.hasUnread };
       if (version === unreadVersion) publishUnread(result.hasUnread === true);
+      if (changed && cache.publish) cache.publish(['members']);
     }
     return result;
   })
@@ -46,6 +48,7 @@ async function mutate(data) {
   if (data.action === 'readMessage') cache.invalidate('access:messages'); else cache.clear();
   if (typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread);
   else unreadAt = 0;
+  if (cache.publish) cache.publish(data.action === 'readMessage' ? ['messages'] : ['home', 'messages', 'approvals', 'members', 'weekly']);
   return result;
 }
 function publishUnread(value) {
@@ -66,9 +69,19 @@ function notifications(force = false) {
   return unreadRequest;
 }
 function subscribeUnread(listener) { unreadListeners.add(listener); if (unread !== null) listener(unread); return () => unreadListeners.delete(listener); }
+function refreshUnread() {
+  unreadAt = 0; unreadVersion++;
+  // A push received during an older read must get a second, post-commit read.
+  return unreadRequest ? unreadRequest.catch(() => {}).then(() => notifications(true)) : notifications(true);
+}
+function refreshIdentity() {
+  return identityRequest ? identityRequest.catch(() => {}).then(() => get(true)) : get(true);
+}
 function read(action, data, force = false) { return cache.load('access:' + action + ':' + JSON.stringify(data), () => call({ ...data, action }), 30000, force); }
-module.exports = { get, apply: () => mutate({ action: 'apply' }),
-  notifications, subscribeUnread, notificationCurrent: () => unread,
+module.exports = { get, refreshIdentity, apply: () => mutate({ action: 'apply' }),
+  sync: action => call({ action }),
+  subscribeChanges: (channel, listener) => cache.subscribe(channel, listener),
+  notifications, refreshUnread, subscribeUnread, notificationCurrent: () => unread,
   peek: (action, data) => cache.peek('access:' + action + ':' + JSON.stringify(data)),
   approvals: (scope, offset, force) => read('approvals', { scope, offset }, force),
   directory: (offset, force) => read('directory', { offset }, force),

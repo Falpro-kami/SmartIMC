@@ -1,4 +1,5 @@
 const { createHash } = require('node:crypto');
+const sync = require('./sync');
 const collection = 'teamMessages';
 function key(value) { return 'msg_' + createHash('sha256').update(value).digest('hex').slice(0, 32); }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
@@ -48,7 +49,10 @@ module.exports = function messages(db, access) {
       if (message.kind === 'weekly' && /^wp_[a-f0-9]{32}$/.test(message.subjectId || '')) {
         url = '/pages/module/index?id=weekly&period=' + message.subjectId;
       }
-      if (markRead) await reference.update({ data: { readBy: db.command.addToSet(id) } });
+      if (markRead && !(message.readBy || []).includes(id)) {
+        await reference.update({ data: { readBy: db.command.addToSet(id) } });
+        await sync.bump(transaction, ['messages']);
+      }
       return { ok: true, url };
     });
     // wx-server-sdk resolves the callback value directly; accept node-sdk's result wrapper as well.
@@ -80,6 +84,7 @@ module.exports = function messages(db, access) {
   async function put(transaction, message) {
     const { _id, ...data } = message;
     await transaction.collection(collection).doc(_id).set({ data });
+    await sync.bump(transaction, ['messages']);
   }
   return { unread, list, read, open: (id, event) => read(id, event, false), applicationData, changeData, put,
     applicationId };

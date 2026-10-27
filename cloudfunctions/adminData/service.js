@@ -69,6 +69,7 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
         const [acl, indexes] = await Promise.all([
           api('DescribeDatabaseACL', { CollectionName: name }), api('DescribeTable', { Tag: env.Databases[0].InstanceId, TableName: name })
         ]);
+        if (name === 'teamSync') acl.safeRule = await api('DescribeSafeRule', { CollectionName: name });
         collections.push({ name, documents: JSON.parse(format.json(documents)), acl, indexes });
       }
       const inventory = async () => (await manager.storage.listDirectoryFiles('')).filter(file => !file.Key.startsWith(PREFIX) && !file.Key.endsWith('/')).sort((a, b) => a.Key.localeCompare(b.Key));

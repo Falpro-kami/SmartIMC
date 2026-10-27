@@ -1,4 +1,5 @@
 const cloudConfig = require('./config/cloud');
+const realtime = require('./services/realtime');
 
 App({
   globalData: {
@@ -6,6 +7,8 @@ App({
     cloudReady: false,
     databaseStatus: 'not-checked'
   },
+  onShow() { realtime.start(); },
+  onHide() { realtime.stop(); },
 
   onLaunch() {
     if (!wx.cloud) {

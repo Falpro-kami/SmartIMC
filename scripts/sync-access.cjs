@@ -7,4 +7,7 @@ for (const name of ['memberAccess', 'equipmentQuery', 'adminData', 'checkDatabas
   fs.writeFileSync(path.join(directory, 'access.js'), source);
 }
 fs.copyFileSync(path.join(__dirname, '../cloudfunctions/weeklyReport/publisher.js'), path.join(__dirname, '../cloudfunctions/weeklyPublish/publisher.js'));
+for (const name of ['memberAccess', 'weeklyReport', 'weeklyPublish']) {
+  fs.copyFileSync(path.join(__dirname, '../cloudfunctions/_shared/sync.js'), path.join(__dirname, '../cloudfunctions', name, 'sync.js'));
+}
 console.log('Shared access policy synchronized.');

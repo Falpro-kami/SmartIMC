@@ -36,6 +36,30 @@ test('session cache shares reads, reuses results and cannot restore invalidated 
   assert.equal(c.peek('weekly:list'), null);
   c.set('home:dashboard', { value: 'private' }); c.clear(); assert.equal(c.peek('home:dashboard'), null);
 });
+
+test('a message push during an earlier unread read always requests post-commit state', async () => {
+  const a = accessFixture(); await a.service.get();
+  let release, queries = 0;
+  a.pendingUnread(() => ++queries === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve({ result: { ok: true, hasUnread: true } }));
+  const old = a.service.notifications(true);
+  const pushed = a.service.refreshUnread();
+  release({ result: { ok: true, hasUnread: false } });
+  await Promise.all([old, pushed]);
+  assert.equal(queries, 2);
+  assert.equal(a.service.notificationCurrent(), true);
+});
+
+test('a membership push waits past an old in-flight identity response before fetching current permissions', async () => {
+  const a = accessFixture(); await a.service.get();
+  let release, reads = 0;
+  const old = { ok: true, accountCode: 'account', member: { teamId: 'IMC', status: 'active', roles: [], revision: 1 }, hasUnread: false };
+  const current = { ...old, member: { ...old.member, roles: ['super_admin'], revision: 2 } };
+  a.pendingIdentity(() => ++reads === 1 ? new Promise(resolve => { release = resolve; }) : Promise.resolve({ result: current }));
+  const pending = a.service.get(true), pushed = a.service.refreshIdentity();
+  release({ result: old }); await pending;
+  const result = await pushed;
+  assert.equal(reads, 2); assert.equal(result.member.roles[0], 'super_admin');
+});
 test('message list and explicit read synchronize unread badges across headers without deleting unrelated page caches', async () => {
   const a = accessFixture(), seen = [];
   a.service.subscribeUnread(value => seen.push(value));

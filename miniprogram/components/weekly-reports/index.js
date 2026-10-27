@@ -4,24 +4,48 @@ Component({
   data: { mode: 'list', loading: true, busy: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
     canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
     files: [], versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
-  lifetimes: { attached() { this.loadList(); }, detached() { this._detached = true; this._epoch = (this._epoch || 0) + 1; } },
-  pageLifetimes: { show() { if (this._initialized && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved) this.refresh(); } },
+  lifetimes: { attached() { this.startLive(); this.loadList(); }, detached() { this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
+  pageLifetimes: {
+    show() { this.startLive(); if (this._initialized && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved) this.refresh(this._livePending === true); },
+    hide() { this.stopLive(); this._epoch = (this._epoch || 0) + 1; }
+  },
   methods: {
-    update(data) { if (!this._detached) this.setData(data); },
-    async refresh(force = false) {
-      if (this.data.mode === 'form') return;
-      if (this.data.mode === 'team' && this.data.selected) return this.loadTeam(force === true);
-      if (this.data.mode === 'detail' && this.data.selected) return this.openPeriod(this.data.selected.id, this._ownerId, force === true);
-      return this.loadList(false, force === true);
+    startLive() {
+      if (!this._unsubscribeLive && weekly.subscribe) this._unsubscribeLive = weekly.subscribe(() => { this._livePending = true; this.refreshLive(); });
     },
-    async loadList(more = false, force = false) {
+    stopLive() { if (this._unsubscribeLive) this._unsubscribeLive(); this._unsubscribeLive = null; },
+    async refreshLive() {
+      if (!this._livePending || this._liveLoading || this._detached || !this._unsubscribeLive || this.data.loading || this.data.busy || this._choosing || this._nativeFile || this._unsaved || this.data.mode === 'form') return;
+      this._livePending = false;
+      this._liveLoading = true;
+      try { await this.refresh(true, true); }
+      finally { this._liveLoading = false; this.refreshLive(); }
+    },
+    update(data) { if (!this._detached) { this.setData(data); if (data.busy === false || data.loading === false) this.refreshLive(); } },
+    async refresh(force = false, quiet = false) {
+      if (this.data.mode === 'form') return;
+      if (this.data.mode === 'team' && this.data.selected) return this.loadTeam(force === true, quiet);
+      if (this.data.mode === 'detail' && this.data.selected) return this.openPeriod(this.data.selected.id, this._ownerId, force === true, quiet);
+      return this.loadList(false, force === true, quiet);
+    },
+    async loadList(more = false, force = false, quiet = false) {
       if (this.data.busy || (more && (this.data.loading || !this.data.hasMore))) return;
+      const retainedOffset = this._offset || 0;
       const epoch = this._epoch = (this._epoch || 0) + 1;
       const cached = !more && weekly.peek && weekly.peek('list', { offset: 0 });
       if (cached) { this._offset = cached.nextOffset; this.update({ ...this.rights(cached), periods: cached.periods.map(weekly.periodView), hasMore: cached.hasMore }); }
-      this.update({ mode: 'list', loading: !cached && (!this.data.periods.length || more), error: '', actionError: '' });
+      this.update({ mode: 'list', loading: quiet ? false : !cached && (!this.data.periods.length || more), error: '', actionError: '' });
       try {
-        const result = await weekly.call('list', { offset: more ? this._offset : 0 }, force);
+        let result = await weekly.call('list', { offset: more ? this._offset : 0 }, force);
+        if (quiet && !more) {
+          const target = retainedOffset, rows = result.periods.slice();
+          while (result.hasMore && result.nextOffset < target) {
+            result = await weekly.call('list', { offset: result.nextOffset }, force);
+            if (this._detached || epoch !== this._epoch) return;
+            rows.push(...result.periods);
+          }
+          result = { ...result, periods: Array.from(new Map(rows.map(row => [row.id, row])).values()) };
+        }
         if (this._detached || epoch !== this._epoch) return;
         this._offset = result.nextOffset;
         this.update({ ...this.rights(result), periods: (more ? this.data.periods : []).concat(result.periods.map(weekly.periodView)), hasMore: result.hasMore });
@@ -29,24 +53,27 @@ Component({
           this._initialized = true;
           if (this.properties.initialPeriod) return this.openPeriod(this.properties.initialPeriod);
         }
-      } catch (error) { if (epoch === this._epoch) this.update({ error: error.message, periods: [], canManage: false }); }
+      } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message, periods: [], canManage: false }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
     rights(r) { return { canManage: !!r.canManage, canReadTeam: !!r.canReadTeam, canRemind: !!r.canRemind, canExport: !!r.canExport }; },
     loadMore() { return this.loadList(true); },
     choosePeriod(e) { return this.openPeriod(e.currentTarget.dataset.id); },
-    async openPeriod(periodId, ownerId = '', force = false) {
+    async openPeriod(periodId, ownerId = '', force = false, quiet = false) {
       if (this.data.busy) return;
       const epoch = this._epoch = (this._epoch || 0) + 1;
       this._ownerId = ownerId;
       this._unsaved = null;
       const query = { periodId, ...(ownerId ? { ownerId } : {}) }, cached = weekly.peek && weekly.peek('get', query);
       if (cached) this.accept(cached);
-      this.update({ mode: 'detail', loading: !cached, error: '', actionError: '', ...(cached ? {} : { selected: null, report: null, files: [], versions: [] }), saveState: '' });
+      if (!quiet) this.update({ mode: 'detail', loading: !cached, error: '', actionError: '', ...(cached ? {} : { selected: null, report: null, files: [], versions: [] }), saveState: '' });
       try {
         const result = await weekly.call('get', query, force);
-        if (epoch === this._epoch) this.accept(result);
-      } catch (error) { if (epoch === this._epoch) this.update({ error: error.message }); }
+        if (epoch === this._epoch && !this._detached) {
+          if (quiet && (this.data.busy || this._choosing || this._nativeFile || this._unsaved || this.data.mode !== 'detail')) { this._livePending = true; return; }
+          this.accept(result);
+        }
+      } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
     accept(result) {
@@ -126,17 +153,17 @@ Component({
       } catch (error) { if (!/cancel/i.test(error.errMsg || '')) this.update({ actionError: error.message || '文件暂时无法打开，请下载后查看。' }); }
       finally { this._nativeFile = false; this.update({ busy: false }); }
     },
-    async loadTeam(force = false) {
+    async loadTeam(force = false, quiet = false) {
       if (this.data.busy || !this.data.selected || !this.data.canReadTeam) return;
       const periodId = this.data.selected.id, epoch = this._epoch = (this._epoch || 0) + 1;
       const cached = weekly.peek && weekly.peek('team', { periodId });
       if (cached) this.acceptTeam(cached);
-      this.update({ mode: 'team', loading: !cached, error: '', actionError: '' });
+      this.update({ mode: 'team', loading: quiet ? false : !cached, error: '', actionError: '' });
       try {
         const result = await weekly.call('team', { periodId }, force === true);
         if (epoch !== this._epoch) return;
         this.acceptTeam(result);
-      } catch (error) { if (epoch === this._epoch) this.update({ error: error.message }); }
+      } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
     acceptTeam(result) { const rows = result.rows.map(r => ({ ...r, statusLabel: weekly.statusLabel(r.status), dateLabel: weekly.dateLabel(r.submittedMs) }));
@@ -172,6 +199,7 @@ Component({
     editCurrentPeriod() { return this.editPeriod(true); },
     async editPeriod(existing) {
       if (this.data.busy || !this.data.canManage) return;
+      this._epoch = (this._epoch || 0) + 1;
       const currentId = this.data.selected && this.data.selected.id;
       this.update({ busy: true, actionError: '' });
       try {

@@ -12,22 +12,29 @@ Page(require('../../utils/member-page')({
     activeTab: 'mine', emptyText: EMPTY.mine,
     tabs: [{ id: 'mine', label: '我的申请' }, { id: 'pending', label: '待我审批' }, { id: 'done', label: '我已审批' }] },
   onLoad(options = {}) { if (this.data.tabs.some(tab => tab.id === options.scope)) this.setData({ activeTab: options.scope, emptyText: EMPTY[options.scope] }); },
-  onShow() { return this.loadApprovals(); },
-  onUnload() { this._unloaded = true; this._epoch = (this._epoch || 0) + 1; },
+  onShow() {
+    if (!this._unsubscribeLive && access.subscribeChanges) this._unsubscribeLive = access.subscribeChanges('approvals', () => {
+      this._views = { [this.data.activeTab]: this.data.requests };
+      this.loadApprovals(true, true);
+    });
+    return this.loadApprovals();
+  },
+  onHide() { if (this._unsubscribeLive) this._unsubscribeLive(); this._unsubscribeLive = null; this._epoch = (this._epoch || 0) + 1; },
+  onUnload() { this._unloaded = true; this.onHide(); },
   switchTab(event) {
     const tab = event.currentTarget.dataset.id;
     if (!this.data.tabs.some(item => item.id === tab) || tab === this.data.activeTab) return;
     this.setData({ activeTab: tab, emptyText: EMPTY[tab] });
     return this.loadApprovals();
   },
-  async loadApprovals() {
+  async loadApprovals(force = false, quiet = false) {
     const epoch = this._epoch = (this._epoch || 0) + 1;
     const tab = this.data.activeTab;
     const currentRequest = () => !this._unloaded && this._epoch === epoch;
     this._views = this._views || {};
     const first = access.peek && access.peek('approvals', { scope: tab, offset: 0 });
     const view = this._views[tab] || (first && !first.hasMore ? first.requests.map(row => ({ ...row, dateLabel: dateLabel(row.createdMs) })) : null);
-    this.setData({ loading: !view, error: '', requests: view || [], canReviewMembers: false });
+    if (!quiet) this.setData({ loading: !view, error: '', requests: view || [], canReviewMembers: false });
     try {
       const current = await access.get();
       if (!currentRequest()) return;
@@ -38,7 +45,7 @@ Page(require('../../utils/member-page')({
       let offset = 0;
       let hasMore = true;
       while (hasMore) {
-        const result = await access.approvals(tab, offset);
+        const result = await access.approvals(tab, offset, force);
         if (!currentRequest()) return;
         if (!Array.isArray(result.requests) || !Number.isSafeInteger(result.nextOffset) ||
           result.nextOffset < offset || (result.hasMore && result.nextOffset <= offset)) {
@@ -49,8 +56,8 @@ Page(require('../../utils/member-page')({
         hasMore = result.hasMore === true;
       }
       this._views[tab] = Array.from(requests.values());
-      this.setData({ requests: this._views[tab] });
-    } catch (error) { if (currentRequest()) { delete this._views[tab]; this.setData({ error: error.message, requests: [], canReviewMembers: false }); } }
+      this.setData({ error: '', requests: this._views[tab] });
+    } catch (error) { if (currentRequest() && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) { delete this._views[tab]; this.setData({ error: error.message, requests: [], canReviewMembers: false }); } }
     finally { if (currentRequest()) this.setData({ loading: false }); }
   },
   openApproval(event) {

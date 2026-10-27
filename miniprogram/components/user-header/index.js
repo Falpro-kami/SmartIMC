@@ -28,23 +28,21 @@ Component({
       });
       this._unsubscribe = profiles.subscribe(result => this.renderProfile(result));
       if (access.subscribeUnread) this._unsubscribeUnread = access.subscribeUnread(value => { if (!this._detached) this.setData({ hasUnread: value }); });
+      if (access.subscribeChanges) this._unsubscribeChanges = access.subscribeChanges('members', () => { if (this._visible) this.loadIdentity(); });
       this.loadProfile();
       this.startNotifications();
     },
-    detached() { this._detached = true; this.stopNotifications(); if (this._unsubscribe) this._unsubscribe(); if (this._unsubscribeUnread) this._unsubscribeUnread(); }
+    detached() { this._detached = true; this.stopNotifications(); if (this._unsubscribe) this._unsubscribe(); if (this._unsubscribeUnread) this._unsubscribeUnread(); if (this._unsubscribeChanges) this._unsubscribeChanges(); }
   },
   pageLifetimes: { show() { this.loadProfile(); this.startNotifications(); }, hide() { this.closeDrawer(); this.stopNotifications(); } },
   methods: {
     startNotifications() {
+      this._visible = true;
       const loading = this.loadIdentity();
       if (access.notifications) access.notifications().then(value => { if (!this._detached && typeof value === 'boolean') this.setData({ hasUnread: value }); }).catch(() => {});
-      if (!this._notificationTimer) this._notificationTimer = setInterval(() => {
-        if (access.notifications) access.notifications(true).catch(() => {});
-        if (!this._lastIdentityCheck || Date.now() - this._lastIdentityCheck >= 30000) this.loadIdentity(true);
-      }, 10000);
       return loading;
     },
-    stopNotifications() { clearInterval(this._notificationTimer); this._notificationTimer = null; },
+    stopNotifications() { this._visible = false; },
     async loadIdentity(force = false) {
       if (this._identityLoading || this._detached) return;
       this._identityLoading = true;

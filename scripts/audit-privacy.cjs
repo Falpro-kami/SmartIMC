@@ -1,6 +1,6 @@
 const { run, ENV } = require('./cloudbase.cjs');
 const CORE = ['equipment', 'userProfiles', 'teamMembers', 'teamSecurity', 'memberAudit', 'teamMessages', 'workbenchUsage', 'adminBackups', 'teamAnnouncements',
-  'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit'];
+  'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'teamSyncAccess'];
 function api(action, body = {}) { return run(['api', 'tcb', action, '--body', JSON.stringify({ EnvId: ENV, ...body }), '-r', 'ap-shanghai']).data; }
 async function status(url) {
   const response = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, signal: AbortSignal.timeout(30000) });
@@ -20,6 +20,13 @@ async function main() {
   }
   for (const name of CORE) if (!names.includes(name)) failures.push('Missing business collection: ' + name);
   for (const name of names) {
+    if (name === 'teamSync') {
+      const rule = api('DescribeSafeRule', { CollectionName: name });
+      const exact = rule.AclTag === 'CUSTOM' && JSON.stringify(JSON.parse(rule.Rule)) === JSON.stringify(require('./lib/sync-rules.cjs'));
+      report.collections.push({ name, acl: rule.AclTag, exactRule: exact });
+      if (!exact) failures.push('Unexpected realtime metadata rule');
+      continue;
+    }
     const acl = api('DescribeDatabaseACL', { CollectionName: name });
     report.collections.push({ name, acl: acl.AclTag });
     const allowed = CORE.includes(name) ? ['ADMINONLY'] : ['ADMINONLY', 'PRIVATE'];

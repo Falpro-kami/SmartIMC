@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk');
 const { randomUUID } = require('node:crypto');
 const access = require('./access');
+const sync = require('./sync');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database({ throwOnNotFound: false });
 const messages = require('./messages')(db, access);
@@ -25,6 +26,8 @@ exports.main = async (event = {}) => {
       const viewer = await access.readMember(db, id);
       if (!access.allowed(viewer, 'equipment.read')) reject('MEMBERSHIP_REQUIRED', '通过 IMC 成员审核后才能访问。');
     }
+    if (event.action === 'syncConnect') return await sync.connect(db, access, id, cloud.getWXContext().OPENID);
+    if (event.action === 'syncState') return { ok: true, state: await sync.state(db) };
     if (event.action === 'home') return await home.dashboard(id);
     if (event.action === 'notificationState') return { ok: true, hasUnread: await messages.unread(id, await access.readMember(db, id)) };
     if (event.action === 'announcements') return await home.list(id, event);
@@ -85,6 +88,7 @@ exports.main = async (event = {}) => {
             before: { status: previous.status, roles: previous.roles || [] }, after: { status: 'pending', roles: [] }, createdAt: db.serverDate() } });
         } else await reference.set({ data: { ...data, teamId: access.TEAM_ID, createdAt: db.serverDate() } });
         await messages.put(transaction, application);
+        await sync.bump(transaction, ['home', 'approvals', 'members']);
       });
       return await self(id);
     }
@@ -139,6 +143,7 @@ exports.main = async (event = {}) => {
       if (!superIds.size) reject('LAST_SUPER_ADMIN', '至少需要保留一名启用中的超级管理员。');
       await targetRef.update({ data: { roles: event.roles, status: event.status,
         revision: event.revision + 1, updatedAt: db.serverDate(), updatedBy: id } });
+      await sync.membership(transaction, target, event.status);
       await securityRef.update({ data: { superAdminIds: Array.from(superIds), updatedAt: db.serverDate() } });
       await transaction.collection('memberAudit').doc(auditId).set({ data: { actorId: id, targetId: event.id,
         applicationId,
@@ -148,6 +153,7 @@ exports.main = async (event = {}) => {
       if (target.status !== event.status || JSON.stringify((target.roles || []).slice().sort()) !== JSON.stringify(event.roles.slice().sort())) {
         await messages.put(transaction, messages.changeData(auditId, event.id, target, { status: event.status, roles: event.roles }));
       }
+      await sync.bump(transaction, ['home', 'approvals', 'members', 'weekly']);
     });
     return { ok: true };
   } catch (error) {

@@ -1,5 +1,6 @@
 const TABLE = 'teamAnnouncements';
 const weeklyTodos = require('./weekly-home');
+const sync = require('./sync');
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
 module.exports = function home(db, access, approvals) {
@@ -75,6 +76,7 @@ module.exports = function home(db, access, approvals) {
         authorName: profile.name, createdBy: previous ? previous.createdBy : id, updatedBy: id,
         createdMs: previous ? previous.createdMs : now, publishedMs: previous ? previous.publishedMs : now,
         updatedMs: now, revision: event.revision + 1 } });
+      await sync.bump(transaction, ['home']);
     });
     return { ok: true, id: event.id };
   }

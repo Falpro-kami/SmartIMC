@@ -14,6 +14,9 @@ async function request(action, data = {}) {
     throw error;
   }
   if (['savePeriod', 'saveDraft', 'submit'].includes(action)) { cache.invalidate('weekly:'); cache.invalidate('home:'); }
+  if (['savePeriod', 'saveDraft', 'submit', 'remind'].includes(action) && cache.publish) {
+    cache.publish(['home', 'weekly', ...(['savePeriod', 'remind'].includes(action) ? ['messages'] : [])]);
+  }
   if (['savePeriod', 'remind'].includes(action)) {
     const access = require('./access');
     if (access.notifications) access.notifications(true).catch(() => {});
@@ -71,4 +74,4 @@ async function exportStats(periodId) {
   await fsCall('writeFile', { filePath, data: result.csv, encoding: 'utf8' });
   return { filePath, fileName: result.name };
 }
-module.exports = { call, peek: (action, data = {}) => cache.peek(cacheKey(action, data)), upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView };
+module.exports = { call, subscribe: listener => cache.subscribe('weekly', listener), peek: (action, data = {}) => cache.peek(cacheKey(action, data)), upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView };

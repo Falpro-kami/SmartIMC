@@ -4,11 +4,12 @@ Page(require('../../utils/member-page')({
   onShow() {
     const tabBar = typeof this.getTabBar === 'function' && this.getTabBar();
     if (tabBar) tabBar.setData({ selected: 0 });
+    if (!this._unsubscribeLive && home.subscribe) this._unsubscribeLive = home.subscribe(() => this.loadHome(true, true));
     return this.loadHome();
   },
-  onHide() { this._epoch = (this._epoch || 0) + 1; },
-  onUnload() { this._unloaded = true; this._epoch = (this._epoch || 0) + 1; },
-  async loadHome(force = false) {
+  onHide() { if (this._unsubscribeLive) this._unsubscribeLive(); this._unsubscribeLive = null; this._epoch = (this._epoch || 0) + 1; },
+  onUnload() { this._unloaded = true; this.onHide(); },
+  async loadHome(force = false, quiet = false) {
     const epoch = this._epoch = (this._epoch || 0) + 1;
     const cached = home.peek && home.peek();
     if (cached) this.renderHome(cached);
@@ -17,7 +18,7 @@ Page(require('../../utils/member-page')({
       const result = await home.dashboard(force === true);
       if (this._unloaded || epoch !== this._epoch) return;
       this.renderHome(result);
-    } catch (error) { if (!this._unloaded && epoch === this._epoch) this.setData({ error: error.message, todos: [], allTodos: [], announcements: [], canManage: false }); }
+    } catch (error) { if (!this._unloaded && epoch === this._epoch && (!quiet || error.code === 'MEMBERSHIP_REQUIRED')) this.setData({ error: error.message, todos: [], allTodos: [], announcements: [], canManage: false }); }
     finally { if (!this._unloaded && epoch === this._epoch) this.setData({ loading: false }); }
   },
   renderHome(result) { const allTodos = result.todos.map(home.present); this._loaded = true;

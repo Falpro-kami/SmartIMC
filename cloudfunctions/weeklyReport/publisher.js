@@ -1,4 +1,5 @@
 const { createHash } = require('node:crypto');
+const sync = require('./sync');
 const key = (prefix, value) => prefix + createHash('sha256').update(value).digest('hex').slice(0, 32);
 const doc = result => Array.isArray(result.data) ? result.data[0] : result.data;
 module.exports = function publisher(db, access, clock = Date.now) {
@@ -34,6 +35,7 @@ module.exports = function publisher(db, access, clock = Date.now) {
         await tx.collection('weeklyAudit').doc(key('wa_', 'scheduled-publish:' + p._id)).set({ data: {
           teamId: 'IMC', actorId: p.updatedBy, action: 'period.scheduledPublish', subjectId: p._id, createdMs: now, scheduledMs: p.publishAtMs
         } });
+        await sync.bump(tx, ['home', 'weekly', 'messages']);
         return 'published';
       });
       const outcome = value && value.result || value;
