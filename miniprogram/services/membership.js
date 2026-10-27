@@ -18,7 +18,7 @@ function check() {
   if (pending) return pending;
   const request = ++epoch;
   publish({ phase: 'checking', approved: false, error: '' });
-  pending = Promise.resolve().then(() => access.get()).then(result => request === epoch ? accept(result) : state)
+  pending = Promise.resolve().then(() => access.get(true)).then(result => request === epoch ? accept(result) : state)
     .catch(error => request === epoch ? publish({ phase: 'error', approved: false, error: error.message || '身份验证失败，请重试。' }) : state)
     .finally(() => { pending = null; });
   return pending;
@@ -34,11 +34,12 @@ async function submit(value) {
   } catch (error) {
     // A lost response can hide a committed application; recover its actual state before retrying.
     try {
-      const result = await access.get();
+      const result = await access.get(true);
       if (request === epoch && result.member) return accept(result);
     } catch (_) { /* Preserve the original save/application error. */ }
     throw error;
   } finally { submitting = false; }
 }
 function subscribe(listener) { subscribers.add(listener); listener(state); return () => subscribers.delete(listener); }
-module.exports = { check, accept, submit, subscribe, current: () => state };
+function ensure() { return state.phase === 'checking' ? check() : Promise.resolve(state); }
+module.exports = { check, ensure, accept, submit, subscribe, current: () => state };

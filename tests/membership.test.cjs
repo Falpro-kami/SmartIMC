@@ -2,9 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-function moduleAt(file, dependencies) {
+function moduleAt(file, dependencies, globals = {}) {
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => dependencies[name] });
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => dependencies[name], ...globals });
   return module.exports;
 }
 const active = { teamId: 'IMC', status: 'active', permissions: ['equipment.read'] };
@@ -32,16 +32,17 @@ test('membership checks fail closed and submitting an application cannot approve
 
 test('guarded pages never load before verification and direct links remain locked until approved', async () => {
   let listener, resolveCheck, loads = 0, shows = 0, hides = 0, pages = 0, options;
-  let state = { phase: 'active', approved: true };
+  let state = { phase: 'checking', approved: false };
   const publish = next => { state = next; listener(next); };
   const service = { subscribe: callback => { listener = callback; callback(state); return () => { listener = () => {}; }; },
-    check: () => { publish({ phase: 'checking', approved: false }); return new Promise(resolve => { resolveCheck = resolve; }); } };
+    current: () => state,
+    ensure: () => { publish({ phase: 'checking', approved: false }); return new Promise(resolve => { resolveCheck = resolve; }); } };
   const wrap = moduleAt('miniprogram/utils/member-page.js', { '../services/membership': service });
   const page = wrap({ data: {}, onLoad(value) { loads++; options = value; }, onShow() { shows++; }, onHide() { hides++; }, onReachBottom() { pages++; } });
   page.setData = values => Object.assign(page.data, values);
   page.onLoad({ id: 'private-detail' });
   const checking = page.onShow();
-  assert.equal(loads, 0, 'A cached active identity must not unlock a new page before the new check');
+  assert.equal(loads, 0, 'The first entry must remain locked until the server confirms membership');
   page.onReachBottom(); assert.equal(pages, 0);
   publish({ phase: 'pending', approved: false }); resolveCheck(state); await checking;
   assert.equal(loads, 0); assert.equal(page.data.membershipAllowed, false);
@@ -70,6 +71,51 @@ test('every registered page excludes business markup before membership approval'
     assert.ok(wxml.trimEnd().endsWith('<membership-gate wx:else />'), route);
   }
   assert.match(fs.readFileSync('miniprogram/custom-tab-bar/index.wxml', 'utf8'), /wx:if="{{authorized}}"/);
+});
+
+test('switching between approved pages reuses session identity without verification screens or extra checks', async () => {
+  let checks = 0;
+  const service = moduleAt('miniprogram/services/membership.js', {
+    './access': { can, get: async () => { checks++; return { member: active }; } }, './profile': {}
+  });
+  const wrap = moduleAt('miniprogram/utils/member-page.js', { '../services/membership': service });
+  let loads = 0, shows = 0;
+  const makePage = () => {
+    const page = wrap({ data: {}, onLoad() { loads++; }, onShow() { shows++; } });
+    page.setData = values => Object.assign(page.data, values); page.onLoad({}); return page;
+  };
+  const first = makePage(), second = makePage();
+  await first.onShow(); assert.equal(checks, 1);
+  first.onHide(); assert.equal(first.data.membershipAllowed, true);
+  const opening = second.onShow();
+  assert.equal(second.data.membershipAllowed, true, 'Approved pages open directly without displaying the gate');
+  await opening; second.onHide(); await first.onShow();
+  assert.equal(checks, 1); assert.equal(loads, 2); assert.equal(shows, 3);
+  service.accept({ member: { ...active, status: 'removed' } });
+  assert.equal(first.data.membershipAllowed, false); assert.equal(second.data.membershipAllowed, false);
+});
+
+test('pending session state remains locked across navigation without repeating the identity request', async () => {
+  let checks = 0;
+  const service = moduleAt('miniprogram/services/membership.js', {
+    './access': { can, get: async () => { checks++; return { member: { ...active, status: 'pending' } }; } }, './profile': {}
+  });
+  await service.ensure(); await service.ensure(); await service.ensure();
+  assert.equal(checks, 1); assert.equal(service.current().approved, false);
+  await service.check(); assert.equal(checks, 2, 'The explicit review-status button still fetches current approval');
+});
+
+test('identity reads share the session result and explicit refresh or a mutation fetches fresh data', async () => {
+  let gets = 0;
+  const access = moduleAt('miniprogram/services/access.js', { '../config/cloud': { accessFunction: 'memberAccess' } }, {
+    getApp: () => ({ globalData: { cloudReady: true } }), wx: { cloud: { callFunction: async ({ data }) => {
+      if (data.action === 'get') { gets++; return { result: { ok: true, member: active, hasUnread: true } }; }
+      return { result: { ok: true } };
+    } } }
+  });
+  await Promise.all([access.get(), access.get()]); await access.get(); assert.equal(gets, 1);
+  await access.get(true); assert.equal(gets, 2);
+  await access.readMessage('message'); await access.get(); assert.equal(gets, 3);
 });
 
 test('a lost application response recovers the pending state without granting access or resubmitting', async () => {

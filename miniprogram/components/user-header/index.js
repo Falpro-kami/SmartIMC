@@ -36,15 +36,15 @@ Component({
   methods: {
     startNotifications() {
       const loading = this.loadIdentity();
-      if (!this._notificationTimer) this._notificationTimer = setInterval(() => this.loadIdentity(), 30000);
+      if (!this._notificationTimer) this._notificationTimer = setInterval(() => this.loadIdentity(true), 30000);
       return loading;
     },
     stopNotifications() { clearInterval(this._notificationTimer); this._notificationTimer = null; },
-    async loadIdentity() {
+    async loadIdentity(force = false) {
       if (this._identityLoading || this._detached) return;
       this._identityLoading = true;
       try {
-        const result = await access.get();
+        const result = await access.get(force);
         if (this._detached) return;
         membership.accept(result);
         const member = result.member;

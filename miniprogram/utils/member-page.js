@@ -16,8 +16,8 @@ function wrap(definition, service = membership) {
   wrapped.onShow = function() {
     this._memberVisible = true;
     this._memberActive = false;
-    this._memberChecking = true;
-    this.setData({ membershipAllowed: false });
+    this._memberChecking = !service.current().approved;
+    this.setData({ membershipAllowed: service.current().approved });
     if (!this._memberUnsubscribe) this._memberUnsubscribe = service.subscribe(state => {
       if (this._memberUnloaded) return;
       this._memberAllowed = state.approved;
@@ -28,13 +28,12 @@ function wrap(definition, service = membership) {
         this._memberActive = false;
       } else if (this._memberVisible && !this._memberChecking) activate(this);
     });
-    return service.check().then(state => { this._memberChecking = false; return state.approved && this._memberAllowed ? activate(this) : undefined; });
+    return service.ensure().then(state => { this._memberChecking = false; return state.approved && this._memberAllowed ? activate(this) : undefined; });
   };
   wrapped.onHide = function() {
     this._memberVisible = false;
     if (this._memberActive && definition.onHide) definition.onHide.call(this);
     this._memberActive = false;
-    this.setData({ membershipAllowed: false });
   };
   wrapped.onUnload = function() {
     this._memberUnloaded = true;
