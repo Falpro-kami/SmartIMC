@@ -1,4 +1,4 @@
-:host { display: block; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+:host { display: block; position: sticky; top: 0; z-index: 30; background: #fff; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
 .user-header { padding: 24px 16px 20px; background: #fff; color: #101b2b; }
 .header-nav { display: flex; align-items: center; justify-content: center; }
 .page-title { display: block; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 28px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
