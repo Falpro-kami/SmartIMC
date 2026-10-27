@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="members-page imc-theme">
   <view class="heading"><text>IMC 成员与权限</text></view>
   <view wx:if="{{error}}" class="error">{{error}}</view>
@@ -15,3 +16,5 @@
     <button class="remove-member" bindtap="removeMember" disabled="{{saving}}">移出成员</button>
   </view></view>
 </view>
+</block>
+<membership-gate wx:else />

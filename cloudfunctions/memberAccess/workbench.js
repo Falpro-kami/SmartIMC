@@ -6,7 +6,7 @@ function sanitize(raw = {}) {
       lastOpenedMs: Number.isSafeInteger(value.lastOpenedMs) && value.lastOpenedMs >= 0 ? value.lastOpenedMs : 0 }];
   }));
 }
-module.exports = function workbench(db) {
+module.exports = function workbench(db, access) {
   async function get(id) {
     const result = await db.collection('workbenchUsage').where({ _id: id }).limit(1).get();
     return { ok: true, usage: sanitize(result.data[0] && result.data[0].stats) };
@@ -14,6 +14,9 @@ module.exports = function workbench(db) {
   async function record(id, event) {
     if (!APP_IDS.includes(event.toolId)) return { ok: false, code: 'INVALID_INPUT', message: '应用不存在。' };
     const result = await db.runTransaction(async transaction => {
+      const actor = await transaction.collection('teamMembers').doc(id).get();
+      const member = Array.isArray(actor.data) ? actor.data[0] : actor.data;
+      if (!access.allowed(member, 'equipment.read')) return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '通过 IMC 成员审核后才能访问。' };
       const reference = transaction.collection('workbenchUsage').doc(id);
       const previous = await reference.get();
       const document = Array.isArray(previous.data) ? previous.data[0] : previous.data;

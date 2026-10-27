@@ -104,7 +104,7 @@ test('My hides privileged routes from ordinary members and an older status reque
   let finish; const navigated = [];
   vm.runInNewContext(fs.readFileSync('miniprogram/pages/profile/index.js', 'utf8'), {
     Page: value => { page = value; }, wx: { navigateTo: value => navigated.push(value.url) },
-    require: name => name.endsWith('/access') ? { get: async () => ({ member }), can: (value, permission) => access.allowed(value, permission) } : {
+    require: name => name.endsWith('/member-page') ? value => value : name.endsWith('/access') ? { get: async () => ({ member }), can: (value, permission) => access.allowed(value, permission) } : {
       status: () => new Promise(resolve => { finish = resolve; }), expiryLabel: () => '剩余 5 天'
     }
   });
@@ -152,7 +152,7 @@ test('client downloads exact encrypted chunks and removes a partial file when ac
 test('backup creation checks matching passwords and clears both fields before sending the request', async () => {
   let page, sent = 0;
   vm.runInNewContext(fs.readFileSync('miniprogram/pages/module/index.js', 'utf8'), {
-    Page: value => { page = value; }, wx: { showToast() {} }, require: () => ({
+    Page: value => { page = value; }, wx: { showToast() {} }, require: name => name.endsWith('/member-page') ? value => value : ({
       async create(value) { sent++; assert.equal(value, password); assert.equal(page.data.password, ''); assert.equal(page.data.passwordConfirm, ''); return { backup: { id: 'new' } }; },
       present: value => value
     })

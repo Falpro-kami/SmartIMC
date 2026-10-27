@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="module-page imc-theme {{entries.length ? 'settings-page' : ''}}">
   <team-announcements wx:if="{{announcementsMode}}" initial-id="{{announcementId}}" compose="{{composeAnnouncement}}" />
   <block wx:elif="{{adminMode}}">
@@ -39,3 +40,5 @@
   </view>
   <view wx:else class="module-card"><image wx:if="{{icon}}" src="/assets/workbench/{{icon}}.png" mode="aspectFit" /><text class="module-title">{{title}}</text><text class="module-status">功能筹备中</text></view>
 </view>
+</block>
+<membership-gate wx:else />

@@ -61,6 +61,8 @@ function sandbox(file, requires, globals = {}) {
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     module, exports: module.exports,
     require: name => {
+      if (name === '../../utils/member-page') return value => value;
+      if (/services\/membership$/.test(name)) return { accept() {}, subscribe(listener) { listener({ approved: true }); return () => {}; } };
       if (!(name in requires)) throw new Error('Unexpected require: ' + name);
       return requires[name];
     }, console, ...globals

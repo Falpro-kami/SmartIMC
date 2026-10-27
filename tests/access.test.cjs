@@ -18,7 +18,7 @@ function harness(options = {}) {
     let limit = 100;
     const order = [];
     return {
-      where(value) { filter = value; return this; }, orderBy(field, direction) { if (options.sort) order.push([field, direction]); return this; }, skip(value) { offset = value; return this; }, limit(value) { limit = value; return this; },
+      where(value) { filter = value; return this; }, field() { return this; }, orderBy(field, direction) { if (options.sort) order.push([field, direction]); return this; }, skip(value) { offset = value; return this; }, limit(value) { limit = value; return this; },
       async get() { if (options.onRead) options.onRead(name); return { data: [...table].map(([id, value]) => ({ ...structuredClone(value), _id: id })).filter(row => Object.entries(filter).every(([key, value]) => {
         if (Array.isArray(value)) return value.includes(row[key]);
         if (value && value.$nin) return !(Array.isArray(row[key]) ? row[key] : [row[key]]).some(item => value.$nin.includes(item));
@@ -61,7 +61,7 @@ function harness(options = {}) {
     });
     return module.exports.main;
   };
-  return { member: load('memberAccess'), equipment: load('equipmentQuery'),
+  return { member: load('memberAccess'), equipment: load('equipmentQuery'), check: load('checkDatabase'),
     as: name => { context = { APPID, OPENID: name }; },
     table: name => tables[name] };
 }
@@ -91,7 +91,7 @@ test('joining never grants a role, never overwrites an existing member and canno
   assert.equal(result.member.roles.length, 0);
   assert.equal(result.accountCode, id);
   assert.equal(app.table('teamMembers').has(userId('victim')), false);
-  assert.equal((await app.member({ action: 'set', id, status: 'active', roles: ['super_admin'], revision: 0 })).code, 'FORBIDDEN');
+  assert.equal((await app.member({ action: 'set', id, status: 'active', roles: ['super_admin'], revision: 0 })).code, 'MEMBERSHIP_REQUIRED');
   app.table('teamMembers').set(id, { ...active(['super_admin']), status: 'disabled' });
   await app.member({ action: 'apply' });
   assert.equal(app.table('teamMembers').get(id).status, 'disabled');
@@ -134,7 +134,7 @@ test('equipment queries deny unapproved/disabled users and accept ordinary activ
 function page(file, service) {
   let definition;
   vm.runInNewContext(fs.readFileSync(file, 'utf8'), {
-    Page: value => { definition = value; }, require: () => service,
+    Page: value => { definition = value; }, require: name => name === '../../utils/member-page' ? value => value : service,
     wx: { showToast() {}, navigateTo() {}, setClipboardData() {} }
   });
   definition.setData = values => {
@@ -280,9 +280,9 @@ test('application alerts, per-admin read state and private approval results foll
   await app.member({ action: 'apply' });
   await app.member({ action: 'apply' });
   assert.equal(app.table('teamMessages').size, 1, 'A repeated application must not duplicate or reset notifications');
-  assert.equal((await app.member({ action: 'messages' })).messages.length, 0);
+  assert.equal((await app.member({ action: 'messages' })).code, 'MEMBERSHIP_REQUIRED');
   const applicationId = [...app.table('teamMessages').keys()][0];
-  assert.equal((await app.member({ action: 'readMessage', id: applicationId })).code, 'FORBIDDEN');
+  assert.equal((await app.member({ action: 'readMessage', id: applicationId })).code, 'MEMBERSHIP_REQUIRED');
   app.as('owner');
   assert.equal((await app.member({ action: 'get' })).hasUnread, true);
   const inbox = await app.member({ action: 'messages', recipientId: applicant });
@@ -397,10 +397,8 @@ test('approval scopes isolate own requests and actual decisions by the current r
   app.as('applicant');
   await app.member({ action: 'apply' });
   const mine = await app.member({ action: 'approvals', scope: 'mine', id: owner });
-  assert.equal(mine.requests.length, 1);
-  assert.equal(mine.requests[0].statusLabel, '待审批');
-  assert.equal('memberId' in mine.requests[0], false);
-  for (const scope of ['pending', 'done']) assert.equal((await app.member({ action: 'approvals', scope, roles: ['super_admin'] })).code, 'FORBIDDEN');
+  assert.equal(mine.code, 'MEMBERSHIP_REQUIRED');
+  for (const scope of ['pending', 'done']) assert.equal((await app.member({ action: 'approvals', scope, roles: ['super_admin'] })).code, 'MEMBERSHIP_REQUIRED');
   app.as('owner');
   assert.equal((await app.member({ action: 'approvals', scope: 'mine', id: applicant })).requests.length, 0);
   assert.equal((await app.member({ action: 'approvals', scope: 'pending' })).requests[0].memberId, applicant);
@@ -417,6 +415,8 @@ test('approval scopes isolate own requests and actual decisions by the current r
   app.as('other');
   assert.equal((await app.member({ action: 'approvals', scope: 'done', actorId: owner })).requests.length, 0);
   app.as('applicant');
+  assert.equal((await app.member({ action: 'approvals', scope: 'mine' })).code, 'MEMBERSHIP_REQUIRED');
+  app.table('teamMembers').set(applicant, active([]));
   assert.equal((await app.member({ action: 'approvals', scope: 'mine' })).requests[0].statusLabel, '已通过');
   assert.equal((await app.member({ action: 'approvals', scope: 'unknown' })).code, 'INVALID_INPUT');
   assert.equal((await app.member({ action: 'approvals', scope: 'mine', offset: -1 })).code, 'INVALID_INPUT');
@@ -463,6 +463,7 @@ test('switching approval tabs ignores late responses and ordinary members can lo
 
 test('workbench usage is stored per platform identity, accepts known tools only and ignores client counts/user IDs', async () => {
   const app = harness();
+  for (const name of ['alice', 'bob']) app.table('teamMembers').set(userId(name), active([]));
   app.as('alice');
   const first = await app.member({ action: 'workbenchUsage', id: userId('bob') });
   assert.equal(first.usage.finance.count, 0);
@@ -512,9 +513,10 @@ test('only a super administrator can remove members; removal revokes access, hid
   assert.equal((await app.equipment({ action: 'list' })).code, 'MEMBERSHIP_REQUIRED');
   assert.equal((await app.member({ action: 'directory' })).code, 'MEMBERSHIP_REQUIRED');
   assert.equal((await app.member({ action: 'apply' })).code, 'MEMBERSHIP_REMOVED');
-  const message = (await app.member({ action: 'messages' })).messages[0];
+  assert.equal((await app.member({ action: 'messages' })).code, 'MEMBERSHIP_REQUIRED');
+  const message = [...app.table('teamMessages').values()][0];
   assert.equal(message.title, '已移出团队');
-  assert.equal(message.read, false);
+  assert.equal(message.readBy.length, 0);
 });
 
 test('failed removal notification rolls back membership, security registry and the audit', async () => {
@@ -611,4 +613,22 @@ test('home rechecks permissions before returning sensitive pending applicants', 
   const result = await app.member({ action: 'home' });
   assert.equal(result.todos.length, 0);
   assert.equal(result.canManage, false);
+});
+
+test('all business endpoints reject unjoined, pending, disabled, removed and other-team identities', async () => {
+  const app = harness();
+  const id = userId('owner');
+  const events = ['home', 'announcements', 'announcement', 'saveAnnouncement', 'withdrawAnnouncement', 'workbenchUsage', 'recordToolOpen', 'directory', 'messages', 'readMessage', 'openMessage', 'list', 'member', 'set']
+    .map(action => ({ action, id: 'msg_' + 'a'.repeat(32), toolId: 'finance', roles: ['super_admin'], status: 'active', OPENID: 'spoof' }));
+  for (const scope of ['mine', 'pending', 'done']) events.push({ action: 'approvals', scope });
+  for (const member of [null, { ...active(['super_admin']), status: 'pending' }, { ...active(['super_admin']), status: 'disabled' },
+    { ...active(['super_admin']), status: 'removed' }, { ...active(['super_admin']), teamId: 'OTHER' }]) {
+    if (member) app.table('teamMembers').set(id, member); else app.table('teamMembers').delete(id);
+    for (const event of events) assert.equal((await app.member(event)).code, 'MEMBERSHIP_REQUIRED', event.action);
+    assert.equal((await app.check()).code, 'MEMBERSHIP_REQUIRED');
+    assert.equal((await app.member({ action: 'get' })).hasUnread, false);
+  }
+  assert.equal(app.table('workbenchUsage').size, 0);
+  assert.equal(app.table('teamAnnouncements').size, 0);
+  app.as(''); assert.equal((await app.check()).code, 'AUTH_REQUIRED');
 });

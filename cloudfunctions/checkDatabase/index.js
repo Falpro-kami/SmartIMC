@@ -1,4 +1,5 @@
 const cloud = require('wx-server-sdk');
+const access = require('./access');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -7,6 +8,9 @@ const collectionName = 'equipment';
 
 exports.main = async () => {
   try {
+    const id = access.identity(cloud.getWXContext());
+    if (!id) return { ok: false, code: 'AUTH_REQUIRED', message: '请从 IMC 小程序中操作。' };
+    if (!access.allowed(await access.readMember(db, id), 'equipment.read')) return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '通过 IMC 成员审核后才能访问。' };
     // Only read one record ID to verify access. Never return equipment records.
     await db.collection(collectionName).field({ _id: true }).limit(1).get();
 

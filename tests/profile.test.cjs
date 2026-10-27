@@ -11,7 +11,9 @@ function sandbox(file, dependencies, globals = {}) {
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     module, exports: module.exports, console, ...globals,
-    require(name) { if (!(name in dependencies)) throw new Error('Unexpected require ' + name); return dependencies[name]; }
+    require(name) { if (name === '../../utils/member-page') return value => value;
+      if (/services\/membership$/.test(name)) return { accept() {}, subscribe(listener) { listener({ approved: true }); return () => {}; } };
+      if (!(name in dependencies)) throw new Error('Unexpected require ' + name); return dependencies[name]; }
   }, { filename: file });
   return module.exports;
 }

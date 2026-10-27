@@ -13,6 +13,7 @@
     "pages/approvals/index"
   ],
   "lazyCodeLoading": "requiredComponents",
+  "usingComponents": { "membership-gate": "/components/membership-gate/index" },
   "window": {
     "navigationStyle": "custom",
     "navigationBarTitleText": "智慧IMC",

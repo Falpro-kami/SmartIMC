@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="approvals-page imc-theme">
   <view class="approval-tabs">
     <button wx:for="{{tabs}}" wx:key="id" class="approval-tab {{activeTab === item.id ? 'approval-tab-selected' : ''}}" data-id="{{item.id}}" bindtap="switchTab">{{item.label}}</button>
@@ -16,3 +17,5 @@
     </view>
   </block>
 </view>
+</block>
+<membership-gate wx:else />

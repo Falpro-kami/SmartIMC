@@ -1,6 +1,7 @@
 const profiles = require('../../services/profile');
 const team = require('../../config/team');
 const access = require('../../services/access');
+const membership = require('../../services/membership');
 
 Component({
   properties: {
@@ -45,6 +46,7 @@ Component({
       try {
         const result = await access.get();
         if (this._detached) return;
+        membership.accept(result);
         const member = result.member;
         let roleTags = [];
         if (member && member.status === 'active') {

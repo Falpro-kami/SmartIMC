@@ -1,5 +1,5 @@
 const access = require('../../services/access');
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', members: [], hasMore: false, roleOptions: [], editor: null, saving: false },
   onLoad(options = {}) { this._focusId = options.id || ''; this.loadMembers(); },
   onUnload() { this._unloaded = true; },
@@ -84,4 +84,4 @@ Page({
     } catch (error) { if (!this._unloaded) this.setData({ formError: error.message }); }
     finally { if (!this._unloaded) this.setData({ saving: false }); }
   }
-});
+}));

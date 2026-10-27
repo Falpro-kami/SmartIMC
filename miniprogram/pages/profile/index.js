@@ -5,7 +5,7 @@ const PERSONAL_ENTRIES = [
   { id: 'my-submissions', title: '我的提交' },
   { id: 'my-favorites', title: '我的收藏' }
 ];
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', status: '', statusLabel: '', roleText: '', canManage: false, applying: false,
     personalEntries: PERSONAL_ENTRIES, expiryLabel: '-', expiryWarning: false },
   onShow() {
@@ -66,4 +66,4 @@ Page({
   openServiceExpiry() {
     if (this.data.canManage) wx.navigateTo({ url: '/pages/module/index?id=service-expiry' });
   }
-});
+}));

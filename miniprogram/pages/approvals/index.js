@@ -7,7 +7,7 @@ function dateLabel(value) {
   const pad = number => String(number).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', requests: [], canReviewMembers: false,
     activeTab: 'mine', emptyText: EMPTY.mine,
     tabs: [{ id: 'mine', label: '我的申请' }, { id: 'pending', label: '待我审批' }, { id: 'done', label: '我已审批' }] },
@@ -55,4 +55,4 @@ Page({
     wx.navigateTo({ url: '/pages/members/index?id=' + encodeURIComponent(request.memberId),
       fail() { wx.showToast({ title: '页面打开失败，请重试', icon: 'none' }); } });
   }
-});
+}));

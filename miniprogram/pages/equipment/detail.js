@@ -3,7 +3,7 @@ const { display } = require('../../utils/equipment');
 
 function value(value) { return value === undefined || value === null || value === '' ? '-' : value; }
 
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', record: null, groups: [] },
   onLoad(options) {
     this._id = options.id || '';
@@ -45,4 +45,4 @@ Page({
     const data = event.currentTarget.dataset.value;
     if (data) wx.setClipboardData({ data, fail() { wx.showToast({ title: '复制失败，请重试', icon: 'none' }); } });
   }
-});
+}));

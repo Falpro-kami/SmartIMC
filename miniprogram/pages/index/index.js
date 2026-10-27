@@ -1,5 +1,5 @@
 const home = require('../../services/home');
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', todos: [], announcements: [], canManage: false },
   onShow() {
     const tabBar = typeof this.getTabBar === 'function' && this.getTabBar();
@@ -29,4 +29,4 @@ Page({
     if (item) wx.navigateTo({ url: '/pages/module/index?id=announcements&announcement=' + encodeURIComponent(item.id) });
   },
   publishAnnouncement() { if (this.data.canManage) wx.navigateTo({ url: '/pages/module/index?id=announcements&compose=1' }); }
-});
+}));

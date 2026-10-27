@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 function load(file, service, wx = {}, component = false) {
   let definition;
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { require: () => service, wx,
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { require: name => name === '../../utils/member-page' ? value => value : service, wx,
     Page: value => { definition = value; }, Component: value => { definition = value; } });
   const target = component ? { data: structuredClone(definition.data), properties: { initialId: '', compose: false }, ...definition.methods } : definition;
   target.setData = values => { for (const [key, value] of Object.entries(values)) {

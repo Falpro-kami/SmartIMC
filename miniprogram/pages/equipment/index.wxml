@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="equipment-page imc-theme">
   <view class="controls">
     <view class="search-row">
@@ -64,3 +65,5 @@
     </view>
   </view>
 </view>
+</block>
+<membership-gate wx:else />

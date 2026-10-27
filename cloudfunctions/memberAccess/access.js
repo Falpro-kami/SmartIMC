@@ -40,7 +40,7 @@ function roleLabels(roles) {
   return labels.length ? labels : ['普通成员'];
 }
 function present(member) {
-  return member ? { id: member._id, teamId: TEAM_ID, status: member.status,
+  return member ? { id: member._id, teamId: member.teamId, status: member.status,
     roles: member.roles || [], roleLabels: roleLabels(member.roles), revision: member.revision || 0,
     permissions: permissions(member) } : null;
 }

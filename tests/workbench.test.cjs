@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { rankTools } = require('../miniprogram/utils/workbench');
 function load(file, dependencies, globals) {
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => dependencies[name], ...globals });
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => name === '../../utils/member-page' ? value => value : dependencies[name], ...globals });
   return module.exports;
 }
 test('common apps rank by frequency, recent use and default order, ignoring invalid stats and unknown apps', () => {

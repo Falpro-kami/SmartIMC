@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="tab-page imc-theme">
 <user-header title="工作台" />
 <view class="workbench-page">
@@ -27,3 +28,5 @@
   </view>
 </view>
 </view>
+</block>
+<membership-gate wx:else />

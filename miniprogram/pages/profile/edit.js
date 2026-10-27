@@ -1,6 +1,6 @@
 const profiles = require('../../services/profile');
 const team = require('../../config/team');
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', name: '', avatar: '', draftAvatar: '', initials: '人', teamName: team.name, saving: false },
   onLoad() { this.loadProfile(); },
   onUnload() { this._unloaded = true; },
@@ -34,4 +34,4 @@ Page({
     } catch (error) { if (!this._unloaded) this.setData({ error: error.message || '保存失败，请重试' }); }
     finally { if (!this._unloaded) this.setData({ saving: false }); }
   }
-});
+}));

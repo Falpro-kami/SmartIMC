@@ -33,6 +33,7 @@ module.exports = function messages(db, access) {
     const result = await db.runTransaction(async transaction => {
       let url = '';
       const member = document(await transaction.collection('teamMembers').doc(id).get());
+      if (!access.allowed(member, 'equipment.read')) return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '通过 IMC 成员审核后才能访问。' };
       const reference = transaction.collection(collection).doc(event.id);
       const message = document(await reference.get());
       const canManage = access.allowed(member, 'members.manage');

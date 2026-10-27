@@ -4,7 +4,7 @@ const access = require('./access');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database({ throwOnNotFound: false });
 const messages = require('./messages')(db, access);
-const workbench = require('./workbench')(db);
+const workbench = require('./workbench')(db, access);
 const approvals = require('./approvals')(db, access, messages);
 const home = require('./home')(db, access, approvals);
 
@@ -12,8 +12,8 @@ function reject(code, message) { const error = new Error(message); error.busines
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
 async function self(id) {
   const member = await access.readMember(db, id);
-  return { ok: true, accountCode: id, member: access.present(member), roleOptions: access.ROLES,
-    hasUnread: await messages.unread(id, member) };
+  return { ok: true, accountCode: id, member: access.present(member), roleOptions: access.allowed(member, 'equipment.read') ? access.ROLES : [],
+    hasUnread: access.allowed(member, 'equipment.read') ? await messages.unread(id, member) : false };
 }
 
 exports.main = async (event = {}) => {
@@ -21,6 +21,10 @@ exports.main = async (event = {}) => {
   if (!id) return { ok: false, code: 'AUTH_REQUIRED', message: '请从 IMC 小程序中操作。' };
   try {
     if (event.action === 'get') return await self(id);
+    if (event.action !== 'apply') {
+      const viewer = await access.readMember(db, id);
+      if (!access.allowed(viewer, 'equipment.read')) reject('MEMBERSHIP_REQUIRED', '通过 IMC 成员审核后才能访问。');
+    }
     if (event.action === 'home') return await home.dashboard(id);
     if (event.action === 'announcements') return await home.list(id, event);
     if (event.action === 'announcement') return await home.get(id, event);
@@ -61,7 +65,7 @@ exports.main = async (event = {}) => {
     }
     if (event.action === 'apply') {
       const profile = await db.collection('userProfiles').where({ _id: id }).limit(1).get();
-      if (!profile.data[0] || !profile.data[0].name) reject('PROFILE_REQUIRED', '请先到“我的 → 个人资料”完善姓名。');
+      if (!profile.data[0] || !profile.data[0].name) reject('PROFILE_REQUIRED', '请先填写姓名后提交加入申请。');
       // Fixed document identity and transaction prevent applying from overwriting an existing role.
       await db.runTransaction(async transaction => {
         const reference = transaction.collection('teamMembers').doc(id);

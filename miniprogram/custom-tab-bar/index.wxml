@@ -1,4 +1,4 @@
-<view class="tab-bar imc-theme" role="tablist">
+<view wx:if="{{authorized}}" class="tab-bar imc-theme" role="tablist">
   <button wx:for="{{list}}" wx:key="pagePath" class="tab-item {{selected === index ? 'tab-selected' : ''}}" data-index="{{index}}" bindtap="switchTab" hover-class="tab-pressed" aria-label="{{item.text}}" aria-role="tab" aria-selected="{{selected === index}}">
     <view class="tab-icon" aria-hidden="true">
       <block wx:if="{{item.icon === 'home'}}"><view class="home-roof" /><view class="home-body" /><view class="home-door" /></block>

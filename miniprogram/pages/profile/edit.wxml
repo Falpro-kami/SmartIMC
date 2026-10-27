@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="profile-editor imc-theme">
   <view class="editor-card">
     <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" disabled="{{loading || saving}}" aria-label="选择微信头像"><view class="editor-avatar"><image wx:if="{{draftAvatar || avatar}}" src="{{draftAvatar || avatar}}" mode="aspectFill" binderror="avatarFailed" /><text wx:else>{{initials}}</text></view><text class="avatar-action">选择微信头像</text></button>
@@ -7,3 +8,5 @@
   <text wx:if="{{error}}" class="error">{{error}}</text>
   <button class="save-button" bindtap="saveProfile" loading="{{loading || saving}}" disabled="{{loading || saving}}">保存</button>
 </view>
+</block>
+<membership-gate wx:else />

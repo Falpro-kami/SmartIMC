@@ -1,8 +1,9 @@
 const tabs = require('../config/tabs');
+const membership = require('../services/membership');
 
 Component({
-  data: { selected: 0, list: tabs },
-  lifetimes: { attached() { this.syncRoute(); } },
+  data: { selected: 0, list: tabs, authorized: false },
+  lifetimes: { attached() { this.syncRoute(); this._unsubscribe = membership.subscribe(state => this.setData({ authorized: state.approved })); }, detached() { if (this._unsubscribe) this._unsubscribe(); } },
   pageLifetimes: { show() { this.syncRoute(); } },
   methods: {
     syncRoute() {
@@ -12,6 +13,7 @@ Component({
       if (selected >= 0) this.setData({ selected });
     },
     switchTab(event) {
+      if (!this.data.authorized) return;
       const index = Number(event.currentTarget.dataset.index);
       if (!Number.isInteger(index) || !tabs[index] || index === this.data.selected || this._switching) return;
       this._switching = true;

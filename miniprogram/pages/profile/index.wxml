@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="tab-page imc-theme"><user-header title="我的" />
   <view class="account-panel">
     <button class="manage-link standalone" bindtap="openProfile"><text>个人资料</text><text class="arrow">›</text></button>
@@ -17,3 +18,5 @@
     <button class="manage-link standalone" bindtap="openSettings"><text>设置与帮助</text><text class="arrow">›</text></button>
   </view>
 </view>
+</block>
+<membership-gate wx:else />

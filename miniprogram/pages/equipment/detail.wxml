@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="detail-page imc-theme">
   <view wx:if="{{loading}}" class="detail-state"><text>正在读取设备详情…</text></view>
   <view wx:elif="{{error}}" class="detail-state"><text>{{error}}</text><button class="detail-retry" bindtap="retry">重新加载</button></view>
@@ -7,3 +8,5 @@
     <view class="detail-section"><text class="section-title">情况说明</text><text class="notes-text {{record.notes ? '' : 'notes-empty'}}">{{record.notes || '-'}}</text></view>
   </block>
 </view>
+</block>
+<membership-gate wx:else />

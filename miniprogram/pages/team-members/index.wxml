@@ -1,3 +1,4 @@
+<block wx:if="{{membershipAllowed}}">
 <view class="directory-page imc-theme">
   <view wx:if="{{loading}}" class="state">正在读取成员…</view>
   <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadMembers">重试</button></view>
@@ -6,3 +7,5 @@
   <button wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</button>
   <button wx:if="{{!loading && !error}}" class="member-row invite-row" open-type="share" aria-label="邀请成员"><view class="avatar invite-avatar"><view class="invite-plus" /></view><text class="name">邀请成员</text></button>
 </view>
+</block>
+<membership-gate wx:else />

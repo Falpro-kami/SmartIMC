@@ -17,7 +17,7 @@ const TOOLS = [
       { id: 'knowledge', name: '团队知识库', label: '团队知识库', icon: '/assets/workbench/knowledge.png', url: '/pages/module/index?id=knowledge' },
       { id: 'weekly-sharing', name: '每周分享', label: '每周分享', icon: '/assets/workbench/weekly-sharing.png', url: '/pages/module/index?id=weekly-sharing' }
 ];
-Page({
+Page(require('../../utils/member-page')({
   data: { tools: TOOLS, commonTools: rankTools(TOOLS) },
 
   onShow() {
@@ -56,4 +56,4 @@ Page({
       }
     });
   }
-});
+}));

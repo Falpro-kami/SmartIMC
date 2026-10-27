@@ -27,7 +27,7 @@ const MODULES = {
     ]
   }
 };
-Page({
+Page(require('../../utils/member-page')({
   data: { title: '', icon: '', description: '', entries: [], announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
     billing: null, expiryLabel: '-', expiryWarning: false, backups: [], password: '', passwordConfirm: '', creating: false, downloading: '', progress: 0, exportedId: '' },
   onLoad(options) {
@@ -97,4 +97,4 @@ Page({
       wx.saveFileToDisk({ filePath: file.filePath, fail: () => wx.showToast({ title: '保存失败，请重试', icon: 'none' }) });
     } else wx.showToast({ title: '请在新版手机微信中导出', icon: 'none' });
   }
-});
+}));

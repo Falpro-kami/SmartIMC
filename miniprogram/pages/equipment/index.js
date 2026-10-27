@@ -1,7 +1,7 @@
 const equipment = require('../../services/equipment');
 const { buildView, PAGE_SIZE } = require('../../utils/equipment');
 
-Page({
+Page(require('../../utils/member-page')({
   data: {
     loading: true, refreshing: false, loaded: false, error: '',
     keyword: '', status: '', location: '',
@@ -116,4 +116,4 @@ Page({
     wx.navigateTo({ url: '/pages/equipment/detail?id=' + encodeURIComponent(id),
       fail() { wx.showToast({ title: '页面打开失败，请重试', icon: 'none' }); } });
   }
-});
+}));

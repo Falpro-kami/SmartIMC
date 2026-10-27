@@ -1,5 +1,5 @@
 const access = require('../../services/access');
-Page({
+Page(require('../../utils/member-page')({
   data: { loading: true, error: '', members: [], hasMore: false },
   onLoad() {
     if (typeof wx.showShareMenu === 'function') wx.showShareMenu({ menus: ['shareAppMessage'] });
@@ -41,4 +41,4 @@ Page({
     const index = this.data.members.findIndex(member => member.id === event.currentTarget.dataset.id);
     if (index >= 0) this.setData({ ['members[' + index + '].avatarUrl']: '' });
   }
-});
+}));

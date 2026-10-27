@@ -8,6 +8,8 @@ const tabs = require('../miniprogram/config/tabs');
 function load(file, globals, dependencies = {}) {
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     ...globals, require: name => {
+      if (name === '../../utils/member-page') return value => value;
+      if (/services\/membership$/.test(name)) return { accept() {}, subscribe(listener) { listener({ approved: true }); return () => {}; } };
       if (!(name in dependencies)) throw new Error('Unexpected require ' + name);
       return dependencies[name];
     }
@@ -32,6 +34,7 @@ test('custom tab state follows the active page and survives returning from a sec
   }, { '../config/tabs': tabs });
   const component = { data: { ...definition.data }, ...definition.methods };
   component.setData = values => Object.assign(component.data, values);
+  component.data.authorized = true;
   definition.lifetimes.attached.call(component);
   assert.equal(component.data.selected, 1);
   route = 'pages/equipment/index';
@@ -69,6 +72,8 @@ test('switching rejects invalid taps, prevents duplicates, and does not highligh
   const component = { data: { ...definition.data }, ...definition.methods };
   component.setData = values => Object.assign(component.data, values);
   const tap = index => component.switchTab({ currentTarget: { dataset: { index } } });
+  tap(1); assert.equal(calls, 0, 'Unapproved identities cannot switch tabs');
+  component.data.authorized = true;
   tap(-1); tap(99); tap('invalid'); tap(0);
   assert.equal(calls, 0);
   tap('1'); tap('2');

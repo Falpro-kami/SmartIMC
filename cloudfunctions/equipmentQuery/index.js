@@ -20,7 +20,7 @@ exports.main = async (event = {}) => {
   try {
     const member = await access.readMember(db, access.identity(context));
     if (!access.allowed(member, 'equipment.read')) {
-      return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '请先到“我的”申请加入 IMC，并等待管理员审核。已停用账号请联系管理员。' };
+      return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '请先提交 IMC 加入申请并等待管理员审核；已停用或移出团队的账号请联系管理员。' };
     }
     const collection = db.collection('equipment');
     if (event.action === 'detail') {
