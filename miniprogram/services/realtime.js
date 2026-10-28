@@ -100,7 +100,9 @@ async function tick() {
   timer = setTimeout(tick, 5000);
 }
 function start() {
-  if (running || !getApp().globalData.cloudReady) return;
+  if (running) return;
+  const app = getApp();
+  if (!app || !app.globalData || !app.globalData.cloudReady) return;
   running = true; epoch++; lastCheck = 0; retryAt = 0; lastPoll = Date.now();
   unsubscribe = membership.subscribe(state => {
     const wasActive = active; active = state.approved;

@@ -7,8 +7,19 @@ App({
     cloudReady: false,
     databaseStatus: 'not-checked'
   },
-  onShow() { realtime.start(); },
-  onHide() { realtime.stop(); },
+  onShow() {
+    clearTimeout(this._realtimeStartTimer);
+    // App lifecycle hooks can run before registration makes getApp() available.
+    this._realtimeStartTimer = setTimeout(() => {
+      this._realtimeStartTimer = null;
+      realtime.start();
+    }, 0);
+  },
+  onHide() {
+    clearTimeout(this._realtimeStartTimer);
+    this._realtimeStartTimer = null;
+    realtime.stop();
+  },
 
   onLaunch() {
     if (!wx.cloud) {

@@ -33,7 +33,7 @@ function server() {
   };
   return value;
 }
-function client(s, time) {
+function client(s, time, options = {}) {
   const calls = [], cache = load('miniprogram/services/session-cache.js', {}, time);
   let approved = true, superAdmin = true, network;
   const wx = { cloud: {
@@ -57,7 +57,7 @@ function client(s, time) {
       return watcher;
     } }) }) })
   }, onNetworkStatusChange: fn => { network = fn; }, offNetworkStatusChange: () => { network = null; } };
-  const globals = { ...time, wx, getApp: () => ({ globalData: { cloudReady: true } }) };
+  const globals = { ...time, wx, getApp: options.getApp || (() => ({ globalData: { cloudReady: true } })) };
   const access = load('miniprogram/services/access.js', { './session-cache': cache, '../config/cloud': {} }, globals);
   const membership = load('miniprogram/services/membership.js', { './access': access, './profile': {} });
   const realtime = load('miniprogram/services/realtime.js', { './access': access, './membership': membership, './session-cache': cache }, globals);
@@ -70,8 +70,73 @@ function client(s, time) {
     p.updates = updates;
     return p;
   }
-  return { access, cache, realtime, membership, home, calls, page, revoke: () => { approved = false; }, role: value => { superAdmin = value; }, network: () => network && network({ isConnected: true }) };
+  return { access, cache, realtime, membership, home, calls, page, wx, revoke: () => { approved = false; }, role: value => { superAdmin = value; }, network: () => network && network({ isConnected: true }) };
 }
+
+function launch(s, time, options = {}) {
+  let app, instance, earlyReads = 0;
+  const c = client(s, time, { getApp: () => { if (!app) earlyReads++; return app; } });
+  c.wx.cloud.init = () => { if (options.cloudFailure) throw new Error('initialization failed'); };
+  vm.runInNewContext(fs.readFileSync('miniprogram/app.js', 'utf8'), {
+    ...time, wx: c.wx, console: { info() {}, error() {} },
+    require: name => name === './services/realtime' ? c.realtime : { envId: 'test' },
+    App(definition) {
+      instance = definition;
+      // WeChat can call both lifecycle hooks before App() returns/getApp() is available.
+      instance.onLaunch(); instance.onShow();
+      if (options.hideOnLaunch) instance.onHide();
+    }
+  });
+  app = instance;
+  return { ...c, app, earlyReads: () => earlyReads };
+}
+
+test('cold App registration defers realtime until getApp exists, then receives messages normally', async () => {
+  const s = server(), t = clock(), c = launch(s, t);
+  assert.equal(c.earlyReads(), 0);
+  assert.equal(c.calls.length, 0);
+  c.app.onShow(); c.app.onShow();
+  await t.advance(0);
+  assert.equal(c.calls.filter(action => action === 'get').length, 1);
+  assert.equal(s.watchers.filter(w => !w.closed).length, 1);
+  c.app.onShow(); await t.advance(0);
+  assert.equal(c.calls.filter(action => action === 'get').length, 1);
+  assert.equal(s.watchers.filter(w => !w.closed).length, 1);
+  await t.advance(200);
+  s.messages = [{ id: 'message', read: false }]; s.push(['messages']);
+  await t.advance(200);
+  assert.equal(c.access.notificationCurrent(), true);
+  c.app.onHide();
+  assert.equal(s.watchers.filter(w => !w.closed).length, 0);
+  assert.equal(t.count(), 0);
+});
+
+test('hiding before deferred startup cancels all work and returning starts one watcher', async () => {
+  const s = server(), t = clock(), c = launch(s, t, { hideOnLaunch: true });
+  await t.advance(1000);
+  assert.equal(c.earlyReads(), 0);
+  assert.equal(c.calls.length, 0);
+  assert.equal(t.count(), 0);
+  c.app.onShow(); await t.advance(200);
+  assert.equal(s.watchers.filter(w => !w.closed).length, 1);
+  c.app.onHide(); assert.equal(t.count(), 0);
+});
+
+test('failed cloud initialization does not start realtime or issue identity requests', async () => {
+  const s = server(), t = clock(), c = launch(s, t, { cloudFailure: true });
+  await t.advance(200);
+  assert.equal(c.earlyReads(), 0);
+  assert.equal(c.calls.length, 0);
+  assert.equal(s.watchers.length, 0);
+  c.app.onHide(); assert.equal(t.count(), 0);
+});
+
+test('realtime safely ignores a start without an available App instance', () => {
+  const s = server(), t = clock(), c = client(s, t, { getApp: () => undefined });
+  assert.doesNotThrow(() => c.realtime.start());
+  assert.equal(c.calls.length, 0);
+  assert.equal(t.count(), 0);
+});
 
 test('two independent visible clients receive a new weekly task and unread badge without navigation or a loading screen', async () => {
   const s = server(), t = clock(), a = client(s, t), b = client(s, t);
