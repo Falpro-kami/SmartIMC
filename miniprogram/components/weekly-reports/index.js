@@ -197,6 +197,7 @@ Component({
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
     accept(result) {
+      if (typeof wx.setNavigationBarTitle === 'function') wx.setNavigationBarTitle({ title: result.own && !result.isLeader && !(result.member && result.member.roles || []).includes('leader') && result.period.canEdit ? '填写周报' : '周报详情' });
       this._draftRevision = result.report ? result.report.revision : 0;
       this.update({ ...this.rights(result), selected: weekly.periodView(result.period), report: result.report, own: result.own, ownerName: result.ownerName,
         answers: result.report && result.report.answers || {}, imageURLs: result.imageURLs || {},

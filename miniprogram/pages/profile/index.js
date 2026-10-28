@@ -1,9 +1,9 @@
 const access = require('../../services/access');
 const adminData = require('../../services/admin-data');
 const PERSONAL_ENTRIES = [
-  { id: 'my-equipment', title: '我的设备' },
-  { id: 'my-submissions', title: '我的提交' },
-  { id: 'my-favorites', title: '我的收藏' }
+  { id: 'my-equipment', title: '我的设备', icon: 'monitor' },
+  { id: 'my-submissions', title: '我的提交', icon: 'file' },
+  { id: 'my-favorites', title: '我的收藏', icon: 'star' }
 ];
 Page(require('../../utils/member-page')({
   data: { loading: true, error: '', status: '', statusLabel: '', roleText: '', canManage: false, applying: false,

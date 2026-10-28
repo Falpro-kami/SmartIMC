@@ -6,7 +6,7 @@
   <view wx:if="{{loading}}" class="state">正在读取…</view>
   <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadApprovals">重试</button></view>
   <view wx:if="{{!loading && !error && !requests.length}}" class="state">{{emptyText}}</view>
-  <block wx:for="{{requests}}" wx:key="id">
+  <view wx:if="{{requests.length}}" class="requests-card"><block wx:for="{{requests}}" wx:key="id">
     <button wx:if="{{activeTab === 'pending'}}" class="request-row" data-id="{{item.id}}" bindtap="openApproval">
       <view class="request-info"><text class="request-name">{{item.title}}</text><text class="request-type">{{item.type}}</text><text wx:if="{{item.dateLabel}}" class="request-date">{{item.dateLabel}}</text></view>
       <text class="request-status status-{{item.statusTone}}">{{item.statusLabel}}</text><text class="arrow">›</text>
@@ -15,7 +15,7 @@
       <view class="request-info"><text class="request-name">{{item.title}}</text><text class="request-type">{{item.type}}</text><text wx:if="{{item.dateLabel}}" class="request-date">{{item.dateLabel}}</text></view>
       <text class="request-status status-{{item.statusTone}}">{{item.statusLabel}}</text>
     </view>
-  </block>
+  </block></view>
 </view>
 </block>
 <membership-gate wx:else />

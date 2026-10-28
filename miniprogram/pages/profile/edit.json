@@ -1,1 +1,6 @@
-{ "navigationStyle": "default", "navigationBarTitleText": "个人资料", "navigationBarBackgroundColor": "#ffffff", "backgroundColor": "#ffffff" }
+{
+  "navigationStyle": "default",
+  "navigationBarTitleText": "个人资料",
+  "navigationBarBackgroundColor": "#ffffff",
+  "backgroundColor": "#f3f5f9"
+}

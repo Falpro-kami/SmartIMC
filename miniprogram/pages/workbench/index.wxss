@@ -1,12 +1,11 @@
-.workbench-page { box-sizing: border-box; padding: 4px 16px 28px; }
-.app-section { padding: 14px 8px; border: 1px solid #dde3ec; border-radius: 9px; background: #fff; }
-.section-title { display: block; padding: 0 6px 16px; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 28px; }
+.workbench-page { box-sizing: border-box; padding: 16px 16px 26px; }
+.app-section { padding: 17px 12px 8px; border: 1px solid #e9edf5; border-radius: 14px; background: #fff; }
+.section-title { display: block; padding: 0 5px; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 32px; }
 .all-apps { margin-top: 14px; }
-.tools-grid { display: flex; flex-wrap: wrap; align-items: flex-start; width: 100%; row-gap: 8px; }
-.tool-entry { display: flex; box-sizing: border-box; flex: 0 0 25%; flex-direction: column; align-items: center; justify-content: flex-start; width: 25%; min-width: 0; min-height: 100px; margin: 0; padding: 4px 0 8px; border: 0; border-radius: 8px; background: transparent; color: #101b2b; font-weight: 400; line-height: 1.5; text-align: center; }
+.tools-grid { display: flex; flex-wrap: wrap; align-items: flex-start; width: 100%; row-gap: 10px; margin-top: 20px; }
+.tool-entry { display: flex; box-sizing: border-box; flex: 0 0 25%; flex-direction: column; align-items: center; justify-content: flex-start; width: 25%; min-width: 0; min-height: 100px; margin: 0; padding: 0 0 8px; border: 0; border-radius: 10px; background: transparent; color: #101b2b; font-weight: 400; line-height: 1.5; text-align: center; }
 .tool-entry::after { border: 0; }
-.tool-entry--pressed { background: #f5f6f8; }
-.tool-icon { display: block; width: 56px; height: 56px; }
-.tool-label { display: block; margin-top: 10px; font-size: 15px; line-height: 22px; white-space: nowrap; word-break: keep-all; }
-@media (max-width: 350px) { .tool-label { font-size: 13px; } .tool-icon { width: 52px; height: 52px; } }
-@media (max-width: 350px) { .workbench-page { padding-left: 12px; padding-right: 12px; } }
+.tool-entry--pressed { background: #f4f6fb; }
+.tool-icon { display: block; width: 52px; height: 52px; }
+.tool-label { display: block; margin-top: 7px; font-size: 14px; line-height: 23px; white-space: nowrap; word-break: keep-all; letter-spacing: -.4px; }
+@media (max-width: 350px) { .workbench-page { padding-left: 12px; padding-right: 12px; } .app-section { padding-left: 8px; padding-right: 8px; } .tool-label { font-size: 13px; } }

@@ -2,5 +2,6 @@
   "navigationBarTitleText": "我的",
   "usingComponents": {
     "user-header": "/components/user-header/index"
-  }
+  },
+  "backgroundColor": "#f3f5f9"
 }

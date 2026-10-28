@@ -1,20 +1,20 @@
-
-.home-content { padding: 4px 16px 28px; color: #101b2b; }
-.home-section { margin-bottom: 14px; padding: 14px 16px 0; border: 1px solid #dde3ec; border-radius: 10px; background: #ffffff; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 4px; font-size: 20px; font-weight: 600; }
-.section-heading button { display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0 -4px 0 0; padding: 0 4px; background: transparent; color: #005bac; font-size: 14px; line-height: 24px; }
-.home-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 76px; margin: 0; padding: 16px 0; border-bottom: 1px solid #dde3ec; border-radius: 0; background: #fff; color: #101b2b; text-align: left; line-height: 1.5; }
+.home-content { padding: 16px 16px 26px; color: #101b2b; }
+.home-section { margin-bottom: 14px; padding: 18px 18px 2px; border: 1px solid #e9edf5; border-radius: 14px; background: #fff; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 35px; margin-bottom: 5px; font-size: 19px; font-weight: 600; }
+.section-heading button { display: flex; align-items: center; gap: 6px; min-height: 44px; margin: -4px -4px -4px 0; padding: 0 4px; background: transparent; color: #2860cf; font-size: 13px; line-height: 24px; }
+.home-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 88px; margin: 0; padding: 14px 0; border-bottom: 1px solid #edf0f4; border-radius: 0; background: #fff; color: #101b2b; text-align: left; line-height: 1.6; }
 .home-row:last-child { border-bottom: 0; }
+.home-row-symbol { flex-shrink: 0; align-self: flex-start; margin-top: 5px; }
 .home-row-main { flex: 1; min-width: 0; }
-.home-row-title { display: block; color: #101b2b; font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
-.home-row-meta { display: block; margin-top: 6px; color: #637083; font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
-.home-arrow { flex-shrink: 0; color: #637083; font-size: 24px; font-weight: 400; line-height: 24px; }
-.todo-status { flex-shrink: 0; color: #805b1e; font-size: 13px; }
-.announcement-title-line { display: flex; align-items: baseline; gap: 8px; }
-.announcement-title-line .home-row-title { flex: 1; min-width: 0; }
-.pinned-tag { flex-shrink: 0; padding: 1px 5px; border-radius: 3px; background: #edf3f8; color: #005bac; font-size: 12px; line-height: 20px; }
-.publish-link { min-height: 48px; margin: 0; padding: 10px 0; color: #005bac; background: #fff; font-size: 16px; line-height: 28px; }
-.home-state, .home-empty { display: block; padding: 24px 0; color: #637083; font-size: 14px; line-height: 24px; text-align: center; }
-.home-error { padding: 16px; border: 1px solid #ecd4d0; border-radius: 10px; color: #ad4037; font-size: 16px; }
-.home-error button { min-height: 44px; margin-top: 12px; background: #edf3f8; color: #005bac; font-size: 16px; }
-@media (max-width: 350px) { .home-content { padding-left: 12px; padding-right: 12px; } .home-section { padding-left: 12px; padding-right: 12px; } }
+.home-row-title { display: block; color: #101b2b; font-size: 16px; font-weight: 400; line-height: 25px; overflow-wrap: anywhere; }
+.home-row-meta { display: block; margin-top: 4px; color: #6b788a; font-size: 12px; line-height: 21px; overflow-wrap: anywhere; }
+.home-arrow { flex-shrink: 0; color: #a4afbd; font-size: 23px; font-weight: 400; line-height: 24px; }
+.todo-status { flex-shrink: 0; color: #2860cf; background: #edf2ff; border-radius: 6px; padding: 2px 7px; font-size: 11px; line-height: 24px; }
+.announcement-title-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; }
+.announcement-title-line .home-row-title { flex: 1; min-width: 80px; }
+.pinned-tag { flex-shrink: 0; padding: 0 5px; border-radius: 4px; background: #edf2ff; color: #2860cf; font-size: 11px; line-height: 21px; }
+.publish-link { min-height: 44px; margin: 0; padding: 9px 0; color: #2860cf; background: #fff; font-size: 14px; line-height: 26px; }
+.home-state, .home-empty { display: block; padding: 24px 0; color: #6b788a; font-size: 14px; line-height: 24px; text-align: center; }
+.home-error { padding: 18px; border: 1px solid #ecd4d0; border-radius: 14px; background: #fff; color: #ad4037; font-size: 16px; }
+.home-error button { min-height: 46px; margin-top: 12px; background: #edf2ff; color: #2860cf; border-radius: 10px; font-size: 16px; }
+@media (max-width: 350px) { .home-content { padding-left: 12px; padding-right: 12px; } .home-section { padding-left: 14px; padding-right: 14px; } .home-row { gap: 8px; } }

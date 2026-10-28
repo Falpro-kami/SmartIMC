@@ -1,10 +1,10 @@
-<view class="templates">
-  <view class="heading"><text class="title">{{localTemplate ? '编辑表单' : editing ? '编辑模板' : '表单模板'}}</text><view class="heading-actions"><button wx:if="{{editing}}" class="link" bindtap="preview" disabled="{{busy}}">预览</button><button class="link" bindtap="back" disabled="{{busy}}">返回</button></view></view>
+<view class="templates {{editing ? 'editing-template' : ''}}">
+  <view class="heading"><text class="title">{{localTemplate ? '编辑表单' : editing ? '编辑模板' : '表单模板'}}</text><view class="heading-actions"><button wx:if="{{!editing}}" class="primary new-template" bindtap="newTemplate">新建模板</button><button wx:if="{{editing}}" class="link" bindtap="preview" disabled="{{busy}}">预览</button><button class="link" bindtap="back" disabled="{{busy}}">返回</button></view></view>
   <view wx:if="{{loading}}" class="empty">正在读取…</view>
   <block wx:elif="{{!editing}}">
     <view wx:if="{{!templates.length}}" class="card empty">暂无模板</view>
-    <view wx:for="{{templates}}" wx:key="id" class="card"><text class="name">{{item.name}}</text><view class="actions"><button class="secondary" data-id="{{item.id}}" bindtap="edit">编辑</button><button wx:if="{{choose}}" class="primary" data-id="{{item.id}}" bindtap="chooseTemplate">使用</button></view></view>
-    <button class="primary wide" bindtap="newTemplate">新建模板</button>
+    <view wx:for="{{templates}}" wx:key="id" class="card template-card"><view class="template-summary"><imc-icon name="file" tone="primary" size="{{26}}" background /><view class="template-copy"><text class="name">{{item.name}}</text><text class="template-meta">{{item.sectionCount}} 个分区 · {{item.fieldCount}} 个填写项</text></view></view><view class="actions"><button class="link" data-id="{{item.id}}" bindtap="edit">编辑</button><button class="link" data-id="{{item.id}}" bindtap="previewList">预览</button><button wx:if="{{choose}}" class="primary" data-id="{{item.id}}" bindtap="chooseTemplate">使用</button></view></view>
+
   </block>
   <block wx:else>
     <view class="card"><text class="label">{{localTemplate ? '表单名称' : '模板名称'}}</text><input class="input" value="{{editing.name}}" bindinput="name" maxlength="60" disabled="{{busy}}" /></view>
@@ -19,7 +19,7 @@
         <text class="label">填写说明（选填）</text><textarea class="input options" value="{{field.help}}" data-path="{{field.path}}" data-key="help" bindinput="fieldInput" maxlength="1000" disabled="{{busy}}" />
         <block wx:if="{{!field.isGroup}}">
         <view class="row"><text>字段类型</text><picker range="{{types}}" data-path="{{field.path}}" bindchange="type" disabled="{{busy}}"><view class="picker">{{field.type === 'text' ? '文本' : field.type === 'number' ? '数字' : field.type === 'date' ? '日期' : field.type === 'single' ? '单选' : field.type === 'multiple' ? '多选' : '附件'}} ›</view></picker></view>
-        <view class="row"><text>必填</text><switch color="#005bac" checked="{{field.required}}" data-path="{{field.path}}" data-key="required" bindchange="fieldInput" disabled="{{busy}}" /></view>
+        <view class="row"><text>必填</text><switch color="#2860cf" checked="{{field.required}}" data-path="{{field.path}}" data-key="required" bindchange="fieldInput" disabled="{{busy}}" /></view>
         <block wx:if="{{field.type === 'text'}}"><text class="label">字数上限</text><input class="input" type="number" value="{{field.maxLength}}" data-path="{{field.path}}" data-key="maxLength" bindinput="fieldInput" disabled="{{busy}}" /></block>
         <block wx:if="{{field.type === 'single' || field.type === 'multiple'}}"><text class="label">选项（每行一个）</text><textarea class="input options" value="{{field.optionsText}}" data-path="{{field.path}}" data-key="options" bindinput="fieldInput" maxlength="2500" disabled="{{busy}}" /></block>
         <block wx:if="{{field.type === 'attachment'}}"><text class="label">附件数量上限</text><input class="input" type="number" value="{{field.maxCount}}" data-path="{{field.path}}" data-key="maxCount" bindinput="fieldInput" disabled="{{busy}}" /><text class="label">单个附件上限（MB）</text><input class="input" type="number" value="{{field.maxSizeMB}}" data-path="{{field.path}}" data-key="maxSizeMB" bindinput="fieldInput" disabled="{{busy}}" /></block>
@@ -27,11 +27,11 @@
         <view class="actions"><button class="link" data-path="{{field.path}}" data-step="-1" bindtap="moveField" disabled="{{busy}}">上移</button><button class="link" data-path="{{field.path}}" data-step="1" bindtap="moveField" disabled="{{busy}}">下移</button><button class="link" data-path="{{field.path}}" bindtap="promote" disabled="{{busy || field.level === 2}}">升一级</button><button class="link" data-path="{{field.path}}" bindtap="demote" disabled="{{busy || field.level === 6}}">降一级</button><button class="link danger" data-path="{{field.path}}" bindtap="removeField" disabled="{{busy}}">删除</button></view>
         <button class="secondary wide" data-path="{{field.path}}" bindtap="addChild" disabled="{{busy || field.level === 6}}">{{field.isGroup ? '＋ 添加子标题' : '细分标题'}}</button>
       </view>
-      <block wx:if="{{!section.fields.length}}"><view class="row"><text>必填</text><switch color="#005bac" checked="{{section.required}}" data-section="{{si}}" data-key="required" bindchange="rootInput" disabled="{{busy}}" /></view><text class="label">字数上限</text><input class="input" type="number" value="{{section.maxLength || 5000}}" data-section="{{si}}" data-key="maxLength" bindinput="rootInput" disabled="{{busy}}" /></block>
+      <block wx:if="{{!section.fields.length}}"><view class="row"><text>必填</text><switch color="#2860cf" checked="{{section.required}}" data-section="{{si}}" data-key="required" bindchange="rootInput" disabled="{{busy}}" /></view><text class="label">字数上限</text><input class="input" type="number" value="{{section.maxLength || 5000}}" data-section="{{si}}" data-key="maxLength" bindinput="rootInput" disabled="{{busy}}" /></block>
       <button class="secondary wide" data-section="{{si}}" bindtap="addField" disabled="{{busy}}">＋ 添加字段</button>
     </view>
     <button class="secondary wide" bindtap="addSection" disabled="{{busy}}">＋ 添加分区</button>
-    <button class="primary wide" bindtap="save" disabled="{{busy}}" loading="{{busy}}">{{localTemplate ? '应用修改' : '保存模板'}}</button>
+    <view class="template-save-footer"><button class="primary wide" bindtap="save" disabled="{{busy}}" loading="{{busy}}">{{localTemplate ? '应用修改' : '保存模板'}}</button></view>
   </block>
   <text wx:if="{{error}}" class="error">{{error}}</text>
 </view>

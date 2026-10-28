@@ -1,6 +1,8 @@
 .members-page, .messages-page, .approvals-page, .directory-page { box-sizing: border-box; padding: 20px 16px calc(28px + env(safe-area-inset-bottom)); color: #101b2b; }
 .state { padding: 48px 16px; text-align: center; font-size: 14px; line-height: 1.6; color: #526173; }
 .error { display: block; margin: 12px 0; padding: 12px 16px; border: 1px solid #ecd4d0; border-radius: 8px; color: #ad4037; font-size: 14px; line-height: 1.6; background: #fffaf9; overflow-wrap: anywhere; }
-.error button, .more { margin: 12px 0 0; padding: 8px 16px; min-height: 44px; line-height: 28px; background: #edf3f8; color: #005bac; border-radius: 8px; font-size: 14px; }
-.arrow { flex-shrink: 0; font-size: 24px; line-height: 1; color: #637083; }
+.error button, .more { margin: 12px 0 0; padding: 8px 16px; min-height: 44px; line-height: 28px; background: #edf2ff; color: #2860cf; border-radius: 8px; font-size: 14px; }
+.arrow { flex-shrink: 0; font-size: 24px; line-height: 1; color: #6b788a; }
 @media (max-width: 350px) { .members-page, .messages-page, .approvals-page, .directory-page { padding-left: 12px; padding-right: 12px; } }
+
+.members-page, .messages-page, .approvals-page, .directory-page { min-height: 100vh; padding-top: 17px; background: #f3f5f9; }

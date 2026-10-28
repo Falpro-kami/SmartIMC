@@ -8,27 +8,27 @@ const MODULES = {
   leave: { title: '请假', icon: 'leave' },
   knowledge: { title: '团队知识库', icon: 'knowledge' },
   'weekly-sharing': { title: '每周分享', icon: 'weekly-sharing' },
-  'my-equipment': { title: '我的设备' },
-  'my-submissions': { title: '我的提交' },
-  'my-favorites': { title: '我的收藏' },
-  privacy: { title: '隐私与授权' },
-  feedback: { title: '意见反馈' },
-  'account-data': { title: '账号与数据' },
-  about: { title: '关于智慧IMC' },
+  'my-equipment': { title: '我的设备', uiIcon: 'monitor' },
+  'my-submissions': { title: '我的提交', uiIcon: 'file' },
+  'my-favorites': { title: '我的收藏', uiIcon: 'star' },
+  privacy: { title: '隐私与授权', uiIcon: 'lock' },
+  feedback: { title: '意见反馈', uiIcon: 'chat' },
+  'account-data': { title: '账号与数据', uiIcon: 'shield' },
+  about: { title: '关于智慧IMC', uiIcon: 'info' },
   'data-backup': { title: '数据备份', adminMode: 'backup' },
   'service-expiry': { title: '到期提醒', adminMode: 'expiry' },
   settings: {
     title: '设置与帮助',
     entries: [
-      { id: 'privacy', title: '隐私与授权' },
-      { id: 'feedback', title: '意见反馈' },
-      { id: 'account-data', title: '账号与数据' },
-      { id: 'about', title: '关于智慧IMC' }
+      { id: 'privacy', title: '隐私与授权', icon: 'lock' },
+      { id: 'feedback', title: '意见反馈', icon: 'chat' },
+      { id: 'account-data', title: '账号与数据', icon: 'shield' },
+      { id: 'about', title: '关于智慧IMC', icon: 'info' }
     ]
   }
 };
 Page(require('../../utils/member-page')({
-  data: { title: '', icon: '', description: '', entries: [], weeklyMode: false, weeklyPeriod: '', weeklyView: 'detail', weeklyOwner: '', weeklyTemplate: '', weeklyChooseTemplate: false, announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
+  data: { title: '', icon: '', uiIcon: 'folder', description: '', entries: [], weeklyMode: false, weeklyPeriod: '', weeklyView: 'detail', weeklyOwner: '', weeklyTemplate: '', weeklyChooseTemplate: false, announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
     billing: null, expiryLabel: '-', expiryWarning: false, backups: [], password: '', passwordConfirm: '', creating: false, downloading: '', progress: 0, exportedId: '' },
   onLoad(options) {
     const module = Object.prototype.hasOwnProperty.call(MODULES, options.id) ? MODULES[options.id] : null;

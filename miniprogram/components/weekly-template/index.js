@@ -23,7 +23,7 @@ Component({
       try {
         const r = await weekly.call('templates', {}, true);
         if (this._detached) return;
-        this.setData({ templates: r.templates });
+        this.setData({ templates: r.templates.map(t => ({ ...t, sectionCount: (t.schema && t.schema.sections || []).length, fieldCount: model.fields(t.schema).filter(f => !f.isGroup).length })) });
         if (this.properties.editId && !this._loaded) {
           const found = this.properties.editId === 'new' ? { id: weekly.newId('wt'), revision: 0, name: '', schema: model.defaults() } : r.templates.find(t => t.id === this.properties.editId);
           if (!found) throw new Error('模板不存在，请返回后重新打开。');
@@ -38,6 +38,7 @@ Component({
     },
     newTemplate() { this.triggerEvent('edit', { id: 'new' }); },
     edit(e) { const t = this.data.templates.find(t => t.id === e.currentTarget.dataset.id); if (t) this.triggerEvent('edit', { id: t.id }); },
+    previewList(e) { const t = this.data.templates.find(t => t.id === e.currentTarget.dataset.id); if (t && !this.data.busy) this.triggerEvent('preview', JSON.parse(JSON.stringify({ name: t.name, schema: t.schema }))); },
     chooseTemplate(e) { const t = this.data.templates.find(t => t.id === e.currentTarget.dataset.id); if (t) this.triggerEvent('select', t); },
     name(e) { this.setData({ 'editing.name': e.detail.value }); },
     buildSections() { this.setData({ editorSections: model.editorSections(this.data.editing && this.data.editing.schema) }); },

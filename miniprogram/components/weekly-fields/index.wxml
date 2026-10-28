@@ -1,11 +1,11 @@
 <view wx:for="{{sections}}" wx:key="id" wx:for-item="section" class="form-section {{embedded ? 'embedded' : ''}}">
-  <view class="field-heading"><text class="section-title">{{section.titleLabel}}</text><button wx:if="{{section.help && (!readonly || outline)}}" class="help-button" data-id="{{section.id}}" bindtap="toggleHelp">说明</button></view>
+  <view class="field-heading"><view class="section-title"><text wx:if="{{!readonly && section.numberLabel}}" class="section-number">{{section.numberLabel}}</text><text>{{readonly ? section.titleLabel : section.displayTitle}}</text></view><button wx:if="{{section.help && (!readonly || outline)}}" class="help-button" data-id="{{section.id}}" bindtap="toggleHelp" aria-label="展开或收起说明"><imc-icon name="info" tone="muted" size="{{15}}" /></button></view>
   <text wx:if="{{section.help && helpOpen[section.id] && (!readonly || outline)}}" class="help-text">{{section.help}}</text>
   <text wx:if="{{readonly && !outline && section.empty}}" class="value section-empty">无</text>
   <view class="fields" wx:if="{{section.fields.length}}">
     <view wx:for="{{section.fields}}" wx:key="id" class="form-field level-{{item.level}}" style="padding-left: {{item.root ? 0 : item.indent}}px">
       <view wx:if="{{!item.root}}" class="field-heading">
-      <checkbox-group wx:if="{{!readonly && !item.required && !item.isGroup}}" class="choice-control" data-id="{{item.id}}" bindchange="toggle"><label class="field-choice"><checkbox value="{{item.id}}" checked="{{item.enabled}}" color="#005bac" disabled="{{disabled || uploading}}" /><text class="label">{{item.labelLabel}}</text></label></checkbox-group>
+      <checkbox-group wx:if="{{!readonly && !item.required && !item.isGroup}}" class="choice-control" data-id="{{item.id}}" bindchange="toggle"><label class="field-choice"><checkbox value="{{item.id}}" checked="{{item.enabled}}" color="#2860cf" disabled="{{disabled || uploading}}" /><text class="label">{{item.labelLabel}}</text></label></checkbox-group>
       <text wx:elif="{{!item.root}}" class="label">{{item.labelLabel}}<text wx:if="{{item.required && !readonly}}" class="required"> *</text></text>
       <button wx:if="{{item.help && (!readonly || outline)}}" class="help-button" data-id="{{item.id}}" bindtap="toggleHelp">说明</button>
       </view>
@@ -21,8 +21,8 @@
       <text wx:elif="{{readonly}}" class="value">{{item.displayValue}}</text>
       <input wx:elif="{{item.type === 'number'}}" class="input" type="digit" value="{{item.value}}" data-id="{{item.id}}" bindinput="input" disabled="{{disabled}}" />
       <picker wx:elif="{{item.type === 'date'}}" mode="date" value="{{item.value}}" data-id="{{item.id}}" bindchange="input" disabled="{{disabled}}"><view class="input picker">{{item.value || '选择日期'}} ›</view></picker>
-      <radio-group wx:elif="{{item.type === 'single'}}" data-id="{{item.id}}" bindchange="input"><label wx:for="{{item.optionsView}}" wx:for-item="option" wx:key="label" class="option"><radio value="{{option.label}}" checked="{{option.checked}}" color="#005bac" disabled="{{disabled}}" />{{option.label}}</label></radio-group>
-      <checkbox-group wx:elif="{{item.type === 'multiple'}}" data-id="{{item.id}}" bindchange="input"><label wx:for="{{item.optionsView}}" wx:for-item="option" wx:key="label" class="option"><checkbox value="{{option.label}}" checked="{{option.checked}}" color="#005bac" disabled="{{disabled}}" />{{option.label}}</label></checkbox-group>
+      <radio-group wx:elif="{{item.type === 'single'}}" data-id="{{item.id}}" bindchange="input"><label wx:for="{{item.optionsView}}" wx:for-item="option" wx:key="label" class="option"><radio value="{{option.label}}" checked="{{option.checked}}" color="#2860cf" disabled="{{disabled}}" />{{option.label}}</label></radio-group>
+      <checkbox-group wx:elif="{{item.type === 'multiple'}}" data-id="{{item.id}}" bindchange="input"><label wx:for="{{item.optionsView}}" wx:for-item="option" wx:key="label" class="option"><checkbox value="{{option.label}}" checked="{{option.checked}}" color="#2860cf" disabled="{{disabled}}" />{{option.label}}</label></checkbox-group>
       </block>
     </view>
   </view>

@@ -1,0 +1,4 @@
+:host { display: inline-flex; flex-shrink: 0; vertical-align: middle; }
+.icon-box { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.icon-background { background: #edf2ff; border-radius: 8px; }
+.icon-image { display: block; flex-shrink: 0; }

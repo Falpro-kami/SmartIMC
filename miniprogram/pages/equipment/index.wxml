@@ -31,14 +31,13 @@
           <view class="card-identity"><text class="device-name">{{item.nameLabel}}</text><text class="field-label number-label">设备编号</text><text class="asset-number">{{item.equipmentNumberLabel}}</text></view>
           <view class="device-photo">
             <image wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFit" data-id="{{item._id}}" binderror="imageFailed" />
-            <view wx:else class="photo-placeholder"><view class="photo-symbol"><view /></view><text>-</text></view>
+            <view wx:else class="photo-placeholder"><imc-icon name="monitor" tone="muted" size="{{36}}" /></view>
           </view>
-          <view class="card-status"><text class="status-tag status-{{item.statusClass}}">{{item.statusLabel}}</text><text class="chevron">›</text></view>
         </view>
         <view class="card-fields">
           <view class="card-field"><text class="field-label">设备型号</text><text class="field-value">{{item.modelLabel}}</text></view>
           <view class="card-field"><text class="field-label">设备位置</text><text class="field-value">{{item.locationLabel}}</text></view>
-          <view class="card-field"><text class="field-label">使用人</text><text class="field-value">{{item.userLabel}}</text></view>
+          <view class="card-field"><text class="field-label">使用人</text><text class="field-value">{{item.userLabel}}</text></view><view class="card-field"><view class="card-status"><text class="status-tag status-{{item.statusClass}}">{{item.statusLabel}}</text><text class="chevron">›</text></view></view>
         </view>
       </button>
     </view>

@@ -1,5 +1,5 @@
 <block wx:if="{{membershipAllowed}}">
-<view class="module-page imc-theme {{entries.length ? 'settings-page' : ''}}">
+<view class="module-page imc-theme {{entries.length ? 'settings-page' : ''}} {{weeklyView === 'template-preview' || weeklyView === 'submission-preview' ? 'document-page' : ''}}">
   <team-announcements wx:if="{{announcementsMode}}" initial-id="{{announcementId}}" compose="{{composeAnnouncement}}" />
   <weekly-reports id="weekly-panel" wx:elif="{{weeklyMode}}" initial-period="{{weeklyPeriod}}" initial-view="{{weeklyView}}" initial-owner="{{weeklyOwner}}" initial-template="{{weeklyTemplate}}" choose-template="{{weeklyChooseTemplate}}" />
   <block wx:elif="{{adminMode}}">
@@ -7,7 +7,7 @@
     <view wx:elif="{{adminError}}" class="admin-error"><text>{{adminError}}</text><button bindtap="loadAdminData">重试</button></view>
     <block wx:elif="{{billing}}">
       <view wx:if="{{adminMode === 'expiry'}}" class="admin-card">
-        <text class="admin-title">云服务</text>
+        <view class="admin-title"><view class="icon-heading"><imc-icon name="cloud" tone="primary" size="{{16}}" background /><text>云服务</text></view></view>
         <view class="admin-field"><text>当前套餐</text><text>{{billing.packageName}}</text></view>
         <view class="admin-field"><text>到期时间</text><text>{{billing.expiresAt || '-'}}</text></view>
         <view class="admin-field"><text>到期提醒</text><text class="{{expiryWarning ? 'admin-warning' : ''}}">{{expiryLabel}}</text></view>
@@ -16,7 +16,7 @@
       </view>
       <block wx:if="{{adminMode === 'backup'}}">
         <view class="admin-card">
-          <text class="admin-title">创建备份</text>
+          <view class="admin-title"><view class="icon-heading"><imc-icon name="backup" tone="primary" size="{{16}}" background /><text>创建备份</text></view></view>
           <text class="backup-label">备份密码</text>
           <input class="backup-password" password maxlength="128" value="{{password}}" bindinput="onBackupPassword" placeholder="12至128个字符" disabled="{{creating}}" />
           <text class="backup-label password-confirm-label">确认密码</text>
@@ -24,7 +24,7 @@
           <button class="admin-primary" bindtap="createBackup" disabled="{{creating || downloading}}" loading="{{creating}}">{{creating ? '正在创建' : '创建加密备份'}}</button>
         </view>
         <view class="admin-card">
-          <text class="admin-title">备份记录</text>
+          <view class="admin-title"><view class="icon-heading"><imc-icon name="folder" tone="primary" size="{{16}}" background /><text>备份记录</text></view></view>
           <text wx:if="{{!backups.length}}" class="admin-empty">暂无备份</text>
           <view wx:for="{{backups}}" wx:key="id" class="backup-record">
             <view class="backup-record-head"><text>{{item.dateLabel}}</text><text class="backup-size">{{item.sizeLabel}}</text></view>
@@ -37,9 +37,9 @@
     </block>
   </block>
   <view wx:elif="{{entries.length}}" class="settings-card">
-    <button wx:for="{{entries}}" wx:key="id" class="settings-row" data-id="{{item.id}}" bindtap="openEntry" hover-class="row-pressed"><text>{{item.title}}</text><text class="arrow">›</text></button>
+    <button wx:for="{{entries}}" wx:key="id" class="settings-row" data-id="{{item.id}}" bindtap="openEntry" hover-class="row-pressed"><view class="entry-label"><imc-icon name="{{item.icon || 'info'}}" tone="muted" /><text>{{item.title}}</text></view><text class="arrow">›</text></button>
   </view>
-  <view wx:else class="module-card"><image wx:if="{{icon}}" src="/assets/workbench/{{icon}}.png" mode="aspectFit" /><text class="module-title">{{title}}</text><text class="module-status">功能筹备中</text></view>
+  <view wx:else class="module-card"><image wx:if="{{icon}}" src="/assets/workbench/{{icon}}.png" mode="aspectFit" /><imc-icon wx:if="{{!icon}}" name="{{uiIcon}}" size="{{28}}" background /><text class="module-title">{{title}}</text><text class="module-status">功能筹备中</text></view>
 </view>
 </block>
 <membership-gate wx:else />

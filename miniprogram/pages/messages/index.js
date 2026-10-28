@@ -16,7 +16,7 @@ Page(require('../../utils/member-page')({
     if (this._unsubscribeUnread) this._unsubscribeUnread(); this._unsubscribeUnread = null;
     this._epoch = (this._epoch || 0) + 1; this._loading = false; this._refreshAgain = false; },
   onUnload() { this._unloaded = true; this.onHide(); },
-  present(messages) { return messages.map(message => ({ ...message, timeLabel: timeLabel(message.createdMs) })); },
+  present(messages) { return messages.map(message => ({ ...message, timeLabel: timeLabel(message.createdMs), icon: /身份|权限|成员/.test(message.title) ? 'shield' : /公告/.test(message.title) ? 'megaphone' : 'file' })); },
   async loadMessages(quiet = false) {
     if (this._loading || this.data.readingAll) { this._refreshAgain = true; return; }
     this._loading = true;

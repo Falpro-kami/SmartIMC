@@ -1,10 +1,10 @@
 <view wx:if="{{authorized}}" class="tab-bar imc-theme" role="tablist">
   <button wx:for="{{list}}" wx:key="pagePath" class="tab-item {{selected === index ? 'tab-selected' : ''}}" data-index="{{index}}" bindtap="switchTab" hover-class="tab-pressed" aria-label="{{item.text}}" aria-role="tab" aria-selected="{{selected === index}}">
-    <view class="tab-icon" aria-hidden="true">
+    <view class="tab-icon-wrap"><view class="tab-icon" aria-hidden="true">
       <block wx:if="{{item.icon === 'home'}}"><view class="home-roof" /><view class="home-body" /><view class="home-door" /></block>
       <view wx:elif="{{item.icon === 'workbench'}}" class="workbench-icon"><view /><view /><view /><view /></view>
       <block wx:else><view class="profile-head" /><view class="profile-body" /></block>
-    </view>
+    </view></view>
     <text class="tab-label">{{item.text}}</text>
   </button>
 </view>

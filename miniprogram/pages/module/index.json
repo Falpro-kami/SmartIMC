@@ -2,7 +2,10 @@
   "navigationStyle": "default",
   "navigationBarTitleText": "工作台",
   "navigationBarBackgroundColor": "#ffffff",
-  "backgroundColor": "#ffffff",
+  "backgroundColor": "#f3f5f9",
   "enablePullDownRefresh": true,
-  "usingComponents": { "team-announcements": "/components/team-announcements/index", "weekly-reports": "/components/weekly-reports/index" }
+  "usingComponents": {
+    "team-announcements": "/components/team-announcements/index",
+    "weekly-reports": "/components/weekly-reports/index"
+  }
 }

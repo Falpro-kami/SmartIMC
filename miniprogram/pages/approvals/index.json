@@ -1,1 +1,6 @@
-{ "navigationStyle": "default", "navigationBarTitleText": "申请与审批", "navigationBarBackgroundColor": "#ffffff", "backgroundColor": "#ffffff" }
+{
+  "navigationStyle": "default",
+  "navigationBarTitleText": "申请与审批",
+  "navigationBarBackgroundColor": "#ffffff",
+  "backgroundColor": "#f3f5f9"
+}

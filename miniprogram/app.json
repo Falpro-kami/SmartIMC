@@ -13,18 +13,21 @@
     "pages/approvals/index"
   ],
   "lazyCodeLoading": "requiredComponents",
-  "usingComponents": { "membership-gate": "/components/membership-gate/index" },
+  "usingComponents": {
+    "membership-gate": "/components/membership-gate/index",
+    "imc-icon": "/components/imc-icon/index"
+  },
   "window": {
     "navigationStyle": "custom",
     "navigationBarTitleText": "智慧IMC",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#ffffff"
+    "backgroundColor": "#f3f5f9"
   },
   "tabBar": {
     "custom": true,
-    "color": "#526173",
-    "selectedColor": "#005bac",
+    "color": "#6b788a",
+    "selectedColor": "#2860cf",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "position": "bottom",

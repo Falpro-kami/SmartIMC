@@ -1,7 +1,7 @@
 @import "../../styles/list.wxss";
 .heading, .sheet-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 20px; font-weight: 600; line-height: 1.5; }
 .heading { margin-bottom: 16px; }
-.member-row { display: flex; width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 16px; align-items: center; gap: 12px; background: white; border: 1px solid #dde3ec; border-radius: 10px; text-align: left; line-height: 1.5; }
+.member-row { display: flex; width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 16px; align-items: center; gap: 12px; background: white; border: 1px solid #e5eaf2; border-radius: 10px; text-align: left; line-height: 1.5; }
 .row-main { flex: 1; min-width: 0; }
 .member-name { display: block; font-size: 16px; font-weight: 600; color: #101b2b; overflow-wrap: anywhere; }
 .role-text { display: block; font-size: 14px; color: #526173; margin-top: 6px; overflow-wrap: anywhere; }
@@ -13,7 +13,14 @@
 .sheet-heading button { flex-shrink: 0; margin: 0; width: 44px; height: 44px; padding: 0; background: transparent; font-size: 28px; color: #526173; line-height: 44px; }
 .sheet-scroll { height: 56vh; min-height: 0; margin: 8px 0; }
 .label { display: block; font-size: 14px; font-weight: 600; color: #526173; margin: 20px 0 8px; }
-.role-option, .status-option { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; box-sizing: border-box; font-size: 16px; border-bottom: 1px solid #dde3ec; }
-.save { flex-shrink: 0; width: 100%; margin: 12px 0 0; color: white; background: #005bac; font-size: 16px; border-radius: 8px; min-height: 48px; line-height: 48px; }
+.role-option, .status-option { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 12px; box-sizing: border-box; font-size: 16px; border-bottom: 1px solid #e5eaf2; }
+.save { flex-shrink: 0; width: 100%; margin: 12px 0 0; color: white; background: #2860cf; font-size: 16px; border-radius: 8px; min-height: 48px; line-height: 48px; }
 .remove-member { flex-shrink: 0; width: 100%; margin: 10px 0 0; padding: 0 12px; min-height: 44px; line-height: 44px; font-size: 16px; border-radius: 8px; background: #fbefed; color: #ad4037; }
 @media (max-width: 350px) { .sheet { padding-left: 12px; padding-right: 12px; } }
+
+.member-row { border-color: #e9edf5; border-radius: 14px; padding: 17px 16px; margin-bottom: 14px; }
+.role-text { font-size: 12px; line-height: 21px; margin-top: 4px; color: #6b788a; }
+.member-status { font-size: 11px; line-height: 24px; border-radius: 6px; padding: 0 7px; background: #edf2ff; color: #2860cf; }
+.sheet { border-radius: 20px 20px 0 0; padding-left: 20px; padding-right: 20px; }
+.role-option, .status-option { border-bottom-color: #edf0f4; font-size: 15px; }
+.save, .remove-member { border-radius: 10px; min-height: 46px; line-height: 46px; }

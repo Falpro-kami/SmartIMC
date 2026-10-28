@@ -1,13 +1,29 @@
 @import "../../styles/list.wxss";
-.approval-tabs { display: flex; padding: 4px; margin-bottom: 20px; border: 1px solid #dde3ec; border-radius: 10px; background: #ffffff; }
+.approval-tabs { display: flex; padding: 4px; margin-bottom: 20px; border: 1px solid #e5eaf2; border-radius: 10px; background: #ffffff; }
 .approval-tab { flex: 1; min-width: 0; min-height: 44px; margin: 0; padding: 0 4px; border: 0; border-radius: 6px; background: #ffffff; color: #526173; font-size: 15px; font-weight: 400; line-height: 44px; white-space: nowrap; }
-.approval-tab-selected { background: #edf3f8; color: #005bac; font-weight: 600; }
-.request-row { box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; padding: 16px; border: 1px solid #dde3ec; border-radius: 10px; background: white; text-align: left; line-height: 1.5; }
+.approval-tab-selected { background: #edf2ff; color: #2860cf; font-weight: 600; }
+.request-row { box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; padding: 16px; border: 1px solid #e5eaf2; border-radius: 10px; background: white; text-align: left; line-height: 1.5; }
 .request-info { flex: 1; min-width: 0; }
 .request-name { display: block; font-size: 16px; font-weight: 600; color: #101b2b; overflow-wrap: anywhere; }
 .request-type { display: block; margin-top: 6px; color: #526173; font-size: 14px; }
 .request-status { flex-shrink: 0; font-size: 13px; color: #805b1e; background: #fbf3e4; border-radius: 4px; padding: 3px 6px; }
-.request-date { display: block; margin-top: 4px; color: #637083; font-size: 13px; font-variant-numeric: tabular-nums; }
+.request-date { display: block; margin-top: 4px; color: #6b788a; font-size: 13px; font-variant-numeric: tabular-nums; }
 .status-success { color: #087f58; background: #edf6f2; }
 .status-rejected { color: #ad4037; background: #fbefed; }
 @media (max-width: 350px) { .approval-tab { font-size: 14px; } }
+
+.approval-tabs { border: 0; border-radius: 10px; padding: 4px; background: #e9edf4; margin-bottom: 17px; }
+.approval-tab { color: #687688; background: transparent; font-size: 14px; border-radius: 7px; }
+.approval-tab-selected { background: #fff; color: #2860cf; }
+.requests-card { border: 1px solid #e9edf5; border-radius: 14px; padding: 0 16px; background: #fff; }
+.request-row { border: 0; border-bottom: 1px solid #edf0f4; border-radius: 0; padding: 16px 0; margin: 0; min-height: 80px; }
+.request-row:last-child { border-bottom: 0; }
+.request-name { font-weight: 400; line-height: 25px; }
+.request-type, .request-date { font-size: 12px; margin-top: 4px; line-height: 21px; color: #6b788a; }
+.request-status { font-size: 11px; line-height: 24px; padding: 0 7px; border-radius: 6px; color: #2860cf; background: #edf2ff; }
+.status-success { color: #087f58; background: #eaf7f0; }
+.status-rejected { color: #ad4037; background: #fbefed; }
+
+.request-type,.request-date { display: inline; }
+.request-type::before { content: ''; display: block; height: 4px; }
+.request-date::before { content: ' · '; }

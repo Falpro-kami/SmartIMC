@@ -1,0 +1,1 @@
+<view class="icon-box {{background ? 'icon-background' : ''}}" style="width: {{background ? size + 12 : size}}px; height: {{background ? size + 12 : size}}px;" aria-hidden="true"><image class="icon-image" style="width: {{size}}px; height: {{size}}px;" src="/assets/ui/{{name}}-{{tone}}.png" mode="aspectFit" /></view>

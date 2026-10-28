@@ -1,17 +1,41 @@
+@import "../../styles/controls.wxss";
 :host { display: block; }
 .templates { font-size: 16px; line-height: 1.6; color: #101b2b; }
 .heading,.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 48px; }
 .heading-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .title { font-size: 20px; font-weight: 600; } .name { font-weight: 600; overflow-wrap: anywhere; }
-.card { box-sizing: border-box; padding: 18px; border: 1px solid #dde3ec; border-radius: 10px; margin-top: 16px; background: #fff; }
-.field { border-top: 1px solid #dde3ec; margin-top: 12px; padding-top: 4px; }
+.card { box-sizing: border-box; padding: 18px; border: 1px solid #e5eaf2; border-radius: 10px; margin-top: 16px; background: #fff; }
+.field { border-top: 1px solid #e5eaf2; margin-top: 12px; padding-top: 4px; }
 .node-title { display: block; font-size: 18px; font-weight: 600; margin-top: 12px; overflow-wrap: anywhere; }
 .label { display: block; margin: 12px 0 8px; color: #526173; }
-.input { box-sizing: border-box; min-height: 48px; width: 100%; border: 1px solid #dde3ec; border-radius: 8px; padding: 0 12px; font-size: 16px; background: #fff; color: #101b2b; }
-.options { padding: 12px; min-height: 120px; } .picker { min-height: 44px; line-height: 44px; color: #005bac; }
+.input { box-sizing: border-box; min-height: 48px; width: 100%; border: 1px solid #e5eaf2; border-radius: 8px; padding: 0 12px; font-size: 16px; background: #fff; color: #101b2b; }
+.options { padding: 12px; min-height: 120px; } .picker { min-height: 44px; line-height: 44px; color: #2860cf; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 button { box-sizing: border-box; margin: 0; min-height: 44px; padding: 8px 12px; border-radius: 8px; font-size: 16px; line-height: 28px; } button::after { border: 0; } button[disabled] { opacity: .5; }
-.primary { color: #fff; background: #005bac; } .secondary { color: #005bac; background: #edf3f8; } .link { color: #005bac; background: #fff; font-size: 14px; }
+.primary { color: #fff; background: #2860cf; } .secondary { color: #2860cf; background: #edf2ff; } .link { color: #2860cf; background: #fff; font-size: 14px; }
 .danger,.error { color: #ad4037; } .error { display: block; margin-top: 12px; overflow-wrap: anywhere; } .wide { margin-top: 14px; width: 100%; }
 .empty { padding: 24px; color: #526173; text-align: center; }
 @media (max-width: 350px) { .card { padding: 12px; } }
+
+.templates { padding-bottom: 12px; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+.card { border-color: #e9edf5; border-radius: 14px; padding: 18px; margin-top: 14px; }
+.title { font-size: 23px; line-height: 34px; }
+.label { font-size: 14px; color: #6b788a; margin-top: 18px; margin-bottom: 8px; }
+.input { border-color: #e4e8ef; background: #fafbfd; border-radius: 9px; }
+.options { min-height: 64px; padding: 11px 12px; line-height: 1.7; }
+.primary, .secondary { border-radius: 10px; min-height: 46px; line-height: 24px; padding: 11px 13px; }
+.link { font-size: 13px; min-height: 44px; }
+.actions { gap: 8px 14px; }
+.actions .link { padding-left: 0; padding-right: 0; font-size: 12px; }
+.field { border-color: #e8edf3; margin-top: 19px; padding-top: 17px; }
+.node-title { font-size: 17px; line-height: 27px; }
+.template-summary { display: flex; align-items: center; gap: 13px; }
+.template-card .name { font-size: 17px; line-height: 27px; }
+.template-card .actions { padding-left: 51px; }
+
+.editing-template { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+.template-save-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #e5eaf1; }
+.template-save-footer .wide { margin-top: 0; }
+.template-copy { flex: 1; min-width: 0; }
+.template-meta { display: block; font-size: 12px; line-height: 21px; margin-top: 4px; color: #6b788a; }
+.new-template { font-size: 14px; min-height: 40px; padding: 8px 13px; line-height: 24px; }

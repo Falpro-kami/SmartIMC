@@ -1,0 +1,5 @@
+:host { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 16px; line-height: 1.6; }
+.icon-heading { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.icon-heading > text { min-width: 0; overflow-wrap: anywhere; }
+.entry-label { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
+.entry-label > text { min-width: 0; overflow-wrap: anywhere; }

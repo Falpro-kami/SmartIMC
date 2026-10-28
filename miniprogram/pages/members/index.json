@@ -1,1 +1,6 @@
-{ "navigationStyle": "default", "navigationBarTitleText": "成员与权限", "navigationBarBackgroundColor": "#ffffff", "backgroundColor": "#ffffff" }
+{
+  "navigationStyle": "default",
+  "navigationBarTitleText": "成员与权限",
+  "navigationBarBackgroundColor": "#ffffff",
+  "backgroundColor": "#f3f5f9"
+}

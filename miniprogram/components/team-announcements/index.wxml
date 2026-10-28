@@ -8,7 +8,7 @@
     <view class="announcement-card">
       <text class="field-label">公告标题</text><input class="title-input" maxlength="80" value="{{draft.title}}" bindinput="onTitle" disabled="{{saving}}" placeholder="请输入公告标题" />
       <text class="field-label body-label">正文</text><textarea class="body-input" maxlength="10000" value="{{draft.body}}" bindinput="onBody" disabled="{{saving}}" placeholder="请输入公告内容" auto-height />
-      <view class="pin-field"><text>置顶公告</text><switch checked="{{draft.pinned}}" bindchange="onPinned" disabled="{{saving}}" color="#005bac" /></view>
+      <view class="pin-field"><text>置顶公告</text><switch checked="{{draft.pinned}}" bindchange="onPinned" disabled="{{saving}}" color="#2860cf" /></view>
     </view>
     <text wx:if="{{formError}}" class="form-error">{{formError}}</text>
     <button class="primary-action full-width" bindtap="saveAnnouncement" loading="{{saving}}" disabled="{{saving}}">{{draft.revision ? '保存修改' : '发布公告'}}</button>
@@ -23,7 +23,7 @@
   </block>
   <block wx:elif="{{mode === 'list'}}">
     <text wx:if="{{!loading && !announcements.length}}" class="announcement-state">暂无公告</text>
-    <button wx:for="{{announcements}}" wx:key="id" class="announcement-card announcement-row" data-id="{{item.id}}" bindtap="selectAnnouncement"><view class="announcement-info"><view class="announcement-title-line"><text wx:if="{{item.pinned}}" class="pinned-tag">置顶</text><text class="announcement-title">{{item.title}}</text></view><text class="announcement-meta">{{item.authorName}} · {{item.dateLabel}}</text></view><text class="announcement-arrow">›</text></button>
+    <button wx:for="{{announcements}}" wx:key="id" class="announcement-card announcement-row" data-id="{{item.id}}" bindtap="selectAnnouncement"><view class="announcement-symbol"><imc-icon name="megaphone" tone="primary" size="{{20}}" background /></view><view class="announcement-info"><view class="announcement-title-line"><text wx:if="{{item.pinned}}" class="pinned-tag">置顶</text><text class="announcement-title">{{item.title}}</text></view><text class="announcement-meta">{{item.authorName}} · {{item.dateLabel}}</text></view><text class="announcement-arrow">›</text></button>
     <button wx:if="{{hasMore && !loading}}" class="secondary-action full-width" bindtap="loadMore">加载更多</button>
   </block>
   <text wx:if="{{loading}}" class="announcement-state">正在读取…</text>

@@ -7,8 +7,8 @@ Component({
   observers: { 'schema,answers,files,selectedFields,readonly,outline': function () { this.build(); } },
   methods: {
     build() {
-      const answers = this.properties.answers || {}, files = new Map([...this.properties.files, ...Object.values(this._files || {})].map(f => [f.id, f]));
-      this.setData({ sections: formModel.view(this.properties.schema, answers, this.properties.selectedFields, this.properties.readonly, this.properties.outline).map(s => ({ ...s, fields: s.fields.map(f => {
+      const answers = this.properties.answers || {}, files = new Map([...(this.properties.files || []), ...Object.values(this._files || {})].map(f => [f.id, f]));
+      this.setData({ sections: formModel.view(this.properties.schema, answers, this.properties.selectedFields, this.properties.readonly, this.properties.outline).map(s => ({ ...s, numberLabel: s.titleLabel.match(/^\d+/)?.[0] || '', displayTitle: s.titleLabel.replace(/^\d+\.\s*/, ''), fields: s.fields.map(f => {
         const value = answers[f.id];
         return { ...f,
           attachments: f.type === 'attachment' ? (value || []).map(id => weekly.fileView(files.get(id) || { id, name: '附件', size: 0 })) : [] };

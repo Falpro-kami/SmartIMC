@@ -1,12 +1,21 @@
 @import "../../styles/list.wxss";
 .messages-toolbar { display: flex; justify-content: flex-end; margin: -8px 0 8px; }
 .mark-read::after { border: 0; }
-.mark-read[disabled] { opacity: .5; color: #637083; }
-.message-row { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 16px; background: white; border: 1px solid #dde3ec; border-radius: 10px; text-align: left; line-height: 1.6; }
+.mark-read[disabled] { opacity: .5; color: #6b788a; }
+.message-row { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 16px; background: white; border: 1px solid #e5eaf2; border-radius: 10px; text-align: left; line-height: 1.6; }
 .message-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .message-title { min-width: 0; color: #101b2b; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
-.unread-dot { width: 7px; height: 7px; border-radius: 50%; background: #d84740; flex-shrink: 0; }
+.unread-dot { width: 7px; height: 7px; border-radius: 50%; background: #cb4242; flex-shrink: 0; }
 .message-body { display: block; margin-top: 8px; font-size: 15px; color: #526173; overflow-wrap: anywhere; }
-.message-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; font-size: 13px; color: #637083; }
+.message-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; font-size: 13px; color: #6b788a; }
 .message-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-.mark-read { margin: -4px -4px -4px 0; padding: 8px 4px; min-height: 44px; color: #005bac; background: transparent; font-size: 14px; line-height: 28px; }
+.mark-read { margin: -4px -4px -4px 0; padding: 8px 4px; min-height: 44px; color: #2860cf; background: transparent; font-size: 14px; line-height: 28px; }
+
+.messages-toolbar { margin: -3px 0 13px; }
+.message-row { position: relative; padding: 17px 16px 13px 61px; margin-bottom: 14px; border: 1px solid #e9edf5; border-radius: 14px; }
+.message-symbol { position: absolute; top: 17px; left: 16px; }
+.message-title { font-size: 16px; line-height: 25px; }
+.message-body { font-size: 14px; line-height: 1.8; margin-top: 8px; }
+.message-footer { font-size: 11px; margin-top: 8px; gap: 6px; }
+.message-footer .mark-read { font-size: 12px; min-height: 44px; }
+.unread-dot { width: 6px; height: 6px; }

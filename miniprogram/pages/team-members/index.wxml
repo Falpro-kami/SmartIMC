@@ -3,9 +3,9 @@
   <view wx:if="{{loading}}" class="state">正在读取成员…</view>
   <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadMembers">重试</button></view>
   <view wx:if="{{!loading && !error && !members.length}}" class="state">暂无团队成员</view>
-  <view wx:for="{{members}}" wx:key="id" class="member-row"><view class="avatar"><image wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" mode="aspectFill" data-id="{{item.id}}" binderror="avatarFailed" /><text wx:else>{{item.initials}}</text></view><view class="member-info"><text class="name">{{item.name}}</text><text class="roles">{{item.roleText}}</text></view></view>
+  <view wx:if="{{members.length || (!loading && !error)}}" class="directory-card"><view wx:for="{{members}}" wx:key="id" class="member-row"><view class="avatar"><image wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" mode="aspectFill" data-id="{{item.id}}" binderror="avatarFailed" /><text wx:else>{{item.initials}}</text></view><view class="member-info"><text class="name">{{item.name}}</text><text class="roles">{{item.roleText}}</text></view></view>
   <button wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</button>
   <button wx:if="{{!loading && !error}}" class="member-row invite-row" open-type="share" aria-label="邀请成员"><view class="avatar invite-avatar"><view class="invite-plus" /></view><text class="name">邀请成员</text></button>
-</view>
+</view></view>
 </block>
 <membership-gate wx:else />

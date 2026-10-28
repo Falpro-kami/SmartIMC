@@ -1,13 +1,8 @@
-page {
-  background: #ffffff;
-  color: #101b2b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
+/* 智慧IMC 已确认视觉：协作蓝。浅灰画布 #f3f5f9、白色分区、14px 圆角、双色功能图标；主色 #2860cf。工作台固定四列，页头固定，周报阅读姓名居中且无分区卡片。关键颜色和尺寸使用明确值。 */
+@import "styles/controls.wxss";
+page { background: #f3f5f9; color: #101b2b; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 button, input, textarea { font-family: inherit; }
 button { box-sizing: border-box; font-weight: 400; }
 button::after { border: 0; }
 button[disabled] { opacity: .5; }
-.tab-page { min-height: 100vh; box-sizing: border-box; padding-bottom: calc(64px + env(safe-area-inset-bottom)); background: #ffffff; }
+.tab-page { min-height: 100vh; box-sizing: border-box; padding-bottom: calc(69px + env(safe-area-inset-bottom)); background: #f3f5f9; }

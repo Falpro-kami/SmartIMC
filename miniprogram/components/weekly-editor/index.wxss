@@ -1,7 +1,8 @@
+@import "../../styles/controls.wxss";
 :host { display: block; min-width: 0; }
-.document { position: relative; border: 1px solid #dde3ec; border-radius: 6px; background: #fff; }
+.document { position: relative; border: 1px solid #e5eaf2; border-radius: 6px; background: #fff; }
 .panel-open { z-index: 30; }
-.editor-tools { position: relative; z-index: 32; display: flex; align-items: center; height: 44px; padding: 0 4px; border-bottom: 1px solid #dde3ec; border-radius: 6px 6px 0 0; background: #fff; }
+.editor-tools { position: relative; z-index: 32; display: flex; align-items: center; height: 44px; padding: 0 4px; border-bottom: 1px solid #e5eaf2; border-radius: 6px 6px 0 0; background: #fff; }
 .tools-scroll { display: block; flex: 1; min-width: 0; width: 0; height: 44px; white-space: nowrap; }
 .tools-line { display: inline-flex; flex-wrap: nowrap; align-items: center; height: 44px; }
 .tool,.menu-tool { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; flex-shrink: 0; margin: 0; padding: 0; width: 44px; height: 44px; min-height: 44px; border: 0; border-radius: 4px; color: #101b2b; background: transparent; line-height: 1; }
@@ -11,12 +12,12 @@
 .color-line { position: absolute; height: 3px; left: 2px; right: 2px; bottom: 0; border-radius: 1px; }
 .style-tool,.dropdown-tool { width: 52px; gap: 4px; }
 .chevron { display: block; width: 10px; height: 10px; }
-.separator,.more-divider { display: block; flex-shrink: 0; width: 1px; height: 16px; margin: 0 4px; background: #dde3ec; }
+.separator,.more-divider { display: block; flex-shrink: 0; width: 1px; height: 16px; margin: 0 4px; background: #e5eaf2; }
 .more-tool { position: relative; flex-shrink: 0; }
 .active { color: #3370ff; background: #eff0f1; }
 .tool[disabled],.menu-tool[disabled] { opacity: .4; }
 .tool:active,.menu-tool:active { background: #eff0f1; }
-.popover { position: absolute; z-index: 33; top: 46px; box-sizing: border-box; padding: 6px; border: 1px solid #dde3ec; border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgba(16,27,43,.12); }
+.popover { position: absolute; z-index: 33; top: 46px; box-sizing: border-box; padding: 6px; border: 1px solid #e5eaf2; border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgba(16,27,43,.12); }
 .heading-menu { left: 8px; width: 58px; }
 .menu-tool { display: flex; }
 .heading-icon { width: 26px; height: 26px; }
@@ -28,9 +29,19 @@
 .white-swatch { border: 1px solid #e5e6eb; }
 .color-check { width: 16px; height: 16px; }
 .more-menu { right: 0; display: flex; flex-wrap: wrap; width: 322px; max-width: calc(100vw - 32px); }
-.history-tools { display: flex; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid #dde3ec; }
+.history-tools { display: flex; width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid #e5eaf2; }
 .dismiss { position: fixed; z-index: 31; top: 0; left: 0; right: 0; bottom: 0; background: transparent; }
 .tool-tip { position: absolute; z-index: 34; top: 48px; right: 0; max-width: 180px; border-radius: 6px; padding: 8px 12px; background: #202328; color: #fff; font-size: 12px; line-height: 1.5; }
 .editor-body { box-sizing: border-box; min-height: 200px; height: auto; padding: 12px; color: #101b2b; font-size: 16px; line-height: 1.8; overflow-wrap: anywhere; }
 .readonly { border: 0; } .readonly .editor-body { min-height: 44px; padding: 0; }
 .error { display: block; padding: 8px 12px; color: #ad4037; font-size: 14px; }
+
+.document { border-color: #dce3ee; border-radius: 10px; }
+.editor-tools { background: #f7f9fc; border-color: #e6ebf2; border-radius: 10px 10px 0 0; }
+.editor-body { padding: 14px; line-height: 1.9; }
+.readonly { border: 0; border-radius: 0; }
+.readonly .editor-body { padding: 0; line-height: 1.95; }
+.active { color: #2860cf; background: #edf2ff; }
+
+.editor-body { min-height: 150px; }
+.readonly .editor-body { min-height: 44px; }
