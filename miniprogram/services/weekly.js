@@ -34,8 +34,40 @@ function dateLabel(ms) {
 }
 const statusLabel = status => ({ unsubmitted: '未提交', draft: '草稿', submitted: '已提交', exempt: '免交', outside: '无需提交' }[status] || '-');
 const fileView = f => ({ ...f, sizeLabel: f.size < 1024 * 1024 ? Math.ceil(f.size / 1024) + ' KB' : (f.size / 1024 / 1024).toFixed(1) + ' MB' });
-const periodView = p => ({ ...p, deadlineLabel: dateLabel(p.deadlineMs), publishLabel: dateLabel(p.publishAtMs), statusLabel: p.status === 'scheduled' ? '待发布' : p.status === 'cancelled' ? '已取消' : statusLabel(p.ownStatus),
+function periodTitle(p, now = Date.now()) {
+  const year = new Date(now + 8 * 3600000).toISOString().slice(0, 4);
+  const short = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? (value.slice(0, 4) === year ? '' : value.slice(0, 4) + '年') + Number(value.slice(5, 7)) + '月' + Number(value.slice(8, 10)) + '日' : value || '-';
+  const standard = p.title === p.startDate + ' 至 ' + p.endDate + ' 周报';
+  return { displayTitle: standard ? short(p.startDate) + '—' + short(p.endDate) : p.title, showDateRange: !standard };
+}
+const periodView = p => ({ ...p, ...periodTitle(p), deadlineLabel: dateLabel(p.deadlineMs), publishLabel: dateLabel(p.publishAtMs), statusLabel: p.status === 'scheduled' ? '待发布' : p.status === 'cancelled' ? '已取消' : statusLabel(p.ownStatus),
   periodLabel: { scheduled: '待发布', cancelled: '已取消发布', open: '开放中', closed: '已关闭', archived: '已归档', deleted: '已删除' }[p.status] || '-' });
+function listEntry(p, rights = {}) {
+  const planned = ['scheduled', 'cancelled'].includes(p.status);
+  if (planned && rights.canManage) return { action: 'settings', label: '周期设置' };
+  if (rights.isLeader && rights.canReadTeam) return { action: 'team', label: '查看团队提交' };
+  if (!rights.isLeader && p.canEdit) return { action: 'detail', label: p.ownStatus === 'submitted' ? '修改周报' : p.ownStatus === 'draft' ? '继续填写' : '填写周报' };
+  if (rights.canReadTeam && p.ownStatus === 'outside') return { action: 'team', label: '查看团队提交' };
+  return { action: 'detail', label: p.ownStatus === 'submitted' ? '查看周报' : '查看详情' };
+}
+function listLayout(periods = [], rights = {}, now = Date.now()) {
+  const today = new Date(now + 8 * 3600000).toISOString().slice(0, 10), year = today.slice(0, 4);
+  const groups = [{ id: 'current', label: '本期周报', rows: [] }, { id: 'planned', label: '发布计划', rows: [] }, { id: 'upcoming', label: '即将开始', rows: [] }, { id: 'history', label: '历史周报', rows: [] }];
+  for (const p of periods) {
+    if (p.status === 'deleted' || ['scheduled', 'cancelled'].includes(p.status) && !rights.canManage) continue;
+    const planned = ['scheduled', 'cancelled'].includes(p.status);
+    const current = p.status === 'open' && !p.supersededBy && p.startDate <= today && p.endDate >= today;
+    const upcoming = p.status === 'open' && !p.supersededBy && p.startDate > today;
+    const entry = listEntry(p, rights), group = groups[planned ? 1 : current ? 0 : upcoming ? 2 : 3];
+    group.rows.push({ ...p, ...periodTitle(p, now), entryLabel: entry.label, entryAction: entry.action,
+      secondaryTeam: !!rights.canReadTeam && !planned && entry.action !== 'team',
+      showOwnStatus: !rights.isLeader && !planned,
+      ownBadgeClass: p.ownStatus === 'submitted' ? 'success' : p.canEdit ? 'accent-badge' : '',
+      deadlineShort: dateLabel(p.deadlineMs).replace(new RegExp('^' + year + '-'), '').replace(/^(\d{2})-(\d{2}) /, (_, m, d) => Number(m) + '月' + Number(d) + '日 '),
+      current, planned });
+  }
+  return groups.filter(group => group.rows.length);
+}
 async function upload(file, periodId, fieldId = '', kind = 'attachment', formKey) {
   const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size, fieldId, kind, ...(formKey ? { formKey } : {}) });
   const uploaded = await wx.cloud.uploadFile({ cloudPath: prepared.cloudPath, filePath: file.path });
@@ -74,4 +106,4 @@ async function exportStats(periodId) {
   await fsCall('writeFile', { filePath, data: result.csv, encoding: 'utf8' });
   return { filePath, fileName: result.name };
 }
-module.exports = { call, subscribe: listener => cache.subscribe('weekly', listener), peek: (action, data = {}) => cache.peek(cacheKey(action, data)), upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView };
+module.exports = { call, subscribe: listener => cache.subscribe('weekly', listener), peek: (action, data = {}) => cache.peek(cacheKey(action, data)), upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView, listEntry, listLayout };

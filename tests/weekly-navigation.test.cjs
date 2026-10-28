@@ -10,12 +10,13 @@ function moduleAt(file, deps, globals = {}) {
   vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, require: name => deps[name], ...globals });
   return module.exports;
 }
-function harness(origin = 'pages/workbench/index', manage = false) {
+function harness(origin = 'pages/workbench/index', manage = false, rightsOverride = {}) {
   const stack = [{ route: origin, options: {}, scrollTop: 0 }], reads = [], nav = [];
-  let panelDefinition, pageDefinition, templateDefinition, confirm = true, failNavigation = false, heldAction = '', releaseRead;
+  let panelDefinition, pageDefinition, templateDefinition, confirm = true, failNavigation = false, heldAction = '', releaseRead, menuIndex = 0;
+  const menus = [];
   const rows = Array.from({ length: 20 }, (_, i) => ({ id: personId(i + 1), name: '测试同学' + (i + 1), status: i === 0 ? 'draft' : 'submitted', submittedMs: 1, files: [] }));
   const periods = Array.from({ length: 25 }, (_, i) => ({ id: periodId(i + 1), title: '周报' + (i + 1), status: 'open', ownStatus: 'outside', startDate: '2026-10-26', endDate: '2026-11-01', deadlineMs: 1793527200000 }));
-  const rights = { isLeader: !manage, canManage: manage, canReadTeam: true, canRemind: false, canExport: false };
+  const rights = { isLeader: !manage, canManage: manage, canReadTeam: true, canRemind: false, canExport: false, ...rightsOverride };
   const templateId = 'wt_' + 'b'.repeat(32), templateRows = [{ id: templateId, name: '研究周报', revision: 1, schema: require('../miniprogram/utils/weekly-form').defaults() }];
   const cloud = { callFunction: async ({ data }) => {
     reads.push({ ...data });
@@ -59,6 +60,7 @@ function harness(origin = 'pages/workbench/index', manage = false) {
   const wx = { cloud,
     setNavigationBarTitle: ({ title }) => { stack.at(-1).title = title; },
     showModal: async () => ({ confirm }),
+    showActionSheet: async ({ itemList }) => { menus.push(itemList); if (menuIndex < 0) throw { errMsg: 'showActionSheet:fail cancel' }; return { tapIndex: menuIndex }; },
     navigateTo(options) { nav.push(options.url); if (failNavigation) { options.fail({ errMsg: 'navigateTo:fail' }); options.complete(); return; } const frame = push(options.url, options.events); if (options.success) options.success({ eventChannel: frame.eventChannel }); options.complete(); },
     navigateBack(options = {}) {
       const delta = options.delta || 1;
@@ -73,9 +75,65 @@ function harness(origin = 'pages/workbench/index', manage = false) {
   vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: value => { panelDefinition = value; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : name === '../../services/profile' ? { load: async () => ({ profile: { name: '测试同学' } }) } : weekly, wx, getCurrentPages: () => stack, setTimeout, clearTimeout });
   vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-template/index.js', 'utf8'), { Component: value => { templateDefinition = value; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : weekly, wx });
   return { stack, reads, nav, push, wx, cache, top: () => stack.at(-1), confirm: value => { confirm = value; }, fail: value => { failNavigation = value; },
-    templateId, hold: action => { heldAction = action; }, release: () => { heldAction = ''; releaseRead(); }, background: () => hide(stack.at(-1)), foreground: () => show(stack.at(-1)) };
+    templateId, periods, menus, menu: index => { menuIndex = index; }, hold: action => { heldAction = action; }, release: () => { heldAction = ''; releaseRead(); }, background: () => hide(stack.at(-1)), foreground: () => show(stack.at(-1)) };
 }
 const tap = id => ({ currentTarget: { dataset: { id } } });
+
+test('weekly list grouping and entry actions respect period state and additive role permissions', () => {
+  const weekly = require('../miniprogram/services/weekly'), now = Date.parse('2026-10-28T12:00:00+08:00');
+  const p = { id: periodId(1), title: '2026-10-26 至 2026-11-01 周报', startDate: '2026-10-26', endDate: '2026-11-01', status: 'open', canEdit: true, ownStatus: 'draft', deadlineMs: Date.parse('2026-11-01T18:00:00+08:00') };
+  const examples = [
+    [{}, 'detail', '继续填写', false, true],
+    [{ isLeader: true, canReadTeam: true }, 'team', '查看团队提交', false, false],
+    [{ canManage: true, canReadTeam: true }, 'detail', '继续填写', true, true],
+    [{ isLeader: true, canManage: true, canReadTeam: true }, 'team', '查看团队提交', false, false]
+  ];
+  for (const [rights, action, label, secondary, ownStatus] of examples) {
+    const group = weekly.listLayout([weekly.periodView(p)], rights, now)[0], row = group.rows[0];
+    assert.equal(group.id, 'current'); assert.equal(row.entryAction, action); assert.equal(row.entryLabel, label);
+    assert.equal(row.secondaryTeam, secondary); assert.equal(row.showOwnStatus, ownStatus);
+    assert.equal(row.displayTitle, '10月26日—11月1日'); assert.equal(row.deadlineShort, '11月1日 18:00');
+  }
+  const planned = { ...p, id: periodId(2), status: 'scheduled', canEdit: false }, old = { ...p, id: periodId(3), status: 'closed', canEdit: false, ownStatus: 'submitted' };
+  const groups = weekly.listLayout([weekly.periodView(planned), weekly.periodView(old), weekly.periodView(p)], { canManage: true }, now);
+  assert.deepEqual(groups.map(g => g.id), ['current','planned','history']);
+  assert.equal(groups[1].rows[0].entryLabel, '周期设置'); assert.equal(groups[2].rows[0].entryLabel, '查看周报');
+  assert.equal(weekly.listLayout([planned], {}, now).length, 0);
+  const upcoming = weekly.listLayout([{ ...p, startDate: '2026-11-02', endDate: '2026-11-08', canEdit: false }], {}, now)[0];
+  assert.equal(upcoming.id, 'upcoming'); assert.equal(upcoming.rows[0].entryLabel, '查看详情');
+  assert.equal(weekly.listEntry({ ...p, canEdit: false, ownStatus: 'outside' }, { canReadTeam: true }).action, 'team');
+  assert.equal(weekly.listLayout([{ ...old, title: '自定义研究汇报', supersededBy: periodId(9) }], {}, now)[0].rows[0].displayTitle, '自定义研究汇报');
+});
+
+test('member, leader, administrator and mixed roles enter the appropriate native page directly from list actions', async () => {
+  for (const rights of [
+    { isLeader: false, canManage: false, canReadTeam: false },
+    { isLeader: true, canManage: false, canReadTeam: true },
+    { isLeader: false, canManage: true, canReadTeam: true },
+    { isLeader: true, canManage: true, canReadTeam: true }
+  ]) {
+    const a = harness('pages/workbench/index', rights.canManage, rights); a.periods[0].canEdit = true; a.periods[0].ownStatus = 'draft';
+    a.push('/pages/module/index?id=weekly'); await settle(); const list = a.top();
+    list.panel.enterPeriod(tap(periodId(1))); await settle();
+    assert.equal(a.top().panel.data.mode, rights.isLeader ? 'team' : 'detail');
+    a.wx.navigateBack(); await settle(); assert.equal(a.top(), list);
+    await list.panel.periodMenu(tap(periodId(1))); await settle();
+    assert.equal(a.menus.length, rights.canManage ? 1 : 0);
+    if (rights.canManage) { assert.equal(a.top().title, '周期设置'); a.wx.navigateBack(); await settle(); assert.equal(a.top(), list); }
+  }
+});
+
+test('planned-period and management-menu navigation preserve the list; cancellation and old editions retain safeguards', async () => {
+  const a = harness('pages/workbench/index', true); a.periods[0].status = 'scheduled';
+  a.push('/pages/module/index?id=weekly'); await settle(); const list = a.top();
+  list.panel.enterPeriod(tap(periodId(1))); await settle(); assert.equal(a.top().title, '周期设置');
+  a.wx.navigateBack(); await settle(); a.menu(-1); await list.panel.periodMenu(tap(periodId(1)));
+  assert.equal(a.top(), list); assert.equal(list.panel._menuOpen, false); assert.equal(list.panel.data.actionError, '');
+  a.menu(0); a.periods[0].supersededBy = periodId(2); await list.panel.loadList(false, true);
+  a.confirm(false); await list.panel.periodMenu(tap(periodId(1)));
+  assert.equal(a.menus.at(-1).length, 1); assert.equal(a.menus.at(-1)[0], '删除周报');
+  assert.equal(a.reads.some(r => r.action === 'deletePeriod'), false);
+});
 
 test('native back returns student → the same filtered team → period → the same paginated list → workbench', async () => {
   const a = harness(); a.push('/pages/module/index?id=weekly'); await settle();

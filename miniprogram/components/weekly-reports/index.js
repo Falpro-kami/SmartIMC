@@ -3,7 +3,7 @@ const formModel = require('../../utils/weekly-form');
 const profiles = require('../../services/profile');
 Component({
   properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' }, initialTemplate: String, chooseTemplate: Boolean },
-  data: { mode: 'list', loading: true, busy: false, previewing: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
+  data: { mode: 'list', loading: true, busy: false, previewing: false, error: '', actionError: '', saveState: '', periods: [], listGroups: [], hasMore: false,
     isLeader: false, canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
     files: [], answers: {}, selectedFields: [], imageURLs: {}, templatesOpen: false, choosingTemplate: false, periodTemplate: null, preview: null, previewMode: 'outline', previewKind: 'template', formUploading: false, versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
   lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { clearTimeout(this._draftTimer); this.flushForm(); this._detached = true; this.stopLive(); if (this._previewChannel && this._previewChannel.off) this._previewChannel.off(this._previewEvent, this._previewListener); this._epoch = (this._epoch || 0) + 1; } },
@@ -109,7 +109,10 @@ Component({
       try { await this.refresh(true, true); }
       finally { this._liveLoading = false; this.refreshLive(); }
     },
-    update(data) { if (!this._detached) { this.setData(data); if (data.busy === false || data.loading === false) this.refreshLive(); } },
+    update(data) { if (!this._detached) {
+      if (weekly.listLayout && ['periods', 'isLeader', 'canManage', 'canReadTeam'].some(key => Object.prototype.hasOwnProperty.call(data, key))) data.listGroups = weekly.listLayout(data.periods || this.data.periods, { ...this.data, ...data });
+      this.setData(data); if (data.busy === false || data.loading === false) this.refreshLive();
+    } },
     async refresh(force = false, quiet = false) {
       if (this._initializing) return;
       if (['publish', 'settings', 'templates', 'template-edit', 'template-preview', 'period-form', 'submission-preview'].includes(this.properties.initialView)) {
@@ -153,6 +156,28 @@ Component({
     rights(r) { return { isLeader: r.isLeader === true, canManage: !!r.canManage, canReadTeam: !!r.canReadTeam, canRemind: !!r.canRemind, canExport: !!r.canExport }; },
     loadMore() { return this.loadList(true); },
     choosePeriod(e) { return this.navigateWeekly(e.currentTarget.dataset.id); },
+    enterPeriod(e) {
+      const p = this.data.periods.find(p => p.id === e.currentTarget.dataset.id);
+      if (!p) return;
+      const entry = weekly.listEntry(p, this.data);
+      if (entry.action === 'settings') return this.navigateEditor('settings', '', null, p.id);
+      return this.navigateWeekly(p.id, entry.action === 'team' ? 'team' : 'detail');
+    },
+    teamFromList(e) { if (this.data.canReadTeam && this.data.periods.some(p => p.id === e.currentTarget.dataset.id)) return this.navigateWeekly(e.currentTarget.dataset.id, 'team'); },
+    async periodMenu(e) {
+      if (!this.data.canManage || this.data.busy || this._menuOpen) return;
+      const p = this.data.periods.find(p => p.id === e.currentTarget.dataset.id);
+      if (!p) return;
+      this._menuOpen = true;
+      try {
+        const items = p.supersededBy ? ['删除周报'] : ['周期设置', '删除周报'];
+        const choice = await wx.showActionSheet({ itemList: items });
+        if (this._detached || !this.data.canManage) return;
+        if (items[choice.tapIndex] === '周期设置') return this.navigateEditor('settings', '', null, p.id);
+        if (items[choice.tapIndex] === '删除周报') return this.deletePeriod(e);
+      } catch (error) { if (!/cancel/i.test(error.errMsg || '')) this.update({ actionError: error.message || '操作菜单打开失败，请重试。' }); }
+      finally { this._menuOpen = false; }
+    },
     openTeam() { if (this.data.selected && this.data.canReadTeam) return this.navigateWeekly(this.data.selected.id, 'team'); },
     async openPeriod(periodId, ownerId = '', force = false, quiet = false) {
       if (this.data.busy) return;
@@ -302,11 +327,11 @@ Component({
       catch (e) { this.update({ actionError: e.message }); }
       finally { this.update({ busy: false }); }
     },
-    navigateEditor(view, templateId = '', preview = null) {
+    navigateEditor(view, templateId = '', preview = null, contextPeriod = '') {
       if (!this.data.canManage || this.data.busy || this._navigating || this._detached || !['publish', 'settings', 'templates', 'template-edit', 'template-preview', 'period-form'].includes(view)) return;
       if (view === 'template-edit' && templateId !== 'new' && !/^wt_[a-f0-9]{32}$/.test(templateId)) return;
-      const periodId = view === 'settings' && this.data.selected && this.data.selected.id;
-      if (view === 'settings' && !periodId) return;
+      const periodId = view === 'settings' && (contextPeriod || this.data.selected && this.data.selected.id);
+      if (view === 'settings' && !/^wp_[a-f0-9]{32}$/.test(periodId || '')) return;
       const choose = view === 'templates' && this.data.mode === 'form';
       const url = '/pages/module/index?id=weekly&view=' + view + (periodId ? '&period=' + periodId : '') + (templateId ? '&template=' + templateId : '') + (choose ? '&choose=1' : '');
       this._navigating = true;
