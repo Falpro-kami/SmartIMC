@@ -37,7 +37,10 @@ function harness(origin = 'pages/workbench/index', manage = false) {
   function push(url, events = {}) {
     hide(stack.at(-1));
     const options = Object.fromEntries(new URL('https://test.local' + url).searchParams);
-    const frame = { route: 'pages/module/index', options, scrollTop: 0, getOpenerEventChannel: () => ({ emit: (name, value) => { if (events[name]) events[name](value); } }) }; stack.push(frame);
+    const listeners = new Map(), queued = new Map();
+    const eventChannel = { emit(name, value) { if (listeners.has(name)) listeners.get(name)(value); else if (events[name]) events[name](value); else queued.set(name, value); },
+      on(name, fn) { listeners.set(name, fn); if (queued.has(name)) { fn(queued.get(name)); queued.delete(name); } }, off(name) { listeners.delete(name); } };
+    const frame = { route: 'pages/module/index', options, scrollTop: 0, eventChannel, getOpenerEventChannel: () => eventChannel }; stack.push(frame);
     const page = { ...pageDefinition, data: structuredClone(pageDefinition.data), setData(values) { Object.assign(this.data, values); } };
     frame.page = page; page.onLoad(options);
     const panel = { ...panelDefinition.methods, properties: { initialPeriod: page.data.weeklyPeriod, initialView: page.data.weeklyView, initialOwner: page.data.weeklyOwner, initialTemplate: page.data.weeklyTemplate, chooseTemplate: page.data.weeklyChooseTemplate },
@@ -45,16 +48,17 @@ function harness(origin = 'pages/workbench/index', manage = false) {
         this.updates.push(values); setData(this, values);
         if (values.templatesOpen && !frame.template) {
           const child = { ...templateDefinition.methods, properties: { editId: this.properties.initialTemplate, choose: this.properties.chooseTemplate }, data: structuredClone(templateDefinition.data),
-            setData(values) { setData(this, values); }, triggerEvent(name, detail) { const method = { edit: 'editTemplate', select: 'selectTemplate', done: 'closeTemplates', close: 'closeTemplates' }[name]; if (method) panel[method]({ detail }); } };
+            setData(values) { setData(this, values); }, triggerEvent(name, detail) { const method = { edit: 'editTemplate', preview: 'previewTemplate', select: 'selectTemplate', done: 'closeTemplates', close: 'closeTemplates' }[name]; if (method) panel[method]({ detail }); } };
           frame.template = child; templateDefinition.lifetimes.attached.call(child);
         }
       } };
     frame.panel = panel; panelDefinition.lifetimes.attached.call(panel); show(frame);
+    return frame;
   }
   const wx = { cloud,
     setNavigationBarTitle: ({ title }) => { stack.at(-1).title = title; },
     showModal: async () => ({ confirm }),
-    navigateTo(options) { nav.push(options.url); if (failNavigation) { options.fail({ errMsg: 'navigateTo:fail' }); options.complete(); return; } push(options.url, options.events); if (options.success) options.success(); options.complete(); },
+    navigateTo(options) { nav.push(options.url); if (failNavigation) { options.fail({ errMsg: 'navigateTo:fail' }); options.complete(); return; } const frame = push(options.url, options.events); if (options.success) options.success({ eventChannel: frame.eventChannel }); options.complete(); },
     navigateBack(options = {}) {
       const delta = options.delta || 1;
       for (let i = 0; i < delta; i++) { const frame = stack.pop(); if (frame.template) templateDefinition.lifetimes.detached.call(frame.template); if (frame.panel) panelDefinition.lifetimes.detached.call(frame.panel); }
@@ -224,4 +228,33 @@ test('backgrounding the first publish load resumes it; a failed editor navigatio
   a.fail(false); a.hold('roster'); list.panel.newPeriod(); await settle();
   a.background(); a.foreground(); a.release(); await settle();
   assert.equal(a.top().panel.data.mode, 'form'); assert.equal(a.top().panel.data.loading, false); assert.ok(a.top().panel.data.form);
+});
+
+test('template preview receives unsaved hierarchy through the page channel and returns to the exact editor without cloud writes', async () => {
+  const a = harness('pages/workbench/index', true); a.push('/pages/module/index?id=weekly'); await settle();
+  a.top().panel.manageTemplates(); await settle(); a.top().template.newTemplate(); await settle(); const editor = a.top();
+  editor.template.name({ detail: { value: '尚未保存的模板' } });
+  editor.template.sectionInput({ currentTarget: { dataset: { section: 0 } }, detail: { value: '项目工作进展' } });
+  editor.scrollTop = 680;
+  const before = JSON.stringify(editor.template.data.editing), writes = a.reads.filter(r => ['saveTemplate', 'savePeriod', 'saveDraft', 'submit'].includes(r.action)).length;
+  for (let i = 0; i < 3; i++) {
+    editor.template.preview(); await settle();
+    assert.equal(a.top().title, '周报预览'); assert.equal(a.top().panel.data.mode, 'preview');
+    assert.equal(a.top().panel.data.preview.name, '尚未保存的模板');
+    assert.equal(a.top().panel.data.preview.schema.sections[0].title, '项目工作进展');
+    assert.equal(a.top().panel.data.error, ''); assert.equal(a.stack.length, 5);
+    a.wx.navigateBack(); await settle(); assert.equal(a.top(), editor); assert.equal(editor.scrollTop, 680);
+    assert.equal(JSON.stringify(editor.template.data.editing), before);
+  }
+  assert.equal(a.reads.filter(r => ['saveTemplate', 'savePeriod', 'saveDraft', 'submit'].includes(r.action)).length, writes);
+});
+
+test('preview opened without an editor has a readable error and a failed navigation keeps template edits intact', async () => {
+  const a = harness('pages/workbench/index', true); a.push('/pages/module/index?id=weekly&view=template-preview'); await settle();
+  assert.equal(a.top().panel.data.loading, false); assert.match(a.top().panel.data.error, /模板编辑页面/);
+  const b = harness('pages/workbench/index', true); b.push('/pages/module/index?id=weekly'); await settle();
+  b.top().panel.manageTemplates(); await settle(); b.top().template.newTemplate(); await settle(); const editor = b.top();
+  b.fail(true); editor.template.preview(); assert.equal(b.top(), editor); assert.equal(editor.panel._navigating, false); assert.ok(editor.template.data.editing);
+  const c = harness(); c.push('/pages/module/index?id=weekly&view=template-preview'); await settle();
+  assert.equal(c.top().panel.data.preview, null); assert.match(c.top().panel.data.error, /管理权限/);
 });

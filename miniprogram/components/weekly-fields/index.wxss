@@ -3,8 +3,18 @@
 .embedded { padding: 0; border: 0; border-radius: 0; }
 .section-title { display: block; font-size: 20px; font-weight: 600; line-height: 30px; color: #101b2b; }
 .fields { display: flex; flex-wrap: wrap; gap: 16px 12px; margin-top: 16px; }
-.form-field { min-width: 0; width: 100%; box-sizing: border-box; } .half { width: calc(50% - 6px); }
-.label { display: block; margin-bottom: 8px; font-size: 16px; color: #526173; overflow-wrap: anywhere; }
+.form-field { min-width: 0; width: 100%; box-sizing: border-box; }
+.label { display: block; margin-bottom: 8px; font-size: 18px; font-weight: 600; color: #101b2b; overflow-wrap: anywhere; line-height: 1.6; }
+.field-choice { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; }
+.field-choice checkbox { flex-shrink: 0; margin-top: 2px; }
+.field-choice .label { margin-bottom: 0; }
+.field-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.field-heading .section-title,.field-heading .label,.choice-control { flex: 1; min-width: 0; margin-bottom: 0; }
+.help-button { flex-shrink: 0; margin: 0; min-width: 44px; min-height: 44px; padding: 8px 0; color: #005bac; background: #fff; border-radius: 4px; font-size: 14px; line-height: 28px; }
+.help-button::after { border: 0; }
+.help-text { display: block; padding: 12px; margin-bottom: 12px; background: #f5f6f8; border-radius: 6px; color: #526173; font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.level-3 .label,.level-4 .label,.level-5 .label,.level-6 .label { font-size: 16px; }
+.section-empty { margin-top: 12px; }
 .required,.danger,.error { color: #ad4037; } .value { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
 .required { display: inline; }
 .input { box-sizing: border-box; min-height: 48px; width: 100%; border: 1px solid #dde3ec; border-radius: 8px; padding: 0 12px; font-size: 16px; background: #fff; color: #101b2b; }
@@ -16,4 +26,4 @@
 .file-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .link { margin: 0; min-height: 44px; padding: 8px; background: #fff; color: #005bac; font-size: 14px; } .danger { color: #ad4037; }
 .error { display: block; font-size: 14px; }
-@media (max-width: 350px) { .form-section { padding: 12px; } .half { width: 100%; } }
+@media (max-width: 350px) { .form-section { padding: 12px; } }

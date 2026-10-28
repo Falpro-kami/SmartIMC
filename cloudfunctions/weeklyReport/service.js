@@ -60,7 +60,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   }
   const fileView = f => ({ id: f.id || f._id, name: f.name, size: f.size, ext: f.ext });
   const reportView = r => r ? { id: r._id, status: r.status, revision: r.revision, files: (r.draftFiles || r.files || []).map(fileView),
-    answers: r.draftAnswers || r.answers || {},
+    answers: r.draftAnswers || r.answers || {}, selectedFields: r.draftSelectedFields || r.selectedFields || null,
     submittedFiles: (r.files || []).map(fileView), hasChanges: r.hasChanges === true, version: r.version || 0,
     submittedMs: r.submittedMs || 0, firstSubmittedMs: r.firstSubmittedMs || 0, updatedMs: r.updatedMs, late: r.late === true } : null;
   function periodView(p, id, report) {
@@ -97,7 +97,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     if (ownerId !== id && (!r || r.status !== 'submitted')) reject('NOT_FOUND', '该成员尚未提交周报。');
     const versions = (await db.collection('weeklyVersions').where({ teamId: TEAM, reportId: reportId(p._id, ownerId) }).orderBy('version', 'desc').limit(100).get()).data;
     // Team readers can see submitted snapshots only, including when an owner has further draft changes.
-    const visible = r && ownerId !== id ? { ...r, draftFiles: r.files, draftAnswers: r.answers || {}, hasChanges: false } : r;
+    const visible = r && ownerId !== id ? { ...r, draftFiles: r.files, draftAnswers: r.answers || {}, draftSelectedFields: r.selectedFields || null, hasChanges: false } : r;
     const imageURLs = await imageLinks(visible && (visible.draftFiles || visible.files) || []);
     const actor = await authorize(id, ownerId === id ? 'weekly.read.own' : 'weekly.read.team');
     return { ok: true, period: periodView(p, id, r), report: reportView(visible), own: ownerId === id, ...rights(actor),
@@ -121,7 +121,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     const p = await period(db, v.periodId);
     const imageURLs = await imageLinks(v.files);
     await authorize(id, permission);
-    return { ok: true, version: { id: v._id, answers: v.answers || {}, files: v.files.map(fileView) }, imageURLs, schema: p.schema || null };
+    return { ok: true, version: { id: v._id, answers: v.answers || {}, selectedFields: v.selectedFields || null, files: v.files.map(fileView) }, imageURLs, schema: p.schema || null };
   }
   async function templates(id) {
     await authorize(id, 'weekly.manage');
@@ -195,8 +195,8 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
         if (!names.has(r.id) && !oldNames.has(r.id)) reject('INVALID_INPUT', '应交成员已变更，请重新选择。');
         return { id: r.id, name: names.get(r.id) || oldNames.get(r.id), exempt: r.exempt.trim() };
       });
-      const schema = e.schema ? form.schema(e.schema) : previous && previous.schema || null;
-      if (previous && !['scheduled', 'cancelled'].includes(previous.status) && JSON.stringify(schema) !== JSON.stringify(previous.schema || null)) reject('INVALID_FORM', '已发布周期的表单保持不变，请在新周期使用修改后的模板。');
+      const schema = e.schema ? form.schema(e.schema) : previous && previous.schema ? form.schema(previous.schema) : null;
+      if (previous && !['scheduled', 'cancelled'].includes(previous.status) && JSON.stringify(schema) !== JSON.stringify(previous.schema ? form.schema(previous.schema) : null)) reject('INVALID_FORM', '已发布周期的表单保持不变，请在新周期使用修改后的模板。');
       const p = { _id: e.id, teamId: TEAM, title, startDate: e.startDate, endDate: e.endDate, deadlineMs, status: e.status,
         schema, templateName: typeof e.templateName === 'string' ? e.templateName.slice(0, 60) : previous && previous.templateName || '',
         allowLateSubmit: e.allowLateSubmit, allowLateEdit: e.allowLateEdit, roster: selected,
@@ -222,7 +222,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       await authorize(id, 'weekly.submit.own', tx);
       const p = await period(tx, e.periodId), r = await read(tx, 'weeklyReports', reportId(p._id, id));
       editable(p, id, r);
-      const field = p.schema && p.schema.sections.flatMap(s => s.fields).find(f => f.id === e.fieldId);
+      const field = p.schema && form.fields(p.schema).find(f => f.id === e.fieldId);
       if (p.schema && (!field || field.type !== (image ? 'text' : 'attachment')) || image && !p.schema) reject('INVALID_FORM', '请选择有效的表单字段。');
       if (field && field.type === 'attachment' && e.size > field.maxSizeMB * 1024 * 1024) reject('FILE_LIMIT', '文件超过该字段的大小限制。');
       await tx.collection('weeklyFiles').doc(fid).set({ data: { teamId: TEAM, ownerId: id, periodId: p._id, name: e.name.trim(), size: e.size, ext,
@@ -272,7 +272,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       if ((r ? r.revision : 0) !== e.revision) reject('CONFLICT', '周报已在其他位置更新，请重新打开。');
       if (submit && !validId(e.requestId, 'ws')) reject('INVALID_INPUT', '提交参数不正确。');
       if (!submit && !validId(e.requestId, 'wd')) reject('INVALID_INPUT', '自动保存参数不正确。');
-      const content = p.schema ? form.answers(p.schema, e.answers || {}, submit) : null;
+      const content = p.schema ? form.answers(p.schema, e.answers || {}, submit, e.selectedFields) : null;
       const fileIds = content ? content.fileIds : e.fileIds;
       if (!Array.isArray(fileIds) || fileIds.length > (content ? 50 : COUNT_LIMIT) || fileIds.some(f => !validId(f, 'wf')) || new Set(fileIds).size !== fileIds.length || (!content && submit && !fileIds.length)) reject('INVALID_INPUT', submit ? '请上传周报文件后提交。' : '最多上传5个文件。');
       const files = [];
@@ -280,7 +280,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
         const f = await read(tx, 'weeklyFiles', fileId);
         if (!f || f.teamId !== TEAM || f.ownerId !== id || f.periodId !== p._id || f.status !== 'ready') reject('FORBIDDEN', '附件尚未完成上传或不属于本次周报。');
         if (content) {
-          const field = p.schema.sections.flatMap(s => s.fields).find(field => field.type === 'text' ? content.imageFields[fileId] === field.id : field.type === 'attachment' && (content.values[field.id] || []).includes(fileId));
+          const field = form.fields(p.schema).find(field => field.type === 'text' ? content.imageFields[fileId] === field.id : field.type === 'attachment' && (content.values[field.id] || []).includes(fileId));
           if (!field || f.fieldId !== field.id || (field.type === 'text' ? !['png', 'jpg', 'jpeg'].includes(f.ext) : !EXTENSIONS.includes(f.ext) || f.size > field.maxSizeMB * 1024 * 1024)) reject('FORBIDDEN', '附件不属于该字段或超过字段限制。');
         }
         files.push({ id: fileId, name: f.name, ext: f.ext, size: f.size, fileID: f.fileID, sha256: f.sha256 });
@@ -288,16 +288,19 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       if (files.reduce((n, f) => n + f.size, 0) > TOTAL_LIMIT) reject('FILE_LIMIT', '每份周报附件合计不超过10MB。');
       const now = clock(), version = (r && r.version || 0) + (submit ? 1 : 0);
       if (submit && version > 100) reject('VERSION_LIMIT', '本周期提交次数已达100次。');
+      const previousSelection = r && r.selectedFields || (p.schema ? form.fields(p.schema).filter(f => !f.required && !f.root && Object.prototype.hasOwnProperty.call(r && r.answers || {}, f.id)).map(f => f.id) : []);
+      const changed = !!r && (JSON.stringify(files.map(f => f.id)) !== JSON.stringify(r.files.map(f => f.id)) || content && (JSON.stringify(content.values) !== JSON.stringify(r.answers || {}) || JSON.stringify(content.selectedFields) !== JSON.stringify(previousSelection)));
       const data = { teamId: TEAM, periodId: p._id, ownerId: id, status: submit ? 'submitted' : r && r.status || 'draft',
         revision: e.revision + 1, version, draftFiles: files, files: submit ? files : r && r.files || [],
         draftAnswers: content ? content.values : {}, answers: submit && content ? content.values : r && r.answers || {},
-        hasChanges: !submit && !!(r && r.status === 'submitted') && (JSON.stringify(files.map(f => f.id)) !== JSON.stringify(r.files.map(f => f.id)) || content && JSON.stringify(content.values) !== JSON.stringify(r.answers || {})),
+        draftSelectedFields: content ? content.selectedFields : [], selectedFields: submit && content ? content.selectedFields : r && r.selectedFields || null,
+        hasChanges: !submit && !!(r && r.status === 'submitted') && changed,
         submittedMs: submit ? now : r && r.submittedMs || 0, firstSubmittedMs: r && r.firstSubmittedMs || (submit ? now : 0),
         late: submit ? now > p.deadlineMs : r && r.late || false, createdMs: r ? r.createdMs : now, updatedMs: now,
         lastSubmitRequest: submit ? e.requestId : r && r.lastSubmitRequest || '', lastDraftRequest: submit ? r && r.lastDraftRequest || '' : e.requestId };
       if (submit) {
         await tx.collection('weeklyVersions').doc(hash('wv_', rid + ':' + version)).set({ data: { teamId: TEAM, reportId: rid, periodId: p._id,
-          ownerId: id, version, files, answers: content ? content.values : {}, submittedMs: now, late: data.late } });
+          ownerId: id, version, files, answers: content ? content.values : {}, selectedFields: content ? content.selectedFields : [], submittedMs: now, late: data.late } });
         await audit(tx, id, 'report.submit', rid, { version, fileIds });
       }
       await tx.collection('weeklyReports').doc(rid).set({ data });

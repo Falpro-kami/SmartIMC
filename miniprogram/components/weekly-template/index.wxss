@@ -1,9 +1,11 @@
 :host { display: block; }
 .templates { font-size: 16px; line-height: 1.6; color: #101b2b; }
 .heading,.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 48px; }
+.heading-actions { display: flex; gap: 8px; }
 .title { font-size: 20px; font-weight: 600; } .name { font-weight: 600; overflow-wrap: anywhere; }
 .card { box-sizing: border-box; padding: 16px; border: 1px solid #dde3ec; border-radius: 10px; margin-top: 14px; background: #fff; }
 .field { border-top: 1px solid #dde3ec; margin-top: 12px; padding-top: 4px; }
+.node-title { display: block; font-size: 18px; font-weight: 600; margin-top: 12px; overflow-wrap: anywhere; }
 .label { display: block; margin: 12px 0 8px; color: #526173; }
 .input { box-sizing: border-box; min-height: 48px; width: 100%; border: 1px solid #dde3ec; border-radius: 8px; padding: 0 12px; font-size: 16px; background: #fff; color: #101b2b; }
 .options { padding: 12px; min-height: 120px; } .picker { min-height: 44px; line-height: 44px; color: #005bac; }

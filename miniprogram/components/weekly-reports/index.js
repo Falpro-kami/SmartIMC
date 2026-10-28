@@ -4,8 +4,8 @@ Component({
   properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' }, initialTemplate: String, chooseTemplate: Boolean },
   data: { mode: 'list', loading: true, busy: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
     isLeader: false, canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
-    files: [], answers: {}, imageURLs: {}, templatesOpen: false, choosingTemplate: false, formUploading: false, versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
-  lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { clearTimeout(this._draftTimer); this.flushForm(); this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
+    files: [], answers: {}, selectedFields: [], imageURLs: {}, templatesOpen: false, choosingTemplate: false, preview: null, previewMode: 'outline', formUploading: false, versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
+  lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { clearTimeout(this._draftTimer); this.flushForm(); this._detached = true; this.stopLive(); if (this._previewChannel && this._previewChannel.off) this._previewChannel.off('weeklyTemplatePreview', this._previewListener); this._epoch = (this._epoch || 0) + 1; } },
   pageLifetimes: {
     show() { this.startLive(); if (!this._initializing && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved && !this._formDirty && !this._formPending && !this._formSave && this.data.mode !== 'form') {
       const force = this._livePending === true; this._livePending = false;
@@ -22,11 +22,21 @@ Component({
       try {
         const periodId = this.properties.initialPeriod;
         const view = this.properties.initialView;
-        if (['publish', 'settings', 'templates', 'template-edit'].includes(view)) {
+        if (['publish', 'settings', 'templates', 'template-edit', 'template-preview'].includes(view)) {
           const rights = await weekly.call('list', { offset: 0 }, force);
           if (this._detached || epoch !== this._epoch) return;
           this.update(this.rights(rights));
           if (!this.data.canManage) throw new Error('没有周报管理权限。');
+          if (view === 'template-preview') {
+            this._initialized = true;
+            this.update({ mode: 'preview', loading: false, error: '请从模板编辑页面打开预览。' });
+            const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [], page = pages[pages.length - 1];
+            const channel = page && page.getOpenerEventChannel && page.getOpenerEventChannel();
+            this._previewListener = value => { if (!this._detached && value && value.schema && Array.isArray(value.schema.sections)) this.update({ preview: value, error: '' }); };
+            this._previewChannel = channel;
+            if (channel && channel.on) channel.on('weeklyTemplatePreview', this._previewListener);
+            return;
+          }
           if (view === 'templates' || view === 'template-edit') {
             this._initialized = true;
             this.update({ mode: 'templates', templatesOpen: true, choosingTemplate: this.properties.chooseTemplate, loading: false });
@@ -58,7 +68,7 @@ Component({
       const matches = page => {
         const options = page.options || {};
         return page.route === 'pages/module/index' && options.id === 'weekly' && (options.period || '') === periodId &&
-          (!periodId ? !['publish', 'templates', 'template-edit', 'settings'].includes(options.view) : ((options.view || 'detail') === view && (view === 'team' || (options.owner || '') === ownerId)));
+          (!periodId ? !['publish', 'templates', 'template-edit', 'settings', 'template-preview'].includes(options.view) : ((options.view || 'detail') === view && (view === 'team' || (options.owner || '') === ownerId)));
       };
       let delta = 0;
       for (let i = pages.length - 2; i >= 0; i--) if (matches(pages[i])) { delta = pages.length - 1 - i; break; }
@@ -97,7 +107,7 @@ Component({
     update(data) { if (!this._detached) { this.setData(data); if (data.busy === false || data.loading === false) this.refreshLive(); } },
     async refresh(force = false, quiet = false) {
       if (this._initializing) return;
-      if (['publish', 'settings', 'templates', 'template-edit'].includes(this.properties.initialView)) {
+      if (['publish', 'settings', 'templates', 'template-edit', 'template-preview'].includes(this.properties.initialView)) {
         if (!this._initialized) return this.initialize(force === true);
         if (this.properties.initialView === 'templates' && force && this.selectComponent) { const child = this.selectComponent('#template-panel'); if (child) return child.load(); }
         return;
@@ -160,6 +170,7 @@ Component({
       this._draftRevision = result.report ? result.report.revision : 0;
       this.update({ ...this.rights(result), selected: weekly.periodView(result.period), report: result.report, own: result.own, ownerName: result.ownerName,
         answers: result.report && result.report.answers || {}, imageURLs: result.imageURLs || {},
+        selectedFields: formModel.selected(result.period.schema, result.report && result.report.answers || {}, result.report && result.report.selectedFields),
         files: (result.report ? result.report.files : []).map(weekly.fileView), submittedLabel: weekly.dateLabel(result.report && result.report.submittedMs),
         versions: result.versions.map(v => ({ ...v, dateLabel: weekly.dateLabel(v.submittedMs), files: v.files.map(weekly.fileView) })) });
     },
@@ -216,7 +227,7 @@ Component({
       try {
         const revision = this.data.report ? this.data.report.revision : 0;
         if (!this._submitToken || this._submitRevision !== revision) { this._submitToken = weekly.newId('ws'); this._submitRevision = revision; }
-        const result = await weekly.call('submit', { periodId: this.data.selected.id, revision, fileIds: this.data.files.map(f => f.id), ...(this.data.selected.schema ? { answers: this.data.answers } : {}), requestId: this._submitToken });
+        const result = await weekly.call('submit', { periodId: this.data.selected.id, revision, fileIds: this.data.files.map(f => f.id), ...(this.data.selected.schema ? { answers: this.data.answers, selectedFields: this.data.selectedFields } : {}), requestId: this._submitToken });
         this.accept(result);
         this.update({ saveState: '' });
         if (!this._detached) wx.showToast({ title: '周报已提交', icon: 'success' });
@@ -226,7 +237,7 @@ Component({
     answersChange(e) {
       if (this.data.busy || !this.data.own || !this.data.selected.canEdit) return;
       this._formDirty = true; this._formGeneration = (this._formGeneration || 0) + 1;
-      this.update({ answers: e.detail.answers, saveState: '正在自动保存…', actionError: '' });
+      this.update({ answers: e.detail.answers, selectedFields: formModel.selected(this.data.selected.schema, e.detail.answers, e.detail.selectedFields), saveState: '正在自动保存…', actionError: '' });
       clearTimeout(this._draftTimer);
       this._draftTimer = setTimeout(() => this.flushForm(), 700);
     },
@@ -235,7 +246,7 @@ Component({
       if (this._formSave) return this._formSave;
       if (!this.data.selected || !this.data.selected.schema || !this.data.own || this._formUploading || this.data.busy || (!this._formDirty && !this._formPending)) return Promise.resolve(true);
       if (!this._formPending) {
-        this._formPending = { periodId: this.data.selected.id, revision: this._draftRevision || 0, answers: JSON.parse(JSON.stringify(this.data.answers)), requestId: weekly.newId('wd') };
+        this._formPending = { periodId: this.data.selected.id, revision: this._draftRevision || 0, answers: JSON.parse(JSON.stringify(this.data.answers)), selectedFields: this.data.selectedFields.slice(), requestId: weekly.newId('wd') };
         this._savingGeneration = this._formGeneration; this._formDirty = false;
       }
       this.update({ saveState: '正在自动保存…', actionError: '' });
@@ -260,20 +271,22 @@ Component({
       catch (e) { this.update({ actionError: e.message }); }
       finally { this.update({ busy: false }); }
     },
-    navigateEditor(view, templateId = '') {
-      if (!this.data.canManage || this.data.busy || this._navigating || this._detached || !['publish', 'settings', 'templates', 'template-edit'].includes(view)) return;
+    navigateEditor(view, templateId = '', preview = null) {
+      if (!this.data.canManage || this.data.busy || this._navigating || this._detached || !['publish', 'settings', 'templates', 'template-edit', 'template-preview'].includes(view)) return;
       if (view === 'template-edit' && templateId !== 'new' && !/^wt_[a-f0-9]{32}$/.test(templateId)) return;
       const periodId = view === 'settings' && this.data.selected && this.data.selected.id;
       if (view === 'settings' && !periodId) return;
       const choose = view === 'templates' && this.data.mode === 'form';
       const url = '/pages/module/index?id=weekly&view=' + view + (periodId ? '&period=' + periodId : '') + (templateId ? '&template=' + templateId : '') + (choose ? '&choose=1' : '');
       this._navigating = true;
-      return wx.navigateTo({ url, events: { weeklyTemplateSelected: template => {
+      return wx.navigateTo({ url, success: result => { if (preview && result.eventChannel) result.eventChannel.emit('weeklyTemplatePreview', preview); }, events: { weeklyTemplateSelected: template => {
         if (!this._detached && this.data.form && this.data.canManage) this.update({ 'form.schema': template.schema, 'form.templateName': template.name });
       } }, fail: () => this.update({ actionError: '页面打开失败，请重试。' }), complete: () => { this._navigating = false; } });
     },
     manageTemplates() { return this.navigateEditor('templates'); },
     editTemplate(e) { return this.navigateEditor('template-edit', e.detail.id); },
+    previewTemplate(e) { return this.navigateEditor('template-preview', '', e.detail); },
+    previewMode(e) { this.update({ previewMode: e.currentTarget.dataset.mode === 'reading' ? 'reading' : 'outline' }); },
     closeTemplates() {
       const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
       if (pages.length > 1) return wx.navigateBack();

@@ -1,5 +1,6 @@
 <view class="weekly imc-theme">
-  <weekly-template id="template-panel" wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" edit-id="{{initialTemplate}}" bindedit="editTemplate" binddone="closeTemplates" bindclose="closeTemplates" bindselect="selectTemplate" />
+  <weekly-template id="template-panel" wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" edit-id="{{initialTemplate}}" bindedit="editTemplate" bindpreview="previewTemplate" binddone="closeTemplates" bindclose="closeTemplates" bindselect="selectTemplate" />
+  <block wx:elif="{{mode === 'preview'}}"><view class="toolbar"><text class="section-title">周报预览</text><button class="text-button" bindtap="closeTemplates">返回</button></view><view wx:if="{{preview}}"><view class="filters"><button class="{{previewMode === 'outline' ? 'active' : ''}}" data-mode="outline" bindtap="previewMode">模板结构</button><button class="{{previewMode === 'reading' ? 'active' : ''}}" data-mode="reading" bindtap="previewMode">阅读效果</button></view><view class="card"><text class="section-title">{{preview.name || '周报'}}</text></view><weekly-fields schema="{{preview.schema}}" readonly outline="{{previewMode === 'outline'}}" /></view><view wx:else class="error">{{error}}</view></block>
   <block wx:else>
   <view class="toolbar">
     <text class="section-title">{{mode === 'list' ? (isLeader ? '周报列表' : '我的周报') : mode === 'team' ? '团队提交' : mode === 'form' ? (form.revision ? '周期设置' : '发布周报') : '周报详情'}}</text>
@@ -35,7 +36,7 @@
       </view>
     </view>
     <block wx:if="{{selected.schema && (!isLeader || !own)}}">
-      <weekly-fields schema="{{selected.schema}}" answers="{{answers}}" files="{{files}}" image-urls="{{imageURLs}}" period-id="{{selected.id}}" readonly="{{!own || !selected.canEdit}}" disabled="{{busy}}" bindchange="answersChange" binduploading="formUpload" bindfile="fieldFile" />
+      <weekly-fields schema="{{selected.schema}}" answers="{{answers}}" selected-fields="{{selectedFields}}" files="{{files}}" image-urls="{{imageURLs}}" period-id="{{selected.id}}" readonly="{{!own || !selected.canEdit}}" disabled="{{busy}}" bindchange="answersChange" binduploading="formUpload" bindfile="fieldFile" />
       <text wx:if="{{saveState}}" class="meta">{{saveState}}</text>
       <button wx:if="{{saveState === '自动保存失败'}}" class="secondary wide" bindtap="retrySave" disabled="{{busy || formUploading}}">重试自动保存</button>
       <button wx:if="{{own && selected.canEdit}}" class="primary wide" bindtap="submit" loading="{{busy}}" disabled="{{busy || formUploading || (report && report.status === 'submitted' && !report.hasChanges && saveState !== '正在自动保存…')}}">{{report && report.status === 'submitted' ? '重新提交' : '提交周报'}}</button>
@@ -56,7 +57,7 @@
       <view wx:for="{{versions}}" wx:key="id" wx:for-item="version" class="version">
         <view class="heading"><text>第 {{version.version}} 次提交</text><text class="meta {{version.late ? 'danger' : ''}}">{{version.late ? '逾期提交' : '已提交'}}</text></view>
         <text class="meta">{{version.dateLabel}}</text>
-        <block wx:if="{{selected.schema}}"><button class="text-button" data-id="{{version.id}}" bindtap="toggleVersion" disabled="{{busy}}">{{version.expanded ? '收起内容' : '查看内容'}}</button><weekly-fields wx:if="{{version.expanded}}" schema="{{selected.schema}}" answers="{{version.answers}}" files="{{version.files}}" image-urls="{{version.imageURLs}}" period-id="{{selected.id}}" version-id="{{version.id}}" readonly embedded bindfile="fieldFile" /></block>
+        <block wx:if="{{selected.schema}}"><button class="text-button" data-id="{{version.id}}" bindtap="toggleVersion" disabled="{{busy}}">{{version.expanded ? '收起内容' : '查看内容'}}</button><weekly-fields wx:if="{{version.expanded}}" schema="{{selected.schema}}" answers="{{version.answers}}" selected-fields="{{version.selectedFields}}" files="{{version.files}}" image-urls="{{version.imageURLs}}" period-id="{{selected.id}}" version-id="{{version.id}}" readonly embedded bindfile="fieldFile" /></block>
         <block wx:else><view wx:for="{{version.files}}" wx:key="id" class="file-row"><text class="file-name">{{item.name}}</text><view class="file-actions"><button class="text-button" data-id="{{item.id}}" data-version="{{version.id}}" bindtap="useFile" disabled="{{busy}}">查看</button><button class="text-button" data-id="{{item.id}}" data-version="{{version.id}}" data-share="1" bindtap="useFile" disabled="{{busy}}">下载</button></view></view></block>
       </view>
     </view>
@@ -72,7 +73,7 @@
       <view wx:for="{{filteredRows}}" wx:key="id" class="team-entry">
         <view class="team-row"><view class="file-info"><text class="row-title">{{item.name}}</text><text wx:if="{{item.status === 'submitted'}}" class="meta">{{item.dateLabel}}</text><text wx:if="{{item.exemption}}" class="meta">{{item.exemption}}</text></view><text class="badge {{item.status === 'submitted' ? 'success' : ''}}">{{item.statusLabel}}</text></view>
         <button wx:if="{{selected.schema && item.status === 'submitted'}}" class="secondary wide" data-id="{{item.id}}" bindtap="toggleTeamContent" disabled="{{busy}}">{{item.expanded ? '收起周报' : '查看周报'}}</button>
-        <weekly-fields wx:if="{{item.expanded && item.detail}}" schema="{{selected.schema}}" answers="{{item.detail.report.answers}}" files="{{item.detail.report.files}}" image-urls="{{item.detail.imageURLs}}" readonly embedded bindfile="fieldFile" />
+        <weekly-fields wx:if="{{item.expanded && item.detail}}" schema="{{selected.schema}}" answers="{{item.detail.report.answers}}" selected-fields="{{item.detail.report.selectedFields}}" files="{{item.detail.report.files}}" image-urls="{{item.detail.imageURLs}}" readonly embedded bindfile="fieldFile" />
         <block wx:if="{{!selected.schema}}"><view wx:for="{{item.files}}" wx:for-item="file" wx:key="id" class="file-row"><text class="file-name">{{file.name}}</text><view class="file-actions"><button class="text-button" data-id="{{file.id}}" bindtap="useFile" disabled="{{busy}}">查看</button><button class="text-button" data-id="{{file.id}}" data-share="1" bindtap="useFile" disabled="{{busy}}">下载</button></view></view></block>
       </view>
     </view>

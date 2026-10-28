@@ -62,6 +62,78 @@ const schema = () => formModel.schema({ sections: [{ id: 'work', title: '工作�
 ] }] });
 const text = value => ({ ops: [{ insert: value + '\n', attributes: { bold: true } }] });
 
+test('optional selection persists in drafts and versions, ignores unchecked values, and never bypasses required validation', async () => {
+  const a = fixture(); await a.period({ schema: schema() });
+  const answers = { body: text('必填工作'), hours: 0, stage: '完成', tags: ['实验'] };
+  const data = { periodId: pid(1), revision: 0, answers, selectedFields: ['stage'], requestId: token('wd', 1) };
+  const draft = await a.send(id(2), 'saveDraft', data);
+  assert.deepEqual(draft.report.selectedFields, ['stage']); assert.equal(draft.report.answers.tags, undefined);
+  const first = await a.send(id(2), 'submit', { ...data, revision: 1, requestId: token('ws', 1) });
+  assert.deepEqual((await a.send(id(4), 'getVersion', { versionId: first.versions[0].id })).version.selectedFields, ['stage']);
+  const changed = await a.send(id(2), 'saveDraft', { ...data, revision: 2, selectedFields: [], requestId: token('wd', 2) });
+  assert.equal(changed.report.hasChanges, true); assert.equal(changed.report.answers.stage, undefined);
+  const leader = await a.send(id(4), 'get', { periodId: pid(1), ownerId: id(2) });
+  assert.deepEqual(leader.report.selectedFields, ['stage']); assert.equal(leader.report.answers.stage, '完成');
+  await denied(a.send(id(2), 'submit', { ...data, revision: 3, answers: { hours: 0 }, selectedFields: [], requestId: token('ws', 2) }), 'INVALID_FORM');
+  for (const selectedFields of [['body'], ['missing'], ['stage', 'stage']]) assert.throws(() => formModel.answers(schema(), answers, true, selectedFields));
+  const allOptional = schema(); allOptional.sections[0].fields.forEach(f => { f.required = false; });
+  assert.deepEqual(formModel.answers(allOptional, {}, true, []).values, {});
+});
+
+test('legacy half widths normalize to full without invalidating published cycle settings or changing field contents', async () => {
+  const a = fixture(); await a.period({ schema: schema() });
+  const stored = a.table('weeklyPeriods').get(pid(1)); stored.schema.sections[0].fields[1].width = 'half';
+  await a.period({ revision: 1, schema: stored.schema });
+  const fields = a.table('weeklyPeriods').get(pid(1)).schema.sections[0].fields;
+  assert.ok(fields.every(f => f.width === 'full')); assert.equal(fields[1].label, '工时'); assert.equal(fields[1].required, true);
+});
+
+test('nested schemas validate leaf permissions and required content, and keep image ownership through submission versions', async () => {
+  const a = fixture(), s = schema(), original = s.sections[0].fields;
+  s.sections[0].fields = [{ id: 'progress', label: '项目工作进展', type: 'group', children: [{ id: 'research', label: '研究工作', type: 'group', children: original.slice(0, 2) }, ...original.slice(2)] }];
+  s.sections.push({ id: 'other', title: '其他', fields: [], required: false });
+  await a.period({ schema: s });
+  assert.equal(formModel.fields(s).length, 7);
+  const image = await a.upload(id(2), pid(1), Buffer.from('89504e470d0a1a0a01020304', 'hex'), '实验.png', { kind: 'image', fieldId: 'body' });
+  const values = { body: { ops: [{ insert: { image: 'imc-image:' + image.id } }] }, hours: 0, other: text('补充说明') };
+  const result = await a.send(id(2), 'submit', { periodId: pid(1), revision: 0, answers: values, selectedFields: [], requestId: token('ws', 1) });
+  assert.equal(result.report.files[0].id, image.id); assert.equal(result.report.answers.other.ops[0].insert, '补充说明\n');
+  assert.equal((await a.send(id(4), 'getVersion', { versionId: result.versions[0].id })).version.answers.hours, 0);
+  assert.throws(() => formModel.answers(s, values, true, ['progress']), e => e.businessCode === 'INVALID_FORM');
+  assert.throws(() => formModel.answers(s, { hours: 0 }, true, []), e => e.businessCode === 'INVALID_FORM');
+  await denied(a.send(id(2), 'prepareUpload', { periodId: pid(1), name: 'x.png', size: 100, kind: 'image', fieldId: 'progress' }), 'INVALID_FORM');
+  const tooDeep = schema(); let node = tooDeep.sections[0].fields[0];
+  for (let i = 0; i < 6; i++) node = { id: 'group' + i, label: '分组', type: 'group', children: [node] };
+  tooDeep.sections[0].fields[0] = node;
+  assert.throws(() => formModel.schema(tooDeep), e => e.businessCode === 'INVALID_FORM');
+  const duplicate = schema(); duplicate.sections[0].fields.push({ id: 'g', label: '分组', type: 'group', children: [{ ...duplicate.sections[0].fields[0] }] });
+  assert.throws(() => formModel.schema(duplicate), e => e.businessCode === 'INVALID_FORM');
+});
+
+test('instructions are validated at each hierarchy level and remain fixed in published snapshots', async () => {
+  const a = fixture(), s = schema();
+  s.sections[0].help = '  总体说明\r\n第二行  ';
+  s.sections[0].fields = [{ id: 'group', label: '实验', type: 'group', help: '分组说明', children: s.sections[0].fields }];
+  s.sections[0].fields[0].children[0].help = '<b>按纯文本显示</b>\n实验过程';
+  s.sections.push({ id: 'other', title: '其他', fields: [], help: '补充内容' });
+  const data = { id: token('wt', 1), revision: 0, name: '说明模板', schema: s };
+  const saved = await a.send(id(1), 'saveTemplate', data);
+  assert.equal(saved.template.schema.sections[0].help, '总体说明\n第二行');
+  assert.equal(saved.template.schema.sections[0].fields[0].children[0].help, '<b>按纯文本显示</b>\n实验过程');
+  await a.period({ schema: saved.template.schema });
+  const changed = structuredClone(saved.template.schema); changed.sections[0].fields[0].help = '新说明';
+  await a.send(id(1), 'saveTemplate', { ...data, revision: 1, schema: changed });
+  const read = await a.send(id(2), 'get', { periodId: pid(1) });
+  assert.equal(read.period.schema.sections[0].fields[0].help, '分组说明');
+  for (const getNode of [s => s.sections[0], s => s.sections[0].fields[0], s => s.sections[0].fields[0].children[0], s => s.sections[1]]) {
+    for (const invalid of ['长'.repeat(1001), '\u0000', { html: '不接受对象' }]) {
+      const bad = structuredClone(s); getNode(bad).help = invalid;
+      assert.throws(() => formModel.schema(bad), e => e.businessCode === 'INVALID_FORM');
+    }
+  }
+  assert.equal(formModel.schema({ sections: [{ id: 'old', title: '旧模板', fields: [] }] }).sections[0].help, '');
+});
+
 test('template management is server authorized, revision checked and snapshotted into each period', async () => {
   const a = fixture(), data = { id: token('wt', 1), revision: 0, name: '研究周报', schema: schema() };
   for (const n of [2, 4, 5]) for (const action of ['templates', 'saveTemplate']) await denied(a.send(id(n), action, data), 'FORBIDDEN');
