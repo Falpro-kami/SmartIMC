@@ -7,6 +7,8 @@ button[disabled] { opacity: .5; }
 .toolbar { margin-bottom: 14px; min-height: 44px; }
 .section-title { display: block; font-size: 20px; font-weight: 600; line-height: 30px; overflow-wrap: anywhere; }
 .card { box-sizing: border-box; padding: 16px; margin-bottom: 14px; border: 1px solid #dde3ec; border-radius: 10px; background: #fff; }
+.preview-document { padding: 4px 0 16px; background: #fff; }
+.preview-name { display: block; text-align: center; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 30px; margin: 12px 0 24px; overflow-wrap: anywhere; }
 .period-row { width: 100%; text-align: left; }
 .row-title { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
 .meta { display: block; color: #526173; font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }

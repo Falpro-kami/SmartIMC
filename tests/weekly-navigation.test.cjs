@@ -70,7 +70,7 @@ function harness(origin = 'pages/workbench/index', manage = false) {
   const cache = moduleAt('miniprogram/services/session-cache.js', {});
   const weekly = moduleAt('miniprogram/services/weekly.js', { './session-cache': cache, './access': { notifications: async () => false }, '../config/cloud': { weeklyFunction: 'weeklyReport' } }, { wx, getApp: () => ({ globalData: { cloudReady: true } }) });
   vm.runInNewContext(fs.readFileSync('miniprogram/pages/module/index.js', 'utf8'), { Page: value => { pageDefinition = value; }, require: name => name === '../../utils/member-page' ? x => x : {}, wx });
-  vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: value => { panelDefinition = value; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : weekly, wx, getCurrentPages: () => stack, setTimeout, clearTimeout });
+  vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: value => { panelDefinition = value; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : name === '../../services/profile' ? { load: async () => ({ profile: { name: '测试同学' } }) } : weekly, wx, getCurrentPages: () => stack, setTimeout, clearTimeout });
   vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-template/index.js', 'utf8'), { Component: value => { templateDefinition = value; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : weekly, wx });
   return { stack, reads, nav, push, wx, cache, top: () => stack.at(-1), confirm: value => { confirm = value; }, fail: value => { failNavigation = value; },
     templateId, hold: action => { heldAction = action; }, release: () => { heldAction = ''; releaseRead(); }, background: () => hide(stack.at(-1)), foreground: () => show(stack.at(-1)) };
@@ -242,6 +242,7 @@ test('template preview receives unsaved hierarchy through the page channel and r
     editor.template.preview(); await settle();
     assert.equal(a.top().title, '周报预览'); assert.equal(a.top().panel.data.mode, 'preview');
     assert.equal(a.top().panel.data.preview.name, '尚未保存的模板');
+    assert.equal(a.top().panel.data.preview.memberName, '测试同学');
     assert.equal(a.top().panel.data.preview.schema.sections[0].title, '项目工作进展');
     assert.equal(a.top().panel.data.error, ''); assert.equal(a.stack.length, 5);
     a.wx.navigateBack(); await settle(); assert.equal(a.top(), editor); assert.equal(editor.scrollTop, 680);
@@ -250,12 +251,40 @@ test('template preview receives unsaved hierarchy through the page channel and r
   assert.equal(a.reads.filter(r => ['saveTemplate', 'savePeriod', 'saveDraft', 'submit'].includes(r.action)).length, writes);
 });
 
+test('a member can preview current content on a separate page and return to the same draft without submitting', async () => {
+  const a = harness(); a.push('/pages/module/index?id=weekly&period=' + periodId(1)); await settle(); const editor = a.top();
+  const schema = require('../miniprogram/utils/weekly-form').defaults();
+  Object.assign(editor.panel.data, { isLeader: false, own: true, ownerName: '示例同学', answers: { progress: { ops: [{ insert: '本周完成实验。\n' }] } }, selectedFields: ['progress'], files: [], imageURLs: { sample: 'private-image' } });
+  editor.panel.data.selected.schema = schema; editor.scrollTop = 630;
+  a.cache.set('weekly:get:' + JSON.stringify({ periodId: periodId(1) }), { ok: true, isLeader: false, own: true, ownerName: '示例同学', period: editor.panel.data.selected,
+    report: { revision: 1, status: 'draft', files: [], answers: editor.panel.data.answers, selectedFields: ['progress'] }, imageURLs: editor.panel.data.imageURLs, versions: [] });
+  const snapshot = JSON.stringify(editor.panel.data.answers), before = a.reads.length;
+  await editor.panel.previewSubmission(); await settle();
+  assert.equal(a.top().title, '周报预览'); assert.equal(a.top().panel.properties.initialView, 'submission-preview');
+  assert.equal(a.top().panel.data.previewKind, 'submission'); assert.equal(a.top().panel.data.previewMode, 'reading');
+  assert.equal(a.top().panel.data.preview.memberName, '示例同学'); assert.equal(JSON.stringify(a.top().panel.data.preview.answers), snapshot);
+  assert.equal(a.reads.length, before, 'preview only receives the authorized local snapshot, without cloud writes or manager checks');
+  a.top().panel.closeTemplates(); await settle();
+  assert.equal(a.top(), editor); assert.equal(editor.scrollTop, 630); assert.equal(JSON.stringify(editor.panel.data.answers), snapshot);
+  a.fail(true); await editor.panel.previewSubmission(); assert.equal(a.top(), editor); assert.equal(editor.panel._navigating, false);
+  assert.match(editor.panel.data.actionError, /预览打开失败/);
+  editor.panel.data.formUploading = true; const count = a.nav.length; await editor.panel.previewSubmission(); assert.equal(a.nav.length, count);
+});
+
+test('submission previews need the opener snapshot and do not turn into a public report or a list route', async () => {
+  const a = harness(); a.push('/pages/module/index?id=weekly&period=' + periodId(1) + '&view=submission-preview'); await settle();
+  assert.equal(a.top().panel.data.preview, null); assert.match(a.top().panel.data.error, /本人周报/); assert.equal(a.reads.length, 0);
+  const source = fs.readFileSync('miniprogram/components/weekly-reports/index.wxml', 'utf8');
+  assert.match(source, /class="preview-name">{{preview.memberName/); assert.doesNotMatch(source, /{{preview.name/);
+  assert.match(source, /readonly embedded outline=/);
+});
+
 test('preview opened without an editor has a readable error and a failed navigation keeps template edits intact', async () => {
   const a = harness('pages/workbench/index', true); a.push('/pages/module/index?id=weekly&view=template-preview'); await settle();
   assert.equal(a.top().panel.data.loading, false); assert.match(a.top().panel.data.error, /模板编辑页面/);
   const b = harness('pages/workbench/index', true); b.push('/pages/module/index?id=weekly'); await settle();
   b.top().panel.manageTemplates(); await settle(); b.top().template.newTemplate(); await settle(); const editor = b.top();
-  b.fail(true); editor.template.preview(); assert.equal(b.top(), editor); assert.equal(editor.panel._navigating, false); assert.ok(editor.template.data.editing);
+  b.fail(true); editor.template.preview(); await settle(); assert.equal(b.top(), editor); assert.equal(editor.panel._navigating, false); assert.ok(editor.template.data.editing);
   const c = harness(); c.push('/pages/module/index?id=weekly&view=template-preview'); await settle();
   assert.equal(c.top().panel.data.preview, null); assert.match(c.top().panel.data.error, /管理权限/);
 });

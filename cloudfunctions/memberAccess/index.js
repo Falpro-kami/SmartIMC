@@ -39,6 +39,7 @@ exports.main = async (event = {}) => {
     if (event.action === 'recordToolOpen') return await workbench.record(id, event);
     if (event.action === 'messages') return await messages.list(id, event);
     if (event.action === 'readMessage') return await messages.read(id, event);
+    if (event.action === 'readAllMessages') return await messages.readAll(id, event);
     if (event.action === 'openMessage') return await messages.open(id, event);
     if (event.action === 'directory') {
       const viewer = await access.readMember(db, id);

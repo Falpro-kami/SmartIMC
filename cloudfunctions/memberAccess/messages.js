@@ -17,6 +17,33 @@ module.exports = function messages(db, access) {
     return { hasUnread: unreadCount > 0, unreadCount };
   }
   async function unread(id, member) { return (await state(id, member)).hasUnread; }
+  function visible(message, id, member) {
+    return message && message.teamId === access.TEAM_ID && (message.recipientKey === id ||
+      Array.isArray(message.recipientKey) && message.recipientKey.includes(id) ||
+      message.recipientKey === 'role:super_admin' && access.allowed(member, 'members.manage'));
+  }
+  async function readAll(id, event) {
+    const now = Date.now(), readBeforeMs = event.readBeforeMs === undefined ? now : event.readBeforeMs;
+    if (!Number.isSafeInteger(readBeforeMs) || readBeforeMs < 0 || readBeforeMs > now) return { ok: false, code: 'INVALID_INPUT', message: '消息参数不正确。' };
+    const member = await access.readMember(db, id);
+    if (!access.allowed(member, 'equipment.read')) return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '通过 IMC 成员审核后才能访问。' };
+    const rows = (await db.collection(collection).where({ ...filter(id, member, true), createdMs: db.command.lte(readBeforeMs) }).field({ _id: true }).limit(40).get()).data;
+    const result = await db.runTransaction(async transaction => {
+      const current = document(await transaction.collection('teamMembers').doc(id).get());
+      if (!access.allowed(current, 'equipment.read')) return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '通过 IMC 成员审核后才能访问。' };
+      const records = await Promise.all(rows.map(row => transaction.collection(collection).doc(row._id).get()));
+      const marked = records.map(document).filter(message => visible(message, id, current) && message.createdMs <= readBeforeMs && !(message.readBy || []).includes(id));
+      for (const message of marked) await transaction.collection(collection).doc(message._id).update({ data: { readBy: db.command.addToSet(id) } });
+      if (marked.length) await sync.bump(transaction, ['messages']);
+      return { ok: true, readIds: marked.map(message => message._id) };
+    });
+    const response = result && result.result || result;
+    if (!response.ok) return response;
+    const current = await access.readMember(db, id);
+    if (!access.allowed(current, 'equipment.read')) return { ok: false, code: 'MEMBERSHIP_REQUIRED', message: '通过 IMC 成员审核后才能访问。' };
+    const remaining = await db.collection(collection).where({ ...filter(id, current, true), createdMs: db.command.lte(readBeforeMs) }).field({ _id: true }).limit(1).get();
+    return { ok: true, readBeforeMs, readIds: response.readIds, hasMore: remaining.data.length > 0, ...await state(id, current) };
+  }
   function present(message, id) {
     return { id: message._id, title: message.title, body: message.body,
       createdMs: message.createdMs, read: (message.readBy || []).includes(id),
@@ -88,6 +115,6 @@ module.exports = function messages(db, access) {
     await transaction.collection(collection).doc(_id).set({ data });
     await sync.bump(transaction, ['messages']);
   }
-  return { unread, state, list, read, open: (id, event) => read(id, event, false), applicationData, changeData, put,
+  return { unread, state, list, read, readAll, open: (id, event) => read(id, event, false), applicationData, changeData, put,
     applicationId };
 };

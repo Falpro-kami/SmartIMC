@@ -1,6 +1,15 @@
 <view class="weekly imc-theme">
   <weekly-template id="template-panel" wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" edit-id="{{initialTemplate}}" local-template="{{periodTemplate}}" bindedit="editTemplate" bindpreview="previewTemplate" binddone="closeTemplates" bindclose="closeTemplates" bindselect="selectTemplate" />
-  <block wx:elif="{{mode === 'preview'}}"><view class="toolbar"><text class="section-title">周报预览</text><button class="text-button" bindtap="closeTemplates">返回</button></view><view wx:if="{{preview}}"><view class="filters"><button class="{{previewMode === 'outline' ? 'active' : ''}}" data-mode="outline" bindtap="previewMode">模板结构</button><button class="{{previewMode === 'reading' ? 'active' : ''}}" data-mode="reading" bindtap="previewMode">阅读效果</button></view><view class="card"><text class="section-title">{{preview.name || '周报'}}</text></view><weekly-fields schema="{{preview.schema}}" readonly outline="{{previewMode === 'outline'}}" /></view><view wx:else class="error">{{error}}</view></block>
+  <block wx:elif="{{mode === 'preview'}}">
+    <view class="toolbar"><text class="section-title">周报预览</text><button class="text-button" bindtap="closeTemplates">返回</button></view>
+    <view wx:if="{{preview}}">
+      <view wx:if="{{previewKind === 'template'}}" class="filters"><button class="{{previewMode === 'outline' ? 'active' : ''}}" data-mode="outline" bindtap="previewMode">模板结构</button><button class="{{previewMode === 'reading' ? 'active' : ''}}" data-mode="reading" bindtap="previewMode">阅读效果</button></view>
+      <view class="preview-document"><text class="preview-name">{{preview.memberName || '-'}}</text>
+        <weekly-fields wx:if="{{preview.schema}}" schema="{{preview.schema}}" answers="{{preview.answers}}" selected-fields="{{preview.selectedFields}}" files="{{preview.files}}" image-urls="{{preview.imageURLs}}" readonly embedded outline="{{previewKind === 'template' && previewMode === 'outline'}}" bindfile="fieldFile" />
+        <block wx:else><text wx:if="{{!preview.files.length}}" class="empty">暂无文件</text><view wx:for="{{preview.files}}" wx:key="id" class="file-row"><view class="file-info"><text class="file-name">{{item.name}}</text><text class="meta">{{item.sizeLabel}}</text></view><button class="text-button" data-id="{{item.id}}" bindtap="useFile">查看</button></view></block>
+      </view>
+    </view><view wx:else class="error">{{error}}</view>
+  </block>
   <block wx:else>
   <view class="toolbar">
     <text class="section-title">{{mode === 'list' ? (isLeader ? '周报列表' : '我的周报') : mode === 'team' ? '团队提交' : mode === 'form' ? (form.revision ? '周期设置' : '发布周报') : '周报详情'}}</text>
@@ -43,7 +52,8 @@
       <weekly-fields schema="{{selected.schema}}" answers="{{answers}}" selected-fields="{{selectedFields}}" files="{{files}}" image-urls="{{imageURLs}}" period-id="{{selected.id}}" form-key="{{selected.formKey}}" readonly="{{!own || !selected.canEdit}}" disabled="{{busy}}" bindchange="answersChange" binduploading="formUpload" bindfile="fieldFile" />
       <text wx:if="{{saveState}}" class="meta">{{saveState}}</text>
       <button wx:if="{{saveState === '自动保存失败'}}" class="secondary wide" bindtap="retrySave" disabled="{{busy || formUploading}}">重试自动保存</button>
-      <button wx:if="{{own && selected.canEdit}}" class="primary wide" bindtap="submit" loading="{{busy}}" disabled="{{busy || formUploading || (report && report.status === 'submitted' && !report.hasChanges && saveState !== '正在自动保存…')}}">{{report && report.status === 'submitted' ? '重新提交' : '提交周报'}}</button>
+      <button wx:if="{{own}}" class="secondary wide" bindtap="previewSubmission" loading="{{previewing}}" disabled="{{busy || formUploading || previewing}}">效果预览</button>
+      <button wx:if="{{own && selected.canEdit}}" class="primary wide" bindtap="submit" loading="{{busy}}" disabled="{{busy || formUploading || previewing || (report && report.status === 'submitted' && !report.hasChanges && saveState !== '正在自动保存…')}}">{{report && report.status === 'submitted' ? '重新提交' : '提交周报'}}</button>
     </block>
     <view wx:elif="{{!isLeader || !own}}" class="card">
       <view class="heading"><text class="section-title">周报文件</text><text wx:if="{{saveState}}" class="meta">{{saveState}}</text></view>
@@ -54,7 +64,8 @@
       </view>
       <button wx:if="{{own && selected.canEdit && files.length < 5}}" class="upload-button" bindtap="addFiles" disabled="{{busy || saveState === '自动保存失败'}}">＋ 上传文件</button>
       <button wx:if="{{saveState === '自动保存失败'}}" class="secondary wide" bindtap="retrySave" disabled="{{busy}}">重试自动保存</button>
-      <button wx:if="{{own && selected.canEdit}}" class="primary wide" bindtap="submit" loading="{{busy}}" disabled="{{busy || !files.length || saveState === '自动保存失败' || (report && report.status === 'submitted' && !report.hasChanges)}}">{{report && report.status === 'submitted' ? '重新提交' : '提交周报'}}</button>
+      <button wx:if="{{own}}" class="secondary wide" bindtap="previewSubmission" loading="{{previewing}}" disabled="{{busy || previewing}}">效果预览</button>
+      <button wx:if="{{own && selected.canEdit}}" class="primary wide" bindtap="submit" loading="{{busy}}" disabled="{{busy || previewing || !files.length || saveState === '自动保存失败' || (report && report.status === 'submitted' && !report.hasChanges)}}">{{report && report.status === 'submitted' ? '重新提交' : '提交周报'}}</button>
     </view>
     <view wx:if="{{versions.length && (!isLeader || !own)}}" class="card">
       <text class="section-title">提交记录</text>

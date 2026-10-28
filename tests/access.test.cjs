@@ -22,6 +22,7 @@ function harness(options = {}) {
       async get() { if (options.onRead) options.onRead(name); return { data: [...table].map(([id, value]) => ({ ...structuredClone(value), _id: id })).filter(row => Object.entries(filter).every(([key, value]) => {
         if (Array.isArray(value)) return (Array.isArray(row[key]) ? row[key] : [row[key]]).some(item => value.includes(item));
         if (value && value.$nin) return !(Array.isArray(row[key]) ? row[key] : [row[key]]).some(item => value.$nin.includes(item));
+        if (value && value.$lte !== undefined) return row[key] <= value.$lte;
         return row[key] === value;
       })).sort((a, b) => { for (const [key, direction] of order) { if (a[key] < b[key]) return direction === 'desc' ? 1 : -1; if (a[key] > b[key]) return direction === 'desc' ? -1 : 1; } return 0; }).slice(offset, offset + limit) }; },
       doc(id) { return {
@@ -31,6 +32,7 @@ function harness(options = {}) {
           table.set(id, structuredClone(data));
         },
         async update({ data }) {
+          if (name === 'teamMessages' && options.failMessageUpdate) throw new Error('message update failed');
           assert.ok(table.has(id));
           const previous = table.get(id);
           const values = Object.fromEntries(Object.entries(data).map(([key, value]) => [key,
@@ -41,7 +43,7 @@ function harness(options = {}) {
     };
   };
   const db = { collection: name => makeCollection(tables, name), command: { in: values => values,
-    nin: values => ({ $nin: values }), addToSet: value => ({ $addToSet: value }) }, serverDate: () => 'server-time',
+    nin: values => ({ $nin: values }), lte: value => ({ $lte: value }), addToSet: value => ({ $addToSet: value }) }, serverDate: () => 'server-time',
     async runTransaction(callback) {
       const draft = structuredClone(tables);
       const result = await callback({ collection: name => makeCollection(draft, name) });
@@ -83,6 +85,42 @@ test('unread counts are scoped to the viewer, capped for 99+, and change only af
   app.as('peer'); assert.equal((await app.member({ action: 'notificationState' })).unreadCount, 1);
   app.as('ordinary'); assert.equal((await app.member({ action: 'notificationState' })).unreadCount, 0);
   app.table('teamMembers').get(ordinary).status = 'removed'; assert.equal((await app.member({ action: 'get' })).unreadCount, 0);
+});
+
+test('all-read covers unloaded messages in bounded batches, preserves other recipients and later arrivals', async () => {
+  const a = harness(), owner = userId('owner'), peer = userId('peer');
+  a.table('teamMembers').set(owner, active(['super_admin'])); a.table('teamMembers').set(peer, active(['super_admin']));
+  const ids = Array.from({ length: 455 }, (_, i) => 'msg_' + i.toString(16).padStart(32, '0'));
+  ids.forEach((id, i) => a.table('teamMessages').set(id, { teamId: 'IMC', recipientKey: i % 2 ? owner : 'role:super_admin', readBy: [], createdMs: 1000, state: 'open' }));
+  const late = 'msg_' + 'd'.repeat(32), other = 'msg_' + 'e'.repeat(32), foreign = 'msg_' + 'f'.repeat(32);
+  a.table('teamMessages').set(late, { teamId: 'IMC', recipientKey: owner, readBy: [], createdMs: 1001 });
+  a.table('teamMessages').set(other, { teamId: 'IMC', recipientKey: peer, readBy: [], createdMs: 999 });
+  a.table('teamMessages').set(foreign, { teamId: 'OTHER', recipientKey: owner, readBy: [], createdMs: 999 });
+  const first = await a.member({ action: 'readAllMessages', readBeforeMs: 1000, recipientId: peer });
+  assert.equal(first.readIds.length, 40); assert.equal(first.hasMore, true); assert.equal(first.unreadCount, 100);
+  let next = first, count = first.readIds.length;
+  while (next.hasMore) { next = await a.member({ action: 'readAllMessages', readBeforeMs: first.readBeforeMs }); count += next.readIds.length; }
+  assert.equal(count, 455); assert.equal(next.hasMore, false); assert.equal(next.unreadCount, 1);
+  for (const id of ids) assert.deepEqual(a.table('teamMessages').get(id).readBy, [owner]);
+  for (const id of [late, other, foreign]) assert.deepEqual(a.table('teamMessages').get(id).readBy, []);
+  assert.equal((await a.member({ action: 'readAllMessages', readBeforeMs: 1000 })).readIds.length, 0);
+  a.as('peer'); assert.equal((await a.member({ action: 'notificationState' })).unreadCount, 100);
+  a.table('teamMembers').get(peer).status = 'removed';
+  assert.equal((await a.member({ action: 'readAllMessages' })).code, 'MEMBERSHIP_REQUIRED');
+  a.as('owner'); assert.equal((await a.member({ action: 'readAllMessages', readBeforeMs: Date.now() + 100000 })).code, 'INVALID_INPUT');
+});
+
+test('all-read is transactional and ordinary members cannot mark shared administrator messages', async () => {
+  const options = { failMessageUpdate: true }, a = harness(options), owner = userId('owner');
+  a.table('teamMembers').set(owner, active([]));
+  for (const [n, recipientKey] of [[1, owner], [2, 'role:super_admin']]) a.table('teamMessages').set('msg_' + String(n).repeat(32), { teamId: 'IMC', recipientKey, readBy: [], createdMs: 1 });
+  const before = structuredClone(a.table('teamSync').get('IMC'));
+  assert.equal((await a.member({ action: 'readAllMessages' })).ok, false);
+  assert.deepEqual(a.table('teamMessages').get('msg_' + '1'.repeat(32)).readBy, []);
+  assert.deepEqual(a.table('teamSync').get('IMC'), before);
+  options.failMessageUpdate = false;
+  assert.equal((await a.member({ action: 'readAllMessages' })).unreadCount, 0);
+  assert.deepEqual(a.table('teamMessages').get('msg_' + '2'.repeat(32)).readBy, []);
 });
 
 test('business roles are additive and isolated; an active super administrator has every permission', () => {
@@ -369,6 +407,24 @@ test('message page opens without reading and marks a message only through the ex
   await inbox.markRead({ currentTarget: { dataset: { id } } });
   assert.equal(read, id);
   assert.equal(inbox.data.messages[0].read, true);
+});
+
+test('message all-read follows server batches and keeps messages arriving during the action unread', async () => {
+  let calls = 0, read = false;
+  const inbox = page('miniprogram/pages/messages/index.js', {
+    messages: async () => ({ messages: [{ id: 'old', read }, { id: 'new', read: false }], nextOffset: 2, hasMore: false, hasUnread: true }),
+    readAllMessages: async cutoff => {
+      calls++; assert.equal(cutoff, calls === 1 ? undefined : 10);
+      if (calls === 2) read = true;
+      return { readBeforeMs: 10, readIds: [calls === 1 ? 'unloaded' : 'old'], hasMore: calls === 1, hasUnread: true };
+    }
+  });
+  await inbox.loadMessages(); await inbox.markAllRead();
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(calls, 2); assert.equal(inbox.data.readingAll, false);
+  assert.equal(inbox.data.messages.find(m => m.id === 'old').read, true);
+  assert.equal(inbox.data.messages.find(m => m.id === 'new').read, false);
+  assert.equal(inbox._locallyRead.has('unloaded'), true);
 });
 
 test('approval workbench collects pending member requests from every page and updates after processing', async () => {

@@ -69,6 +69,7 @@ test('message list and explicit read synchronize unread badges across headers wi
   a.cache.set('home:dashboard', { todos: [] });
   await a.service.readMessage('message'); assert.equal(seen.at(-1), false);
   assert.ok(a.cache.peek('home:dashboard'));
+  await a.service.readAllMessages(); assert.equal(seen.at(-1), false); assert.ok(a.cache.peek('home:dashboard'));
   assert.equal(a.calls.filter(action => action === 'get').length, 1);
 });
 test('late unread requests cannot turn a read message red again and role changes clear business caches', async () => {

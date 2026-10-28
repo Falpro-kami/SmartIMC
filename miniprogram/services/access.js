@@ -45,10 +45,11 @@ async function mutate(data) {
   identityEpoch++;
   unreadVersion++;
   identity = data.action === 'apply' ? result : null;
-  if (data.action === 'readMessage') cache.invalidate('access:messages'); else cache.clear();
+  const reading = ['readMessage', 'readAllMessages'].includes(data.action);
+  if (reading) cache.invalidate('access:messages'); else cache.clear();
   if (typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread, result.unreadCount);
   else unreadAt = 0;
-  if (cache.publish) cache.publish(data.action === 'readMessage' ? ['messages'] : ['home', 'messages', 'approvals', 'members', 'weekly']);
+  if (cache.publish) cache.publish(reading ? ['messages'] : ['home', 'messages', 'approvals', 'members', 'weekly']);
   return result;
 }
 function publishUnread(value, count) {
@@ -91,6 +92,7 @@ module.exports = { get, refreshIdentity, apply: () => mutate({ action: 'apply' }
     if (epoch === identityEpoch && version === unreadVersion && typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread, result.unreadCount);
     return result; },
   readMessage: id => mutate({ action: 'readMessage', id }),
+  readAllMessages: readBeforeMs => mutate({ action: 'readAllMessages', ...(readBeforeMs === undefined ? {} : { readBeforeMs }) }),
   openMessage: id => call({ action: 'openMessage', id }),
   list: (offset, force) => read('list', { offset }, force),
   member: id => call({ action: 'member', id }),

@@ -1,4 +1,7 @@
 @import "../../styles/list.wxss";
+.messages-toolbar { display: flex; justify-content: flex-end; margin: -8px 0 8px; }
+.mark-read::after { border: 0; }
+.mark-read[disabled] { opacity: .5; color: #637083; }
 .message-row { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 16px; background: white; border: 1px solid #dde3ec; border-radius: 10px; text-align: left; line-height: 1.6; }
 .message-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .message-title { min-width: 0; color: #101b2b; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
