@@ -51,6 +51,61 @@ test('programmatic editor echoes do not trigger a save loop, including image siz
   p._editor = { setContents({ delta }) { p.input({ detail: { delta: { ops: delta.ops.map(op => ({ ...op, attributes: { ...op.attributes, fontSize: '16px', 'data-local': 'temporary' } })) } } }); } };
   p.renderValue(); assert.equal(p.events.length, 0);
 });
+
+test('toolbar menus restore the text selection before heading, color and highlight formatting', async () => {
+  const p = component('weekly-editor'), calls = [];
+  p._editor = { getSelection({ success }) { success({ range: { index: 3, length: 5 } }); }, setSelection({ index, length, success }) { calls.push(['selection', index, length]); success(); }, format: (...args) => calls.push(args) };
+  const panel = name => ({ currentTarget: { dataset: { panel: name } } });
+  await p.openPanel(panel('heading'));
+  assert.equal(p.data.panel, 'heading');
+  p.chooseHeading({ currentTarget: { dataset: { name: 'header', value: 3 } } });
+  assert.deepEqual(calls, [['selection', 3, 5], ['header', 3]]); assert.equal(p.data.panel, '');
+  await p.openPanel(panel('highlight')); p.chooseColor({ currentTarget: { dataset: { color: '#f1c232' } } });
+  assert.deepEqual(calls.at(-1), ['backgroundColor', '#f1c232']);
+  p.status({ detail: { header: 3, backgroundColor: 'rgb(241, 194, 50)', color: '#1155cc', strike: true } });
+  assert.equal(p.data.formats.header, 3); assert.equal(p.data.highlightColor, '#f1c232');
+  assert.equal(p.data.tools.find(t => t.name === 'strike').active, true);
+  await p.openPanel(panel('highlight')); const before = calls.length;
+  p.chooseColor({ currentTarget: { dataset: { color: '#f1c232' } } });
+  assert.equal(calls.length, before + 1, 'choosing the current color restores selection but does not toggle the color off');
+  await p.openPanel(panel('color')); p.chooseColor({ currentTarget: { dataset: { color: 'javascript:alert(1)' } } });
+  assert.equal(p.data.panel, 'color');
+  p.properties.readonly = true; p.closePanel(); await p.openPanel(panel('more')); assert.equal(p.data.panel, '');
+});
+
+test('horizontal toolbar swipes and dismissed asynchronous selections cannot accidentally format or reopen a menu', async () => {
+  const p = component('weekly-editor'); let capture, formats = 0;
+  p._editor = { getSelection({ success }) { capture = success; }, format() { formats++; } };
+  const opening = p.openPanel({ currentTarget: { dataset: { panel: 'heading' } } });
+  p.closePanel(); capture({ range: { index: 0, length: 2 } }); await opening;
+  assert.equal(p.data.panel, ''); assert.equal(p._selection, null);
+  p.touchStart({ touches: [{ clientX: 100, clientY: 0 }] });
+  p.touchMove({ touches: [{ clientX: 50, clientY: 0 }] });
+  p.format({ currentTarget: { dataset: { name: 'bold' } } }); assert.equal(formats, 0);
+  p.touchStart({ touches: [{ clientX: 50, clientY: 0 }] });
+  p.format({ currentTarget: { dataset: { name: 'bold' } } }); assert.equal(formats, 1);
+});
+
+test('native RGB text and highlight colors survive autosave as safe portable Delta attributes', () => {
+  const p = component('weekly-editor'); p.properties = { maxLength: 5000 };
+  p.input({ detail: { delta: { ops: [{ insert: '带颜色正文\n', attributes: { color: 'rgb(17, 85, 204)', backgroundColor: '#fff2cc', link: 'https://example.com', arbitrary: 'unsupported' } }] } } });
+  const delta = p.events[0].detail.value;
+  assert.deepEqual(JSON.parse(JSON.stringify(delta.ops[0].attributes)), { color: '#1155cc', background: '#fff2cc' });
+  const backend = require('../cloudfunctions/weeklyReport/form');
+  const schema = backend.schema({ sections: [{ id: 'work', title: '工作', fields: [{ id: 'body', label: '本周工作', type: 'text', required: true }] }] });
+  assert.deepEqual(backend.answers(schema, { body: delta }, true).values.body, JSON.parse(JSON.stringify(delta)));
+});
+
+test('image insertion exits uploading state when native selection restoration fails', async () => {
+  const p = component('weekly-editor', { '../../services/weekly': { upload: async () => ({ id: fid }), call: async () => ({ url: 'https://private.example/image' }) } },
+    { chooseMedia: async () => ({ tempFiles: [{ tempFilePath: 'wxfile://image', size: 100 }] }), getImageInfo: async () => ({ type: 'png' }) });
+  p.properties = { value: { ops: [] }, maxLength: 5000, periodId: 'period', fieldId: 'body' };
+  p._selection = { index: 0, length: 0 };
+  p._editor = { setSelection({ fail }) { fail(); }, insertImage() { assert.fail('must not insert into a changed selection'); } };
+  await p.image();
+  assert.equal(p.data.uploading, false); assert.match(p.data.error, /选区已变化/);
+  assert.equal(p.events.at(-1).detail.value, false);
+});
 test('form fields display zero values and multi-select labels without WXML method calls', () => {
   const p = component('weekly-fields', { '../../services/weekly': { fileView: f => f } });
   p.properties = { schema: { sections: [{ id: 's', title: '分区', fields: [{ id: 'n', type: 'number' }, { id: 'm', type: 'multiple', options: ['研究', '实验'] }] }] }, answers: { n: 0, m: ['研究', '实验'] }, files: [] };

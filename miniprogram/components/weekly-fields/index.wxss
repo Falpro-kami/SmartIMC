@@ -8,9 +8,10 @@
 .field-choice { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; }
 .field-choice checkbox { flex-shrink: 0; margin-top: 2px; }
 .field-choice .label { margin-bottom: 0; }
-.field-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.field-heading .section-title,.field-heading .label,.choice-control { flex: 1; min-width: 0; margin-bottom: 0; }
-.help-button { flex-shrink: 0; margin: 0; min-width: 44px; min-height: 44px; padding: 8px 0; color: #005bac; background: #fff; border-radius: 4px; font-size: 14px; line-height: 28px; }
+.field-heading { display: flex; align-items: flex-start; justify-content: flex-start; gap: 8px; margin-bottom: 8px; }
+.field-heading .section-title,.field-heading .label,.choice-control { flex: 0 1 auto; min-width: 0; margin-bottom: 0; }
+.section-title { overflow-wrap: anywhere; }
+.help-button { flex-shrink: 0; margin: 0; min-width: 44px; min-height: 44px; padding: 0; color: #005bac; background: #fff; border-radius: 4px; font-size: 14px; line-height: 30px; text-align: left; }
 .help-button::after { border: 0; }
 .help-text { display: block; padding: 12px; margin-bottom: 12px; background: #f5f6f8; border-radius: 6px; color: #526173; font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .level-3 .label,.level-4 .label,.level-5 .label,.level-6 .label { font-size: 16px; }

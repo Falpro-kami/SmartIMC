@@ -1,22 +1,34 @@
-<view class="document {{readonly ? 'readonly' : ''}}">
-  <view wx:if="{{!readonly}}" class="editor-tools">
-    <button class="tool bold {{formats.bold ? 'active' : ''}}" data-name="bold" catchtouchend="format" disabled="{{disabled}}">B</button>
-    <button class="tool italic {{formats.italic ? 'active' : ''}}" data-name="italic" catchtouchend="format" disabled="{{disabled}}">I</button>
-    <button class="tool underline {{formats.underline ? 'active' : ''}}" data-name="underline" catchtouchend="format" disabled="{{disabled}}">U</button>
-    <button class="tool" data-name="list" data-value="bullet" catchtouchend="format" disabled="{{disabled}}">列表</button>
-    <button class="tool" bindtap="image" disabled="{{disabled || uploading}}" loading="{{uploading}}">图片</button>
-    <button class="tool" bindtap="more" disabled="{{disabled}}">更多</button>
-    <block wx:if="{{more}}">
-    <button class="tool {{formats.header ? 'active' : ''}}" data-name="header" data-value="{{2}}" catchtouchend="format" disabled="{{disabled}}">标题</button>
-    <button class="tool" data-name="list" data-value="ordered" catchtouchend="format" disabled="{{disabled}}">编号列表</button>
-    <button class="tool" data-name="align" data-value="left" catchtouchend="format" disabled="{{disabled}}">左对齐</button>
-    <button class="tool" data-name="align" data-value="center" catchtouchend="format" disabled="{{disabled}}">居中</button>
-    <button class="tool" data-name="align" data-value="right" catchtouchend="format" disabled="{{disabled}}">右对齐</button>
-    <button class="tool" data-name="undo" catchtouchend="format" disabled="{{disabled}}">撤销</button>
-    <button class="tool" data-name="redo" catchtouchend="format" disabled="{{disabled}}">重做</button>
-    <button class="tool" data-name="removeFormat" catchtouchend="format" disabled="{{disabled}}">清除格式</button>
-    </block>
-  </view>
-  <editor id="body" class="editor-body" read-only="{{readonly || disabled}}" placeholder="请输入" show-img-size="{{false}}" show-img-toolbar="{{!readonly}}" show-img-resize="{{!readonly}}" bindready="ready" bindinput="input" bindstatuschange="status" />
+<view class="document {{readonly ? 'readonly' : ''}} {{panel || tip ? 'panel-open' : ''}}">
+  <block wx:if="{{!readonly}}">
+    <view wx:if="{{panel || tip}}" class="dismiss" catchtap="closePanel"></view>
+    <view class="editor-tools" bindtouchstart="touchStart" bindtouchmove="touchMove">
+      <scroll-view class="tools-scroll" scroll-x enhanced show-scrollbar="{{false}}" bindscroll="closePanel">
+        <view class="tools-line">
+          <button class="tool style-tool {{panel === 'heading' ? 'active' : ''}}" data-panel="heading" data-label="正文与标题" catchtouchend="openPanel" bindlongpress="showTip" aria-label="正文与标题" disabled="{{disabled}}"><image class="tool-icon" src="/assets/editor/font.png" /><image class="chevron" src="/assets/editor/chevron.png" /></button>
+          <view class="separator"></view>
+          <block wx:for="{{tools}}" wx:key="icon">
+            <view wx:if="{{item.separator}}" class="separator"></view>
+            <button class="tool {{item.active ? 'active' : ''}} {{item.panel ? 'dropdown-tool' : ''}}" data-name="{{item.name}}" data-value="{{item.value}}" data-panel="{{item.panel}}" data-label="{{item.label}}" catchtouchend="tool" bindlongpress="showTip" aria-label="{{item.label}}" disabled="{{disabled}}">
+              <view class="icon-wrap"><image class="tool-icon" src="/assets/editor/{{item.icon}}{{item.active ? '-active' : ''}}.png" /><view wx:if="{{item.name === 'color' || item.name === 'backgroundColor'}}" class="color-line" style="background-color: {{item.name === 'color' ? textColor : highlightColor}}"></view></view>
+              <image wx:if="{{item.panel}}" class="chevron" src="/assets/editor/chevron.png" />
+            </button>
+          </block>
+        </view>
+      </scroll-view>
+      <view class="more-divider"></view><button class="tool more-tool {{panel === 'more' ? 'active' : ''}}" data-panel="more" data-label="更多" catchtouchend="openPanel" bindlongpress="showTip" aria-label="更多" disabled="{{disabled}}"><image class="tool-icon" src="/assets/editor/more.png" /></button>
+    </view>
+    <view wx:if="{{tip}}" class="tool-tip">{{tip}}</view>
+    <view wx:if="{{panel === 'heading'}}" class="popover heading-menu">
+      <button wx:for="{{headings}}" wx:key="icon" class="menu-tool {{formats.header === item.value || !formats.header && !item.value ? 'active' : ''}}" data-name="header" data-value="{{item.value}}" catchtouchend="chooseHeading" aria-label="{{item.label}}"><image class="heading-icon" src="/assets/editor/{{item.icon}}{{formats.header === item.value || !formats.header && !item.value ? '-active' : ''}}.png" /></button>
+    </view>
+    <view wx:if="{{panel === 'color' || panel === 'highlight'}}" class="popover palette">
+      <view wx:for="{{colors}}" wx:key="id" wx:for-item="row" class="palette-row"><button wx:for="{{row.items}}" wx:key="value" class="swatch-button" data-color="{{item.value}}" catchtouchend="chooseColor" aria-label="{{item.label}}"><view class="swatch {{item.value === '#ffffff' ? 'white-swatch' : ''}}" style="background-color: {{item.value}}"><image wx:if="{{(panel === 'color' ? textColor : highlightColor) === item.value}}" class="color-check" src="/assets/editor/{{item.dark ? 'check-light' : 'check'}}.png" /></view></button></view>
+    </view>
+    <view wx:if="{{panel === 'more'}}" class="popover more-menu">
+      <button wx:for="{{extras}}" wx:key="icon" class="tool {{item.active ? 'active' : ''}}" data-name="{{item.name}}" data-value="{{item.value}}" data-action="{{item.action}}" data-label="{{item.label}}" catchtouchend="tool" bindlongpress="showTip" aria-label="{{item.label}}" disabled="{{disabled || uploading}}" loading="{{item.action === 'image' && uploading}}"><image wx:if="{{item.action !== 'image' || !uploading}}" class="tool-icon" src="/assets/editor/{{item.icon}}{{item.active ? '-active' : ''}}.png" /></button>
+      <view class="history-tools"><button wx:for="{{history}}" wx:key="name" class="tool" data-name="{{item.name}}" data-label="{{item.label}}" catchtouchend="format" bindlongpress="showTip" aria-label="{{item.label}}" disabled="{{disabled}}"><image class="tool-icon" src="/assets/editor/{{item.icon}}.png" /></button></view>
+    </view>
+  </block>
+  <editor id="body" class="editor-body" read-only="{{readonly || disabled}}" placeholder="请输入" show-img-size="{{false}}" show-img-toolbar="{{!readonly}}" show-img-resize="{{!readonly}}" bindready="ready" bindinput="input" bindstatuschange="status" bindfocus="closePanel" />
   <text wx:if="{{error}}" class="error">{{error}}</text>
 </view>
