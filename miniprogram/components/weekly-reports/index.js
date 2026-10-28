@@ -2,7 +2,7 @@ const weekly = require('../../services/weekly');
 Component({
   properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' } },
   data: { mode: 'list', loading: true, busy: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
-    canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
+    isLeader: false, canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
     files: [], versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
   lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
   pageLifetimes: {
@@ -115,7 +115,7 @@ Component({
       } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message, periods: [], canManage: false }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
-    rights(r) { return { canManage: !!r.canManage, canReadTeam: !!r.canReadTeam, canRemind: !!r.canRemind, canExport: !!r.canExport }; },
+    rights(r) { return { isLeader: r.isLeader === true, canManage: !!r.canManage, canReadTeam: !!r.canReadTeam, canRemind: !!r.canRemind, canExport: !!r.canExport }; },
     loadMore() { return this.loadList(true); },
     choosePeriod(e) { return this.navigateWeekly(e.currentTarget.dataset.id); },
     openTeam() { if (this.data.selected && this.data.canReadTeam) return this.navigateWeekly(this.data.selected.id, 'team'); },

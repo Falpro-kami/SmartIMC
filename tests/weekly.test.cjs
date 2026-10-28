@@ -88,6 +88,25 @@ test('weekly actions enforce real membership and business permissions before ret
   await denied(a.send(id(4), 'exportStats', { periodId: pid(1) }), 'FORBIDDEN');
 });
 
+test('leader presentation follows the authorized viewer role while keeping member files and additive permissions', async () => {
+  const a = fixture(); await a.period();
+  const file = await a.upload(); await submitted(a, [file.id]);
+  assert.equal((await a.send(id(4), 'list', { isLeader: false })).isLeader, true);
+  const own = await a.send(id(4), 'get', { periodId: pid(1) });
+  assert.equal(own.isLeader, true); assert.equal(own.own, true); assert.equal(own.canReadTeam, true);
+  const student = await a.send(id(4), 'get', { periodId: pid(1), ownerId: id(2) });
+  assert.equal(student.isLeader, true); assert.equal(student.own, false);
+  assert.equal(student.report.files[0].id, file.id); assert.equal(student.versions.length, 1);
+  assert.equal((await a.send(id(2), 'list', { isLeader: true })).isLeader, false);
+  assert.equal((await a.send(id(1), 'get', { periodId: pid(1) })).isLeader, false);
+  a.table('teamMembers').set(id(5), active(['super_admin']));
+  const superAdmin = await a.send(id(5), 'list');
+  assert.equal(superAdmin.isLeader, false); assert.equal(superAdmin.canManage, true);
+  a.table('teamMembers').set(id(5), active(['leader', 'weekly_admin', 'super_admin']));
+  const combined = await a.send(id(5), 'get', { periodId: pid(1) });
+  assert.equal(combined.isLeader, true); assert.equal(combined.canManage, true); assert.equal(combined.canRemind, true);
+});
+
 test('periods validate dates and revisions, snapshot names, preserve exemptions and target notifications only', async () => {
   const a = fixture();
   await denied(a.period({ startDate: '2026-02-30' }), 'INVALID_INPUT');
@@ -291,6 +310,15 @@ function component(service, wx = {}) {
 }
 const uiService = extra => ({ newId: prefix => token(prefix, 1), dateLabel: () => '2026-10-27 10:00', fileView: f => f, periodView: p => p, statusLabel: s => s, ...extra });
 const uiResult = (revision, files, submitted = false) => ({ period: { id: pid(1), canEdit: true }, own: true, report: { revision, status: submitted ? 'submitted' : 'draft', files }, versions: [] });
+
+test('weekly components use the server leader flag for list and detail and discard it after a role change', async () => {
+  const p = component(uiService({ call: async () => ({ periods: [], nextOffset: 0, hasMore: false, isLeader: true, canReadTeam: true }) }));
+  await p.loadList(); assert.equal(p.data.isLeader, true); assert.equal(p.data.canReadTeam, true);
+  p.accept({ ...uiResult(1, [], true), own: false, isLeader: true, canReadTeam: true });
+  assert.equal(p.data.own, false); assert.equal(p.data.isLeader, true);
+  p.accept({ ...uiResult(1, [], true), isLeader: false, canReadTeam: false });
+  assert.equal(p.data.isLeader, false); assert.equal(p.data.own, true);
+});
 test('upload and removal save drafts automatically with stable retry IDs and block submission while unsaved', async () => {
   let fail = true, draftCalls = 0, submitCalls = 0;
   const f = { id: token('wf', 1), name: 'report.pdf', size: 30 };

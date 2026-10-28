@@ -71,7 +71,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       required: !!person && !person.exempt, exemption: person && person.exempt || '', canEdit,
       ownStatus: person && person.exempt ? 'exempt' : !person ? 'outside' : report ? report.status : 'unsubmitted' };
   }
-  function rights(member) { return { canManage: access.allowed(member, 'weekly.manage'), canReadTeam: access.allowed(member, 'weekly.read.team'),
+  function rights(member) { return { isLeader: (member.roles || []).includes('leader'), canManage: access.allowed(member, 'weekly.manage'), canReadTeam: access.allowed(member, 'weekly.read.team'),
     canRemind: access.allowed(member, 'weekly.remind'), canExport: access.allowed(member, 'weekly.export') }; }
   async function list(id, event) {
     const actor = await authorize(id);

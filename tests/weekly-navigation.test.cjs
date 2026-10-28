@@ -15,7 +15,7 @@ function harness(origin = 'pages/workbench/index') {
   let panelDefinition, pageDefinition, confirm = true, failNavigation = false, heldAction = '', releaseRead;
   const rows = Array.from({ length: 20 }, (_, i) => ({ id: personId(i + 1), name: '测试同学' + (i + 1), status: i === 0 ? 'draft' : 'submitted', submittedMs: 1, files: [] }));
   const periods = Array.from({ length: 25 }, (_, i) => ({ id: periodId(i + 1), title: '周报' + (i + 1), status: 'open', ownStatus: 'outside', startDate: '2026-10-26', endDate: '2026-11-01', deadlineMs: 1793527200000 }));
-  const rights = { canManage: false, canReadTeam: true, canRemind: false, canExport: false };
+  const rights = { isLeader: true, canManage: false, canReadTeam: true, canRemind: false, canExport: false };
   const cloud = { callFunction: async ({ data }) => {
     reads.push({ ...data });
     if (data.action === heldAction) await new Promise(resolve => { releaseRead = resolve; });
