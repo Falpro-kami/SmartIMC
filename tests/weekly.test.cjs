@@ -145,7 +145,9 @@ test('template management is server authorized, revision checked and snapshotted
   await a.send(id(1), 'saveTemplate', { ...data, revision: 1, schema: changed });
   assert.equal((await a.send(id(1), 'templates')).templates[0].revision, 2);
   assert.equal((await a.send(id(2), 'get', { periodId: pid(1) })).period.schema.sections[0].fields[0].label, '本周工作');
-  await denied(a.period({ revision: 1, schema: changed }), 'INVALID_FORM');
+  await a.period({ revision: 1, schema: changed });
+  assert.equal(a.table('weeklyPeriods').size, 1, 'a period with no filling activity can be corrected in place');
+  assert.equal(a.table('weeklyPeriods').get(pid(1)).schema.sections[0].fields[0].label, '新的字段');
   a.table('teamMembers').set(id(5), active(['super_admin']));
   assert.equal((await a.send(id(5), 'templates')).templates.length, 1);
 });
@@ -162,6 +164,91 @@ test('form validation merges text types, strips unsafe styles and enforces every
   assert.deepEqual(safe.ops[0].attributes, { bold: true });
   assert.throws(() => formModel.schema({ sections: [null] }));
   assert.throws(() => formModel.schema({ sections: [{ id: 'x', title: 'x', fields: [{ id: 'x', label: 'x', type: 'text', required: false }] }] }));
+});
+
+test('an unused published form is corrected in place and stale clients cannot write into the replacement fields', async () => {
+  const a = fixture(); await a.period({ schema: schema() });
+  const old = await a.send(id(2), 'get', { periodId: pid(1) }), changed = schema(); changed.sections[0].fields[0].label = '研究工作';
+  await a.period({ revision: 1, schema: changed });
+  const latest = await a.send(id(2), 'get', { periodId: pid(1) });
+  assert.notEqual(latest.period.formKey, old.period.formKey); assert.equal(a.table('weeklyPeriods').size, 1);
+  const payload = { periodId: pid(1), revision: 0, answers: { body: text('已填写'), hours: 0 }, selectedFields: [], requestId: token('wd', 1) };
+  await denied(a.send(id(2), 'saveDraft', { ...payload, formKey: old.period.formKey }), 'FORM_CHANGED');
+  await denied(a.send(id(2), 'saveDraft', payload), 'FORM_CHANGED');
+  await denied(a.send(id(2), 'prepareUpload', { periodId: pid(1), fieldId: 'docs', formKey: old.period.formKey, name: '周报.pdf', size: 10 }), 'FORM_CHANGED');
+  assert.equal(a.table('weeklyReports').size, 0); assert.equal(a.table('weeklyFiles').size, 0);
+  await a.send(id(2), 'saveDraft', { ...payload, formKey: latest.period.formKey });
+  assert.equal(a.table('weeklyPeriods').get(pid(1)).hasActivity, true);
+});
+
+test('publishing a revision keeps old drafts, submissions, private images and history immutable and links both editions', async () => {
+  const a = fixture(); await a.period({ schema: schema() });
+  const image = await a.upload(id(2), pid(1), Buffer.from('89504e470d0a1a0a01020304', 'hex'), '研究.png', { kind: 'image', fieldId: 'body' });
+  await a.send(id(2), 'saveDraft', { periodId: pid(1), revision: 0, answers: { body: { ops: [{ insert: { image: 'imc-image:' + image.id } }] }, hours: 1 }, requestId: token('wd', 1) });
+  const submitted = await a.send(id(3), 'submit', { periodId: pid(1), revision: 0, answers: { body: text('原版提交内容'), hours: 2 }, requestId: token('ws', 1) });
+  const original = structuredClone(a.table('weeklyPeriods').get(pid(1))), reports = structuredClone(a.table('weeklyReports')), versions = structuredClone(a.table('weeklyVersions'));
+  const noticeId = [...a.table('teamMessages').keys()][0]; a.table('teamMessages').get(noticeId).readBy = [id(2)];
+  const changed = schema(); changed.sections[0].fields[0] = { ...changed.sections[0].fields[0], id: 'summary', label: '新版研究总结' };
+  await denied(a.period({ revision: 1, schema: changed }), 'REVISION_REQUIRED');
+  assert.equal(a.table('weeklyPeriods').size, 1); assert.equal(a.table('weeklyPeriods').get(pid(1)).status, 'open');
+  const revision = await a.period({ revision: 1, schema: changed, confirmRevision: true });
+  assert.equal(revision.revised, true); assert.equal(revision.edition, 2); assert.notEqual(revision.id, pid(1));
+  assert.deepEqual(a.table('weeklyReports'), reports); assert.deepEqual(a.table('weeklyVersions'), versions);
+  const old = a.table('weeklyPeriods').get(pid(1)), next = a.table('weeklyPeriods').get(revision.id);
+  assert.equal(old.status, 'closed'); assert.equal(old.supersededBy, revision.id); assert.deepEqual(old.schema, original.schema);
+  assert.equal(next.previousPeriodId, pid(1)); assert.equal(next.rootPeriodId, pid(1)); assert.equal(next.edition, 2); assert.equal(next.hasActivity, false);
+  const weeklyTodos = require('../cloudfunctions/memberAccess/weekly-home');
+  assert.deepEqual((await weeklyTodos(a.db, id(2))).map(t => t.periodId), [revision.id], 'only the new edition remains a home todo');
+  assert.equal((await a.send(id(2), 'get', { periodId: pid(1) })).report.answers.body.ops[0].insert.image, 'imc-image:' + image.id);
+  assert.ok((await a.send(id(2), 'get', { periodId: pid(1) })).imageURLs[image.id]);
+  assert.equal((await a.send(id(4), 'getVersion', { versionId: submitted.versions[0].id })).schema.sections[0].fields[0].id, 'body');
+  assert.equal((await a.send(id(2), 'get', { periodId: revision.id })).report, null);
+  await denied(a.send(id(2), 'saveDraft', { periodId: pid(1), revision: 1, answers: {}, requestId: token('wd', 2) }), 'CLOSED');
+  await denied(a.period({ revision: 2, status: 'open' }), 'SUPERSEDED');
+  await denied(a.send(id(1), 'configuration', { periodId: pid(1) }), 'SUPERSEDED');
+  await denied(a.send(id(3), 'submit', { periodId: revision.id, revision: 0, answers: { summary: text('新内容'), hours: 1, docs: [image.id] }, selectedFields: ['docs'], requestId: token('ws', 2) }), 'FORBIDDEN');
+  await a.send(id(3), 'submit', { periodId: revision.id, revision: 0, answers: { summary: text('新版提交'), hours: 3 }, requestId: token('ws', 2) });
+  const thirdSchema = structuredClone(next.schema); thirdSchema.sections[0].fields[0].help = '新版说明';
+  const third = await a.period({ id: revision.id, revision: 1, schema: thirdSchema, confirmRevision: true });
+  assert.equal(third.edition, 3); assert.equal(a.table('weeklyPeriods').get(third.id).rootPeriodId, pid(1));
+  assert.equal(a.table('weeklyPeriods').get(third.id).previousPeriodId, revision.id);
+  assert.deepEqual(a.table('teamMessages').get(noticeId).readBy, [id(2)]);
+  const notices = [...a.table('teamMessages').values()].filter(m => m.title === '周报已发布修订版');
+  assert.equal(notices.length, 2); assert.ok(notices.every(m => !m.readBy.length && m.body.includes('表单内容及填写规则')));
+  assert.equal([...a.table('weeklyAudit').values()].filter(a => a.action === 'period.revise').length, 2);
+});
+
+test('settings corrections notify both old and new assignees without a new edition or changing submitted records', async () => {
+  const a = fixture(); await a.period(); const f = await a.upload(); await submitted(a, [f.id]);
+  const reports = structuredClone(a.table('weeklyReports')), originalNotice = [...a.table('teamMessages').keys()][0];
+  a.table('teamMessages').get(originalNotice).readBy = [id(2)];
+  const result = await a.period({ revision: 1, deadline: '2026-11-02T18:00', allowLateEdit: true, roster: [{ id: id(3), exempt: '' }] });
+  assert.equal(result.id, pid(1)); assert.equal(result.revised, undefined); assert.equal(a.table('weeklyPeriods').size, 1);
+  assert.deepEqual(a.table('weeklyReports'), reports);
+  const change = [...a.table('teamMessages').values()].find(m => m.title === '周报设置已更新');
+  assert.deepEqual(change.recipientKey, [id(2), id(3)]); assert.match(change.body, /截止时间/); assert.match(change.body, /应交成员/);
+  assert.deepEqual(a.table('teamMessages').get(originalNotice).readBy, [id(2)]);
+  const count = a.table('teamMessages').size;
+  await denied(a.period({ revision: 1, deadline: '2026-11-02T18:00' }), 'CONFLICT');
+  assert.equal(a.table('teamMessages').size, count);
+});
+
+test('activity appearing after the initial check still requires a revision, including legacy upload-only records', async () => {
+  const a = fixture(); await a.period({ schema: schema() });
+  const originalTransaction = a.db.runTransaction.bind(a.db); let intercepted = false;
+  a.db.runTransaction = async callback => {
+    if (!intercepted) { intercepted = true; await a.send(id(2), 'saveDraft', { periodId: pid(1), revision: 0, answers: { body: text('同时填写'), hours: 1 }, requestId: token('wd', 1) }); }
+    return originalTransaction(callback);
+  };
+  const changed = schema(); changed.sections[0].title = '修正后的标题';
+  await denied(a.period({ revision: 1, schema: changed }), 'REVISION_REQUIRED');
+  assert.equal(a.table('weeklyPeriods').size, 1); assert.equal(a.table('weeklyReports').size, 1);
+  const b = fixture(); await b.period({ schema: schema() });
+  await b.upload(id(2), pid(1), undefined, '原附件.pdf', { fieldId: 'docs' });
+  delete b.table('weeklyPeriods').get(pid(1)).hasActivity;
+  await denied(b.period({ revision: 1, schema: changed }), 'REVISION_REQUIRED');
+  await denied(b.send(id(4), 'savePeriod', { id: pid(1), revision: 1, schema: changed, confirmRevision: true }), 'FORBIDDEN');
+  assert.equal(b.table('weeklyPeriods').size, 1);
 });
 
 test('rich reports preserve submitted text and private inline images while later draft changes stay private', async () => {
@@ -462,6 +549,24 @@ function component(service, wx = {}) {
 }
 const uiService = extra => ({ newId: prefix => token(prefix, 1), dateLabel: () => '2026-10-27 10:00', fileView: f => f, periodView: p => p, statusLabel: s => s, ...extra });
 const uiResult = (revision, files, submitted = false) => ({ period: { id: pid(1), canEdit: true }, own: true, report: { revision, status: submitted ? 'submitted' : 'draft', files }, versions: [] });
+
+test('revision confirmation can be cancelled without losing edits and confirmed publishing navigates to the returned new edition', async () => {
+  let confirmed = false; const calls = [], modals = [];
+  const p = component(uiService({ call: async (action, payload) => {
+    calls.push(structuredClone(payload)); assert.equal(action, 'savePeriod');
+    if (!payload.confirmRevision) { const e = new Error('需要发布修订版'); e.code = 'REVISION_REQUIRED'; throw e; }
+    return { ok: true, id: pid(2), revised: true, edition: 2 };
+  } }), { showModal: async options => { modals.push(options); return { confirm: confirmed }; } });
+  p.properties.initialView = 'settings'; p.data.canManage = true;
+  p.data.form = { id: pid(1), revision: 1, title: '本周周报', schema: schema(), templateName: '研究表单', startDate: '2026-10-26', endDate: '2026-11-01', deadlineDate: '2026-11-01', deadlineTime: '18:00', status: 'open', allowLateSubmit: true, allowLateEdit: false };
+  p.data.members = [{ id: id(2), selected: true, exempt: '' }];
+  let destination; p.navigateWeekly = (...args) => { destination = args; };
+  const before = JSON.stringify(p.data.form);
+  await p.savePeriod(); assert.equal(calls.length, 1); assert.equal(destination, undefined); assert.equal(JSON.stringify(p.data.form), before); assert.equal(p.data.busy, false);
+  assert.match(modals[0].content, /原草稿、提交和文件保留/);
+  confirmed = true; await p.savePeriod();
+  assert.equal(calls.length, 3); assert.equal(calls.at(-1).confirmRevision, true); assert.equal(destination[0], pid(2)); assert.equal(p.data.busy, false);
+});
 
 test('weekly components use the server leader flag for list and detail and discard it after a role change', async () => {
   const p = component(uiService({ call: async () => ({ periods: [], nextOffset: 0, hasMore: false, isLeader: true, canReadTeam: true }) }));

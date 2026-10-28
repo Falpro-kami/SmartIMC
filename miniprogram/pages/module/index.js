@@ -33,15 +33,15 @@ Page(require('../../utils/member-page')({
   onLoad(options) {
     const module = Object.prototype.hasOwnProperty.call(MODULES, options.id) ? MODULES[options.id] : null;
     if (!module) { this.setData({ title: '页面不存在', description: '请返回工作台选择功能' }); return; }
-    const weeklyView = ['publish', 'templates', 'template-edit', 'template-preview'].includes(options.view) ? options.view : /^wp_[a-f0-9]{32}$/.test(options.period || '') && ['team', 'settings'].includes(options.view) ? options.view : 'detail';
-    const weeklyPeriod = !['publish', 'templates', 'template-edit', 'template-preview'].includes(weeklyView) && /^wp_[a-f0-9]{32}$/.test(options.period || '') ? options.period : '';
+    const weeklyView = ['publish', 'templates', 'template-edit', 'template-preview', 'period-form'].includes(options.view) ? options.view : /^wp_[a-f0-9]{32}$/.test(options.period || '') && ['team', 'settings'].includes(options.view) ? options.view : 'detail';
+    const weeklyPeriod = !['publish', 'templates', 'template-edit', 'template-preview', 'period-form'].includes(weeklyView) && /^wp_[a-f0-9]{32}$/.test(options.period || '') ? options.period : '';
     const weeklyOwner = weeklyPeriod && weeklyView === 'detail' && /^user_[a-f0-9]{32}$/.test(options.owner || '') ? options.owner : '';
     const weeklyTemplate = weeklyView === 'template-edit' && /^wt_[a-f0-9]{32}$/.test(options.template || '') ? options.template : weeklyView === 'template-edit' ? 'new' : '';
     const weeklyChooseTemplate = weeklyView === 'templates' && options.choose === '1';
     this.setData({ ...module, ...(module.weeklyMode ? { weeklyPeriod, weeklyView, weeklyOwner, weeklyTemplate, weeklyChooseTemplate } : {}), ...(module.announcementsMode ? {
       announcementId: /^ann_[a-f0-9]{32}$/.test(options.announcement || '') ? options.announcement : '', composeAnnouncement: options.compose === '1'
     } : {}) });
-    const weeklyTitle = { publish: '发布周报', settings: '周期设置', templates: '表单模板', 'template-edit': weeklyTemplate === 'new' ? '新建模板' : '编辑模板', 'template-preview': '周报预览' }[weeklyView];
+    const weeklyTitle = { publish: '发布周报', settings: '周期设置', templates: '表单模板', 'template-edit': weeklyTemplate === 'new' ? '新建模板' : '编辑模板', 'template-preview': '周报预览', 'period-form': '编辑本期表单' }[weeklyView];
     wx.setNavigationBarTitle({ title: module.weeklyMode ? weeklyTitle || (weeklyPeriod ? weeklyView === 'team' ? '团队提交' : weeklyOwner ? '成员周报' : '周报详情' : module.title) : module.title });
     if (module.adminMode) this.loadAdminData();
   },

@@ -13,7 +13,7 @@
       <text wx:if="{{readonly && item.empty && (!item.isGroup || !item.children.length)}}" class="value">无</text>
       <block wx:elif="{{item.isGroup}}"></block>
       <block wx:elif="{{readonly || item.enabled}}">
-      <weekly-editor wx:if="{{item.type === 'text'}}" value="{{item.delta}}" image-urls="{{imageUrls}}" readonly="{{readonly}}" disabled="{{disabled}}" period-id="{{periodId}}" field-id="{{item.id}}" max-length="{{item.maxLength}}" data-id="{{item.id}}" bindchange="textChange" binduploading="uploading" />
+      <weekly-editor wx:if="{{item.type === 'text'}}" value="{{item.delta}}" image-urls="{{imageUrls}}" readonly="{{readonly}}" disabled="{{disabled}}" period-id="{{periodId}}" form-key="{{formKey}}" field-id="{{item.id}}" max-length="{{item.maxLength}}" data-id="{{item.id}}" bindchange="textChange" binduploading="uploading" />
       <block wx:elif="{{item.type === 'attachment'}}">
         <view wx:for="{{item.attachments}}" wx:for-item="file" wx:key="id" class="file-row"><text class="filename">{{file.name}}</text><view class="file-actions"><button class="link" data-id="{{file.id}}" bindtap="useFile">查看</button><button wx:if="{{!readonly}}" class="link danger" data-id="{{file.id}}" data-field="{{item.id}}" bindtap="removeFile" disabled="{{disabled || uploading}}">移除</button><button wx:else class="link" data-id="{{file.id}}" data-share="1" bindtap="useFile">下载</button></view></view>
         <button wx:if="{{!readonly && item.attachments.length < item.maxCount}}" class="upload" data-id="{{item.id}}" bindtap="addFiles" disabled="{{disabled || uploading}}">＋ 上传文件</button>

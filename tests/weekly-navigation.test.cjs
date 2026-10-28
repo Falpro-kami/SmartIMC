@@ -47,7 +47,7 @@ function harness(origin = 'pages/workbench/index', manage = false) {
       data: structuredClone(panelDefinition.data), updates: [], selectComponent: () => frame.template, setData(values) {
         this.updates.push(values); setData(this, values);
         if (values.templatesOpen && !frame.template) {
-          const child = { ...templateDefinition.methods, properties: { editId: this.properties.initialTemplate, choose: this.properties.chooseTemplate }, data: structuredClone(templateDefinition.data),
+          const child = { ...templateDefinition.methods, properties: { editId: this.properties.initialTemplate, choose: this.properties.chooseTemplate, localTemplate: this.data.periodTemplate }, data: structuredClone(templateDefinition.data),
             setData(values) { setData(this, values); }, triggerEvent(name, detail) { const method = { edit: 'editTemplate', preview: 'previewTemplate', select: 'selectTemplate', done: 'closeTemplates', close: 'closeTemplates' }[name]; if (method) panel[method]({ detail }); } };
           frame.template = child; templateDefinition.lifetimes.attached.call(child);
         }
@@ -257,4 +257,21 @@ test('preview opened without an editor has a readable error and a failed navigat
   b.fail(true); editor.template.preview(); assert.equal(b.top(), editor); assert.equal(editor.panel._navigating, false); assert.ok(editor.template.data.editing);
   const c = harness(); c.push('/pages/module/index?id=weekly&view=template-preview'); await settle();
   assert.equal(c.top().panel.data.preview, null); assert.match(c.top().panel.data.error, /管理权限/);
+});
+
+test('editing the period snapshot uses a separate native page and does not save or mutate a shared template', async () => {
+  const a = harness('pages/workbench/index', true); a.push('/pages/module/index?id=weekly&period=' + periodId(1)); await settle();
+  a.top().panel.editCurrentPeriod(); await settle(); const settings = a.top(); settings.scrollTop = 420;
+  settings.panel.editPeriodForm(); await settle(); const editor = a.top();
+  assert.equal(editor.title, '编辑本期表单'); assert.ok(editor.template.data.editing);
+  editor.template.fieldInput({ currentTarget: { dataset: { path: '0.0', key: 'label' } }, detail: { value: '本期修正的字段' } });
+  editor.template.preview(); await settle(); assert.equal(a.top().title, '周报预览');
+  a.wx.navigateBack(); await settle(); assert.equal(a.top(), editor);
+  assert.equal(editor.template.data.editing.schema.sections[0].fields[0].label, '本期修正的字段');
+  editor.template.save(); await settle();
+  assert.equal(a.top(), settings); assert.equal(settings.scrollTop, 420);
+  assert.equal(settings.panel.data.form.schema.sections[0].fields[0].label, '本期修正的字段');
+  assert.equal(a.reads.filter(r => ['saveTemplate', 'savePeriod'].includes(r.action)).length, 0);
+  a.push('/pages/module/index?id=weekly&view=templates'); await settle();
+  assert.notEqual(a.top().template.data.templates[0].schema.sections[0].fields[0].label, '本期修正的字段');
 });

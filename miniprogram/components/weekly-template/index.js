@@ -8,13 +8,17 @@ function locate(sections, path) {
 }
 function depth(node) { return node.type === 'group' && node.children.length ? 1 + Math.max(...node.children.map(depth)) : 1; }
 Component({
-  properties: { choose: Boolean, editId: String },
+  properties: { choose: Boolean, editId: String, localTemplate: { type: Object, value: null } },
   data: { templates: [], loading: true, busy: false, error: '', editing: null, editorSections: [], types: model.labels },
   lifetimes: { attached() { this.load(); }, detached() { this._detached = true; } },
-  pageLifetimes: { show() { if (!this.properties.editId) this.load(); } },
+  pageLifetimes: { show() { if (!this.properties.editId && !this.properties.localTemplate) this.load(); } },
   methods: {
     async load() {
       if (this._loading) return;
+      if (this.properties.localTemplate) {
+        if (!this._loaded) { this.setData({ editing: JSON.parse(JSON.stringify(this.properties.localTemplate)), loading: false }); this.buildSections(); this._loaded = true; }
+        return;
+      }
       this._loading = true; this.setData({ loading: true, error: '' });
       try {
         const r = await weekly.call('templates', {}, true);
@@ -71,6 +75,7 @@ Component({
     type(e) { this.node(e, ({ list, index, node }) => { if (node.type !== 'group') list[index] = { ...model.field(model.types[Number(e.detail.value)]), id: node.id, label: node.label, help: node.help || '', required: node.required }; }); },
     async save() {
       if (this.data.busy || !this.data.editing) return;
+      if (this.properties.localTemplate) { this.triggerEvent('select', JSON.parse(JSON.stringify(this.data.editing))); return; }
       this.setData({ busy: true, error: '' });
       try { const r = await weekly.call('saveTemplate', this.data.editing); if (!this._detached) { this.triggerEvent('saved', r.template); this.triggerEvent('done'); } }
       catch (e) { if (!this._detached) this.setData({ error: e.message }); }
@@ -78,7 +83,7 @@ Component({
     },
     async back() {
       if (this.data.busy) return;
-      if (this.data.editing) { const r = await wx.showModal({ title: '离开模板编辑', content: '放弃尚未保存的模板修改？', confirmText: '离开' }); if (r.confirm) this.triggerEvent('close'); }
+      if (this.data.editing) { const r = await wx.showModal({ title: this.properties.localTemplate ? '离开表单编辑' : '离开模板编辑', content: this.properties.localTemplate ? '放弃尚未应用的表单修改？' : '放弃尚未保存的模板修改？', confirmText: '离开' }); if (r.confirm) this.triggerEvent('close'); }
       else this.triggerEvent('close');
     }
   }

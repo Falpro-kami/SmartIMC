@@ -1,5 +1,5 @@
 <view class="templates">
-  <view class="heading"><text class="title">{{editing ? '编辑模板' : '表单模板'}}</text><view class="heading-actions"><button wx:if="{{editing}}" class="link" bindtap="preview" disabled="{{busy}}">预览</button><button class="link" bindtap="back" disabled="{{busy}}">返回</button></view></view>
+  <view class="heading"><text class="title">{{localTemplate ? '编辑表单' : editing ? '编辑模板' : '表单模板'}}</text><view class="heading-actions"><button wx:if="{{editing}}" class="link" bindtap="preview" disabled="{{busy}}">预览</button><button class="link" bindtap="back" disabled="{{busy}}">返回</button></view></view>
   <view wx:if="{{loading}}" class="empty">正在读取…</view>
   <block wx:elif="{{!editing}}">
     <view wx:if="{{!templates.length}}" class="card empty">暂无模板</view>
@@ -7,7 +7,7 @@
     <button class="primary wide" bindtap="newTemplate">新建模板</button>
   </block>
   <block wx:else>
-    <view class="card"><text class="label">模板名称</text><input class="input" value="{{editing.name}}" bindinput="name" maxlength="60" disabled="{{busy}}" /></view>
+    <view class="card"><text class="label">{{localTemplate ? '表单名称' : '模板名称'}}</text><input class="input" value="{{editing.name}}" bindinput="name" maxlength="60" disabled="{{busy}}" /></view>
     <view wx:for="{{editorSections}}" wx:key="id" wx:for-item="section" wx:for-index="si" class="card">
       <text class="title">{{section.titleLabel}}</text>
       <text class="label">分区标题</text><input class="input" value="{{section.title}}" data-section="{{si}}" bindinput="sectionInput" maxlength="60" disabled="{{busy}}" />
@@ -31,7 +31,7 @@
       <button class="secondary wide" data-section="{{si}}" bindtap="addField" disabled="{{busy}}">＋ 添加字段</button>
     </view>
     <button class="secondary wide" bindtap="addSection" disabled="{{busy}}">＋ 添加分区</button>
-    <button class="primary wide" bindtap="save" disabled="{{busy}}" loading="{{busy}}">保存模板</button>
+    <button class="primary wide" bindtap="save" disabled="{{busy}}" loading="{{busy}}">{{localTemplate ? '应用修改' : '保存模板'}}</button>
   </block>
   <text wx:if="{{error}}" class="error">{{error}}</text>
 </view>

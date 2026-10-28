@@ -2,7 +2,7 @@ const weekly = require('../../services/weekly');
 const formModel = require('../../utils/weekly-form');
 Component({
   properties: { schema: Object, answers: { type: Object, value: {} }, files: { type: Array, value: [] }, imageUrls: Object,
-    selectedFields: { type: Array, value: null }, readonly: Boolean, outline: Boolean, disabled: Boolean, embedded: Boolean, periodId: String, versionId: String },
+    selectedFields: { type: Array, value: null }, readonly: Boolean, outline: Boolean, disabled: Boolean, embedded: Boolean, periodId: String, versionId: String, formKey: String },
   data: { sections: [], error: '', uploading: false, helpOpen: {} },
   observers: { 'schema,answers,files,selectedFields,readonly,outline': function () { this.build(); } },
   methods: {
@@ -43,7 +43,7 @@ Component({
         const chosen = await wx.chooseMessageFile({ count: field.maxCount - ids.length, type: 'file', extension: ['doc', 'docx', 'pdf'] });
         for (const file of chosen.tempFiles) {
           if (file.size > field.maxSizeMB * 1024 * 1024) throw new Error('文件不能超过' + field.maxSizeMB + 'MB。');
-          const uploaded = await weekly.upload(file, this.properties.periodId, field.id);
+          const uploaded = await weekly.upload(file, this.properties.periodId, field.id, 'attachment', this.properties.formKey);
           this._files = { ...this._files, [uploaded.id]: uploaded }; ids.push(uploaded.id);
           this.change(field.id, ids.slice());
         }

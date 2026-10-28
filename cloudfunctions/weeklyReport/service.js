@@ -51,9 +51,17 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     return row;
   }
   const target = (p, id) => p.roster.find(row => row.id === id);
+  const formKey = p => hash('form_', p._id + ':' + JSON.stringify(p.schema ? form.schema(p.schema) : null));
+  function checkForm(p, key) { if ((key || (p.schemaRevision || 1) > 1) && key !== formKey(p)) reject('FORM_CHANGED', '本期表单已修改，请重新打开周报后填写；当前尚未保存的输入请先保留。'); }
+  async function hasActivity(p) {
+    if (p.hasActivity) return true;
+    for (const table of ['weeklyReports', 'weeklyFiles']) if ((await db.collection(table).where({ teamId: TEAM, periodId: p._id }).limit(1).get()).data.length) return true;
+    return false;
+  }
   function editable(p, id, report) {
     const person = target(p, id);
     if (!person || person.exempt) reject('NOT_REQUIRED', '本周期无需你提交周报。');
+    if (p.supersededBy) reject('CLOSED', '这版周报已被修订，原内容已保留，请打开新版填写。');
     if (p.status !== 'open') reject('CLOSED', p.status === 'archived' ? '该周期已归档。' : '该周期已关闭。');
     if (clock() < dateMs(p.startDate)) reject('NOT_STARTED', '本周期尚未开始。');
     if (clock() > p.deadlineMs && !(report && report.status === 'submitted' ? p.allowLateEdit : p.allowLateSubmit)) reject('DEADLINE', '已超过提交截止时间。');
@@ -70,7 +78,8 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     return { id: p._id, title: p.title, startDate: p.startDate, endDate: p.endDate, deadlineMs: p.deadlineMs,
       status: p.status, revision: p.revision, allowLateSubmit: p.allowLateSubmit, allowLateEdit: p.allowLateEdit,
       publishAtMs: p.publishAtMs || 0, publishError: p.publishError || '',
-      schema: p.schema || null, templateName: p.templateName || '',
+      schema: p.schema || null, templateName: p.templateName || '', formKey: formKey(p),
+      edition: p.edition || 1, previousPeriodId: p.previousPeriodId || '', supersededBy: p.supersededBy || '',
       required: !!person && !person.exempt, exemption: person && person.exempt || '', canEdit,
       ownStatus: person && person.exempt ? 'exempt' : !person ? 'outside' : report ? report.status : 'unsubmitted' };
   }
@@ -158,18 +167,19 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   async function configuration(id, event) {
     await authorize(id, 'weekly.manage');
     const p = await period(db, event.periodId);
+    if (p.supersededBy) reject('SUPERSEDED', '这版周报已被修订，请打开新版设置。');
     return { ok: true, period: { ...periodView(p, id), roster: p.roster } };
   }
   async function audit(tx, actorId, action, subjectId, data = {}) {
     await tx.collection('weeklyAudit').doc(hash('wa_', randomUUID())).set({ data: { teamId: TEAM, actorId, action, subjectId, ...data, createdMs: clock() } });
   }
-  async function notice(tx, p, ids, suffix, title) {
+  async function notice(tx, p, ids, suffix, title, body = p.title) {
     if (!ids.length) return;
     const messageId = hash('msg_', 'weekly:' + p._id + ':' + suffix);
     // Idempotent notification: retries never reset readBy or re-light an already read message.
     if (await read(tx, 'teamMessages', messageId)) return;
     await tx.collection('teamMessages').doc(messageId).set({ data: { teamId: TEAM, kind: 'weekly', recipientKey: ids,
-      subjectId: p._id, title, body: p.title, createdMs: clock(), state: 'open', readBy: [] } });
+      subjectId: p._id, title, body, createdMs: clock(), state: 'open', readBy: [] } });
     await sync.bump(tx, ['messages']);
   }
   async function savePeriod(id, e) {
@@ -183,10 +193,13 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       !Array.isArray(e.roster) || !e.roster.length || e.roster.length > 300 || new Set(e.roster.map(r => r.id)).size !== e.roster.length ||
       e.roster.some(r => !validId(r.id, 'user') || typeof r.exempt !== 'string' || r.exempt.length > 80)) reject('INVALID_INPUT', '请检查周期名称、日期、截止时间和应交成员。');
     const active = await roster(id), names = new Map(active.members.map(m => [m.id, m.name]));
+    const before = await read(db, 'weeklyPeriods', e.id), activity = before ? await hasActivity(before) : false;
+    let result = { ok: true, id: e.id };
     await db.runTransaction(async tx => {
       await authorize(id, 'weekly.manage', tx);
       const previous = await read(tx, 'weeklyPeriods', e.id);
       if (previous && previous.teamId !== TEAM) reject('NOT_FOUND', '周报周期不存在。');
+      if (previous && previous.supersededBy) reject('SUPERSEDED', '这版周报已被修订，请打开新版设置。');
       if ((previous ? previous.revision : 0) !== e.revision) reject('CONFLICT', '周期已更新，请重新打开后编辑。');
       if (!previous && !['open', 'scheduled'].includes(e.status)) reject('INVALID_INPUT', '请选择立即发布或定时发布。');
       if (previous && !['scheduled', 'cancelled'].includes(previous.status) && ['scheduled', 'cancelled'].includes(e.status)) reject('INVALID_INPUT', '已发布的周期不能改回定时发布。');
@@ -196,20 +209,44 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
         return { id: r.id, name: names.get(r.id) || oldNames.get(r.id), exempt: r.exempt.trim() };
       });
       const schema = e.schema ? form.schema(e.schema) : previous && previous.schema ? form.schema(previous.schema) : null;
-      if (previous && !['scheduled', 'cancelled'].includes(previous.status) && JSON.stringify(schema) !== JSON.stringify(previous.schema ? form.schema(previous.schema) : null)) reject('INVALID_FORM', '已发布周期的表单保持不变，请在新周期使用修改后的模板。');
+      const published = previous && !['scheduled', 'cancelled'].includes(previous.status);
+      const schemaChanged = !!previous && JSON.stringify(schema) !== JSON.stringify(previous.schema ? form.schema(previous.schema) : null);
+      const revise = !!(published && schemaChanged && (activity || previous.hasActivity));
+      if (revise && e.status !== 'open') reject('INVALID_INPUT', '发布修订版时，请将周期状态设为开放中。');
+      if (revise && e.confirmRevision !== true) reject('REVISION_REQUIRED', '已有成员填写或上传文件。发布修订版后，旧版停止填写，原草稿、提交和文件保留；成员需按新版重新填写提交。');
+      if (revise && (previous.edition || 1) >= 100) reject('VERSION_LIMIT', '本期修订已达100版。');
+      const changes = [];
+      if (previous) {
+        for (const [key, label] of [['title', '周报名称'], ['startDate', '开始日期'], ['endDate', '结束日期'], ['deadlineMs', '截止时间'], ['allowLateSubmit', '逾期补交规则'], ['allowLateEdit', '逾期修改规则'], ['status', '周期状态']]) {
+          const value = key === 'deadlineMs' ? deadlineMs : e[key]; if (previous[key] !== value) changes.push(label);
+        }
+        const rosterValue = rows => rows.map(r => [r.id, r.exempt]).sort((a, b) => a[0].localeCompare(b[0]));
+        if (JSON.stringify(rosterValue(previous.roster)) !== JSON.stringify(rosterValue(selected))) changes.push('应交成员及免交规则');
+        if (schemaChanged) changes.push('表单内容及填写规则');
+      }
       const p = { _id: e.id, teamId: TEAM, title, startDate: e.startDate, endDate: e.endDate, deadlineMs, status: e.status,
         schema, templateName: typeof e.templateName === 'string' ? e.templateName.slice(0, 60) : previous && previous.templateName || '',
         allowLateSubmit: e.allowLateSubmit, allowLateEdit: e.allowLateEdit, roster: selected,
         publishAtMs, publishError: '', publishedMs: ['scheduled', 'cancelled'].includes(e.status) ? 0 : previous && previous.publishedMs || clock(),
+        edition: previous && previous.edition || 1, rootPeriodId: previous && previous.rootPeriodId || e.id, previousPeriodId: previous && previous.previousPeriodId || '',
+        hasActivity: !!(activity || previous && previous.hasActivity), schemaRevision: (previous && previous.schemaRevision || 1) + (schemaChanged ? 1 : 0),
         revision: e.revision + 1, createdMs: previous ? previous.createdMs : clock(), updatedMs: clock(), updatedBy: id };
+      if (revise) {
+        p._id = hash('wp_', e.id + ':edition:' + e.revision); p.previousPeriodId = e.id; p.edition++; p.revision = 1; p.schemaRevision = 1; p.hasActivity = false; p.createdMs = clock(); p.publishedMs = clock();
+        await tx.collection('weeklyPeriods').doc(e.id).update({ data: { status: previous.status === 'archived' ? 'archived' : 'closed', supersededBy: p._id, revision: e.revision + 1, updatedMs: clock(), updatedBy: id } });
+        result = { ok: true, id: p._id, revised: true, edition: p.edition, previousId: e.id };
+      }
       const newRecipients = selected.filter(r => !r.exempt && !(previous && !['scheduled', 'cancelled'].includes(previous.status) && previous.roster.some(old => old.id === r.id && !old.exempt))).map(r => r.id);
-      if (e.status === 'open') await notice(tx, p, newRecipients, 'publish:' + p.revision, '周报待提交');
+      if (published && changes.length) {
+        const recipients = [...new Set([...previous.roster, ...selected].map(r => r.id))].filter(id => names.has(id));
+        await notice(tx, p, recipients, 'change:' + p.revision, revise ? '周报已发布修订版' : '周报设置已更新', p.title + '\n变更：' + changes.join('、') + (revise ? '\n请按新版重新填写提交，原内容可在上一版查看。' : ''));
+      } else if (e.status === 'open') await notice(tx, p, newRecipients, 'publish:' + p.revision, '周报待提交');
       const { _id, ...data } = p;
-      await tx.collection('weeklyPeriods').doc(e.id).set({ data });
-      await audit(tx, id, previous ? 'period.update' : e.status === 'scheduled' ? 'period.schedule' : 'period.publish', e.id, { before: previous || null, after: p });
+      await tx.collection('weeklyPeriods').doc(p._id).set({ data });
+      await audit(tx, id, revise ? 'period.revise' : previous ? 'period.update' : e.status === 'scheduled' ? 'period.schedule' : 'period.publish', e.id, { before: previous || null, after: p, changes });
       await sync.bump(tx, ['home', 'weekly']);
     });
-    return { ok: true, id: e.id };
+    return result;
   }
   async function prepare(id, e) {
     await authorize(id, 'weekly.submit.own');
@@ -222,9 +259,11 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       await authorize(id, 'weekly.submit.own', tx);
       const p = await period(tx, e.periodId), r = await read(tx, 'weeklyReports', reportId(p._id, id));
       editable(p, id, r);
+      checkForm(p, e.formKey);
       const field = p.schema && form.fields(p.schema).find(f => f.id === e.fieldId);
       if (p.schema && (!field || field.type !== (image ? 'text' : 'attachment')) || image && !p.schema) reject('INVALID_FORM', '请选择有效的表单字段。');
       if (field && field.type === 'attachment' && e.size > field.maxSizeMB * 1024 * 1024) reject('FILE_LIMIT', '文件超过该字段的大小限制。');
+      if (!p.hasActivity) await tx.collection('weeklyPeriods').doc(p._id).update({ data: { hasActivity: true } });
       await tx.collection('weeklyFiles').doc(fid).set({ data: { teamId: TEAM, ownerId: id, periodId: p._id, name: e.name.trim(), size: e.size, ext,
         fieldId: field ? field.id : '', kind: image ? 'image' : 'attachment',
         path, status: 'uploading', createdMs: clock() } });
@@ -269,6 +308,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       if (submit && validId(e.requestId, 'ws') && r && r.lastSubmitRequest === e.requestId) return;
       if (!submit && validId(e.requestId, 'wd') && r && r.lastDraftRequest === e.requestId) return;
       editable(p, id, r);
+      checkForm(p, e.formKey);
       if ((r ? r.revision : 0) !== e.revision) reject('CONFLICT', '周报已在其他位置更新，请重新打开。');
       if (submit && !validId(e.requestId, 'ws')) reject('INVALID_INPUT', '提交参数不正确。');
       if (!submit && !validId(e.requestId, 'wd')) reject('INVALID_INPUT', '自动保存参数不正确。');
@@ -304,6 +344,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
         await audit(tx, id, 'report.submit', rid, { version, fileIds });
       }
       await tx.collection('weeklyReports').doc(rid).set({ data });
+      if (!p.hasActivity) await tx.collection('weeklyPeriods').doc(p._id).update({ data: { hasActivity: true } });
       await sync.bump(tx, ['home', 'weekly']);
     });
     return get(id, { periodId: e.periodId });

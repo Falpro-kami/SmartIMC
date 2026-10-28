@@ -36,8 +36,8 @@ const statusLabel = status => ({ unsubmitted: '未提交', draft: '草稿', subm
 const fileView = f => ({ ...f, sizeLabel: f.size < 1024 * 1024 ? Math.ceil(f.size / 1024) + ' KB' : (f.size / 1024 / 1024).toFixed(1) + ' MB' });
 const periodView = p => ({ ...p, deadlineLabel: dateLabel(p.deadlineMs), publishLabel: dateLabel(p.publishAtMs), statusLabel: p.status === 'scheduled' ? '待发布' : p.status === 'cancelled' ? '已取消' : statusLabel(p.ownStatus),
   periodLabel: { scheduled: '待发布', cancelled: '已取消发布', open: '开放中', closed: '已关闭', archived: '已归档' }[p.status] || '-' });
-async function upload(file, periodId, fieldId = '', kind = 'attachment') {
-  const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size, fieldId, kind });
+async function upload(file, periodId, fieldId = '', kind = 'attachment', formKey) {
+  const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size, fieldId, kind, ...(formKey ? { formKey } : {}) });
   const uploaded = await wx.cloud.uploadFile({ cloudPath: prepared.cloudPath, filePath: file.path });
   const result = await call('finishUpload', { fileId: prepared.id, fileID: uploaded.fileID });
   return fileView(result.file);

@@ -1,5 +1,5 @@
 <view class="weekly imc-theme">
-  <weekly-template id="template-panel" wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" edit-id="{{initialTemplate}}" bindedit="editTemplate" bindpreview="previewTemplate" binddone="closeTemplates" bindclose="closeTemplates" bindselect="selectTemplate" />
+  <weekly-template id="template-panel" wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" edit-id="{{initialTemplate}}" local-template="{{periodTemplate}}" bindedit="editTemplate" bindpreview="previewTemplate" binddone="closeTemplates" bindclose="closeTemplates" bindselect="selectTemplate" />
   <block wx:elif="{{mode === 'preview'}}"><view class="toolbar"><text class="section-title">周报预览</text><button class="text-button" bindtap="closeTemplates">返回</button></view><view wx:if="{{preview}}"><view class="filters"><button class="{{previewMode === 'outline' ? 'active' : ''}}" data-mode="outline" bindtap="previewMode">模板结构</button><button class="{{previewMode === 'reading' ? 'active' : ''}}" data-mode="reading" bindtap="previewMode">阅读效果</button></view><view class="card"><text class="section-title">{{preview.name || '周报'}}</text></view><weekly-fields schema="{{preview.schema}}" readonly outline="{{previewMode === 'outline'}}" /></view><view wx:else class="error">{{error}}</view></block>
   <block wx:else>
   <view class="toolbar">
@@ -14,6 +14,7 @@
     <button wx:for="{{periods}}" wx:key="id" class="card period-row" data-id="{{item.id}}" bindtap="choosePeriod">
       <view class="heading"><text class="row-title">{{item.title}}</text><text wx:if="{{!isLeader}}" class="badge {{item.ownStatus === 'submitted' ? 'success' : ''}}">{{item.statusLabel}}</text></view>
       <text class="meta">{{item.startDate}} 至 {{item.endDate}}</text>
+      <text wx:if="{{item.edition > 1 || item.supersededBy}}" class="meta">第{{item.edition || 1}}版{{item.supersededBy ? ' · 已修订' : ''}}</text>
       <view class="heading"><text class="meta">截止 {{item.deadlineLabel}}</text><text class="meta">{{item.periodLabel}} ›</text></view>
     </button>
     <button wx:if="{{hasMore}}" class="secondary wide" bindtap="loadMore">加载更多</button>
@@ -32,11 +33,13 @@
       <view wx:if="{{report && report.hasChanges && own && !isLeader}}" class="meta change-status">有待重新提交的修改</view>
       <view class="actions {{isLeader ? 'center-actions' : ''}}" wx:if="{{canReadTeam || canManage}}">
         <button wx:if="{{canReadTeam}}" class="secondary" bindtap="openTeam" disabled="{{busy}}">查看团队提交</button>
-        <button wx:if="{{canManage && !isLeader}}" class="secondary" bindtap="editCurrentPeriod" disabled="{{busy}}">周期设置</button>
+        <button wx:if="{{canManage && !selected.supersededBy}}" class="secondary" bindtap="editCurrentPeriod" disabled="{{busy}}">周期设置</button>
       </view>
+      <text wx:if="{{selected.edition > 1 || selected.supersededBy}}" class="meta">第{{selected.edition || 1}}版{{selected.supersededBy ? ' · 已修订' : ''}}</text>
+      <view wx:if="{{selected.previousPeriodId || selected.supersededBy}}" class="actions"><button wx:if="{{selected.previousPeriodId}}" class="secondary" data-id="{{selected.previousPeriodId}}" bindtap="openEdition">查看上一版</button><button wx:if="{{selected.supersededBy}}" class="secondary" data-id="{{selected.supersededBy}}" bindtap="openEdition">查看新版</button></view>
     </view>
     <block wx:if="{{selected.schema && (!isLeader || !own)}}">
-      <weekly-fields schema="{{selected.schema}}" answers="{{answers}}" selected-fields="{{selectedFields}}" files="{{files}}" image-urls="{{imageURLs}}" period-id="{{selected.id}}" readonly="{{!own || !selected.canEdit}}" disabled="{{busy}}" bindchange="answersChange" binduploading="formUpload" bindfile="fieldFile" />
+      <weekly-fields schema="{{selected.schema}}" answers="{{answers}}" selected-fields="{{selectedFields}}" files="{{files}}" image-urls="{{imageURLs}}" period-id="{{selected.id}}" form-key="{{selected.formKey}}" readonly="{{!own || !selected.canEdit}}" disabled="{{busy}}" bindchange="answersChange" binduploading="formUpload" bindfile="fieldFile" />
       <text wx:if="{{saveState}}" class="meta">{{saveState}}</text>
       <button wx:if="{{saveState === '自动保存失败'}}" class="secondary wide" bindtap="retrySave" disabled="{{busy || formUploading}}">重试自动保存</button>
       <button wx:if="{{own && selected.canEdit}}" class="primary wide" bindtap="submit" loading="{{busy}}" disabled="{{busy || formUploading || (report && report.status === 'submitted' && !report.hasChanges && saveState !== '正在自动保存…')}}">{{report && report.status === 'submitted' ? '重新提交' : '提交周报'}}</button>
@@ -81,7 +84,8 @@
   <block wx:elif="{{mode === 'form' && form}}">
     <view class="card">
       <text class="section-title">周期设置</text>
-      <view class="field"><text>表单模板</text><button wx:if="{{!form.revision || form.canSchedule}}" class="text-button" bindtap="manageTemplates" disabled="{{busy}}">{{form.templateName || '选择模板'}} ›</button><text wx:else>{{form.templateName || '文件上传'}}</text></view>
+      <view class="field"><text>表单模板</text><button class="text-button" bindtap="manageTemplates" disabled="{{busy}}">{{form.templateName || '选择模板'}} ›</button></view>
+      <button class="secondary" bindtap="editPeriodForm" disabled="{{busy}}">编辑本期表单</button>
       <text class="label">周报名称</text><input class="input" value="{{form.title}}" data-field="title" bindinput="formInput" maxlength="60" disabled="{{busy}}" />
       <view wx:if="{{form.canSchedule}}" class="field"><text>定时发布</text><switch checked="{{form.scheduled}}" bindchange="scheduleInput" color="#005bac" disabled="{{busy}}" /></view>
       <block wx:if="{{form.scheduled}}"><text class="label">发布时间（北京时间）</text><view class="date-time"><picker mode="date" value="{{form.publishDate}}" data-field="publishDate" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.publishDate}} ›</view></picker><picker mode="time" value="{{form.publishTime}}" data-field="publishTime" bindchange="formInput" disabled="{{busy}}"><view class="picker-value">{{form.publishTime}} ›</view></picker></view></block>

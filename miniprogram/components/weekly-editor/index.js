@@ -36,7 +36,7 @@ function hexColor(value) {
 }
 Component({
   properties: { value: { type: Object, value: null }, imageUrls: { type: Object, value: {} }, readonly: Boolean, disabled: Boolean,
-    periodId: String, fieldId: String, maxLength: { type: Number, value: 5000 } },
+    periodId: String, fieldId: String, formKey: String, maxLength: { type: Number, value: 5000 } },
   data: { formats: {}, error: '', uploading: false, panel: '', tip: '', tools, extras, colors,
     textColor: '#000000', highlightColor: '#f1c232',
     headings: [{ icon: 'font', label: '正文', value: 0 }, ...[1, 2, 3].map(value => ({ icon: 'h' + value, label: value + '级标题', value }))],
@@ -148,7 +148,7 @@ Component({
         const chosen = await wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['compressed'] });
         const file = chosen.tempFiles[0], info = await wx.getImageInfo({ src: file.tempFilePath });
         if (!['jpg', 'jpeg', 'png'].includes(info.type) || file.size > 5 * 1024 * 1024) throw new Error('请选择5MB以内的 JPG 或 PNG 图片。');
-        const uploaded = await weekly.upload({ path: file.tempFilePath, size: file.size, name: 'image-' + Date.now() + '.' + info.type }, this.properties.periodId, this.properties.fieldId, 'image');
+        const uploaded = await weekly.upload({ path: file.tempFilePath, size: file.size, name: 'image-' + Date.now() + '.' + info.type }, this.properties.periodId, this.properties.fieldId, 'image', this.properties.formKey);
         const link = await weekly.call('imageURL', { fileId: uploaded.id });
         if (this._detached) return;
         this._localURLs = { ...this._localURLs, [uploaded.id]: link.url };
