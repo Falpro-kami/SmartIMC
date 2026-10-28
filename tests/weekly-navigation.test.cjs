@@ -52,7 +52,7 @@ function harness(origin = 'pages/workbench/index') {
   const cache = moduleAt('miniprogram/services/session-cache.js', {});
   const weekly = moduleAt('miniprogram/services/weekly.js', { './session-cache': cache, './access': { notifications: async () => false }, '../config/cloud': { weeklyFunction: 'weeklyReport' } }, { wx, getApp: () => ({ globalData: { cloudReady: true } }) });
   vm.runInNewContext(fs.readFileSync('miniprogram/pages/module/index.js', 'utf8'), { Page: value => { pageDefinition = value; }, require: name => name === '../../utils/member-page' ? x => x : {}, wx });
-  vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: value => { panelDefinition = value; }, require: () => weekly, wx, getCurrentPages: () => stack });
+  vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: value => { panelDefinition = value; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : weekly, wx, getCurrentPages: () => stack, setTimeout, clearTimeout });
   return { stack, reads, nav, push, wx, cache, top: () => stack.at(-1), confirm: value => { confirm = value; }, fail: value => { failNavigation = value; },
     hold: action => { heldAction = action; }, release: () => { heldAction = ''; releaseRead(); }, background: () => hide(stack.at(-1)), foreground: () => show(stack.at(-1)) };
 }

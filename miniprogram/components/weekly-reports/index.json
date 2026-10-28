@@ -1,1 +1,1 @@
-{ "component": true }
+{ "component": true, "usingComponents": { "weekly-template": "../weekly-template/index", "weekly-fields": "../weekly-fields/index" } }

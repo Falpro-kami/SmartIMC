@@ -1,6 +1,6 @@
 const config = require('../config/cloud');
 const cache = require('./session-cache');
-const READS = ['list', 'get', 'roster', 'configuration', 'team'];
+const READS = ['list', 'get', 'roster', 'configuration', 'team', 'templates'];
 const cacheKey = (action, data) => 'weekly:' + action + ':' + JSON.stringify(data);
 async function request(action, data = {}) {
   if (!getApp().globalData.cloudReady) throw new Error('云开发尚未准备好，请重新打开小程序。');
@@ -13,8 +13,8 @@ async function request(action, data = {}) {
     error.code = result && result.code;
     throw error;
   }
-  if (['savePeriod', 'saveDraft', 'submit'].includes(action)) { cache.invalidate('weekly:'); cache.invalidate('home:'); }
-  if (['savePeriod', 'saveDraft', 'submit', 'remind'].includes(action) && cache.publish) {
+  if (['savePeriod', 'saveDraft', 'submit', 'saveTemplate'].includes(action)) { cache.invalidate('weekly:'); cache.invalidate('home:'); }
+  if (['savePeriod', 'saveDraft', 'submit', 'remind', 'saveTemplate'].includes(action) && cache.publish) {
     cache.publish(['home', 'weekly', ...(['savePeriod', 'remind'].includes(action) ? ['messages'] : [])]);
   }
   if (['savePeriod', 'remind'].includes(action)) {
@@ -36,8 +36,8 @@ const statusLabel = status => ({ unsubmitted: '未提交', draft: '草稿', subm
 const fileView = f => ({ ...f, sizeLabel: f.size < 1024 * 1024 ? Math.ceil(f.size / 1024) + ' KB' : (f.size / 1024 / 1024).toFixed(1) + ' MB' });
 const periodView = p => ({ ...p, deadlineLabel: dateLabel(p.deadlineMs), publishLabel: dateLabel(p.publishAtMs), statusLabel: p.status === 'scheduled' ? '待发布' : p.status === 'cancelled' ? '已取消' : statusLabel(p.ownStatus),
   periodLabel: { scheduled: '待发布', cancelled: '已取消发布', open: '开放中', closed: '已关闭', archived: '已归档' }[p.status] || '-' });
-async function upload(file, periodId) {
-  const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size });
+async function upload(file, periodId, fieldId = '', kind = 'attachment') {
+  const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size, fieldId, kind });
   const uploaded = await wx.cloud.uploadFile({ cloudPath: prepared.cloudPath, filePath: file.path });
   const result = await call('finishUpload', { fileId: prepared.id, fileID: uploaded.fileID });
   return fileView(result.file);

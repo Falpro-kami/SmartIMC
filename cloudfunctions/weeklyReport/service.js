@@ -1,5 +1,6 @@
 const { createHash, randomUUID } = require('node:crypto');
 const sync = require('./sync');
+const form = require('./form');
 const TEAM = 'IMC';
 const PREFIX = 'cloud://well-leopon-d5glrufc6e4fd4413.7765-well-leopon-d5glrufc6e4fd4413-1516940081/';
 const FILE_LIMIT = 5 * 1024 * 1024, TOTAL_LIMIT = 10 * 1024 * 1024, COUNT_LIMIT = 5;
@@ -59,6 +60,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   }
   const fileView = f => ({ id: f.id || f._id, name: f.name, size: f.size, ext: f.ext });
   const reportView = r => r ? { id: r._id, status: r.status, revision: r.revision, files: (r.draftFiles || r.files || []).map(fileView),
+    answers: r.draftAnswers || r.answers || {},
     submittedFiles: (r.files || []).map(fileView), hasChanges: r.hasChanges === true, version: r.version || 0,
     submittedMs: r.submittedMs || 0, firstSubmittedMs: r.firstSubmittedMs || 0, updatedMs: r.updatedMs, late: r.late === true } : null;
   function periodView(p, id, report) {
@@ -68,6 +70,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     return { id: p._id, title: p.title, startDate: p.startDate, endDate: p.endDate, deadlineMs: p.deadlineMs,
       status: p.status, revision: p.revision, allowLateSubmit: p.allowLateSubmit, allowLateEdit: p.allowLateEdit,
       publishAtMs: p.publishAtMs || 0, publishError: p.publishError || '',
+      schema: p.schema || null, templateName: p.templateName || '',
       required: !!person && !person.exempt, exemption: person && person.exempt || '', canEdit,
       ownStatus: person && person.exempt ? 'exempt' : !person ? 'outside' : report ? report.status : 'unsubmitted' };
   }
@@ -93,11 +96,53 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     const r = await read(db, 'weeklyReports', reportId(p._id, ownerId));
     if (ownerId !== id && (!r || r.status !== 'submitted')) reject('NOT_FOUND', '该成员尚未提交周报。');
     const versions = (await db.collection('weeklyVersions').where({ teamId: TEAM, reportId: reportId(p._id, ownerId) }).orderBy('version', 'desc').limit(100).get()).data;
-    const actor = await authorize(id, ownerId === id ? 'weekly.read.own' : 'weekly.read.team');
     // Team readers can see submitted snapshots only, including when an owner has further draft changes.
-    const visible = r && ownerId !== id ? { ...r, draftFiles: r.files, hasChanges: false } : r;
+    const visible = r && ownerId !== id ? { ...r, draftFiles: r.files, draftAnswers: r.answers || {}, hasChanges: false } : r;
+    const imageURLs = await imageLinks(visible && (visible.draftFiles || visible.files) || []);
+    const actor = await authorize(id, ownerId === id ? 'weekly.read.own' : 'weekly.read.team');
     return { ok: true, period: periodView(p, id, r), report: reportView(visible), own: ownerId === id, ...rights(actor),
-      ownerName: (target(p, ownerId) || {}).name || '-', versions: versions.map(v => ({ id: v._id, version: v.version, submittedMs: v.submittedMs, late: v.late, files: v.files.map(fileView) })) };
+      imageURLs, ownerName: (target(p, ownerId) || {}).name || '-', versions: versions.map(v => ({ id: v._id, version: v.version, submittedMs: v.submittedMs, late: v.late, files: p.schema ? [] : v.files.map(fileView) })) };
+  }
+  async function imageLinks(files) {
+    const imageFiles = files.filter(f => ['png', 'jpg', 'jpeg'].includes(f.ext)), imageURLs = {};
+    if (imageFiles.length) {
+      const unique = [...new Map(imageFiles.map(f => [f.id, f])).values()];
+      const links = await cloud.getTempFileURL({ fileList: unique.map(f => f.fileID) });
+      for (const f of unique) { const link = (links.fileList || []).find(l => l.fileID === f.fileID && l.status === 0 && /^https:\/\//.test(l.tempFileURL)); if (link) imageURLs[f.id] = link.tempFileURL; }
+    }
+    return imageURLs;
+  }
+  async function getVersion(id, e) {
+    if (!validId(e.versionId, 'wv')) reject('INVALID_INPUT', '提交记录参数不正确。');
+    const v = await read(db, 'weeklyVersions', e.versionId);
+    if (!v || v.teamId !== TEAM) reject('NOT_FOUND', '提交记录不存在。');
+    const permission = v.ownerId === id ? 'weekly.read.own' : 'weekly.read.team';
+    await authorize(id, permission);
+    const p = await period(db, v.periodId);
+    const imageURLs = await imageLinks(v.files);
+    await authorize(id, permission);
+    return { ok: true, version: { id: v._id, answers: v.answers || {}, files: v.files.map(fileView) }, imageURLs, schema: p.schema || null };
+  }
+  async function templates(id) {
+    await authorize(id, 'weekly.manage');
+    const rows = await all('weeklyTemplates', { teamId: TEAM });
+    await authorize(id, 'weekly.manage');
+    return { ok: true, templates: rows.map(t => ({ id: t._id, name: t.name, revision: t.revision, schema: t.schema })) };
+  }
+  async function saveTemplate(id, e) {
+    await authorize(id, 'weekly.manage');
+    if (!validId(e.id, 'wt') || !Number.isSafeInteger(e.revision) || e.revision < 0 || typeof e.name !== 'string' || !e.name.trim() || e.name.length > 60 || /[\u0000-\u001f]/.test(e.name)) reject('INVALID_INPUT', '请填写模板名称。');
+    const schema = form.schema(e.schema);
+    await db.runTransaction(async tx => {
+      await authorize(id, 'weekly.manage', tx);
+      const previous = await read(tx, 'weeklyTemplates', e.id);
+      if (previous && previous.teamId !== TEAM) reject('FORBIDDEN', '无法编辑该模板。');
+      if ((previous ? previous.revision : 0) !== e.revision) reject('CONFLICT', '模板已更新，请重新打开。');
+      await tx.collection('weeklyTemplates').doc(e.id).set({ data: { teamId: TEAM, name: e.name.trim(), schema, revision: e.revision + 1, updatedMs: clock(), updatedBy: id } });
+      await audit(tx, id, 'template.save', e.id, { revision: e.revision + 1 });
+      await sync.bump(tx, ['weekly']);
+    });
+    return { ok: true, template: { id: e.id, name: e.name.trim(), schema, revision: e.revision + 1 } };
   }
   async function roster(id) {
     await authorize(id, 'weekly.manage');
@@ -150,7 +195,10 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
         if (!names.has(r.id) && !oldNames.has(r.id)) reject('INVALID_INPUT', '应交成员已变更，请重新选择。');
         return { id: r.id, name: names.get(r.id) || oldNames.get(r.id), exempt: r.exempt.trim() };
       });
+      const schema = e.schema ? form.schema(e.schema) : previous && previous.schema || null;
+      if (previous && !['scheduled', 'cancelled'].includes(previous.status) && JSON.stringify(schema) !== JSON.stringify(previous.schema || null)) reject('INVALID_FORM', '已发布周期的表单保持不变，请在新周期使用修改后的模板。');
       const p = { _id: e.id, teamId: TEAM, title, startDate: e.startDate, endDate: e.endDate, deadlineMs, status: e.status,
+        schema, templateName: typeof e.templateName === 'string' ? e.templateName.slice(0, 60) : previous && previous.templateName || '',
         allowLateSubmit: e.allowLateSubmit, allowLateEdit: e.allowLateEdit, roster: selected,
         publishAtMs, publishError: '', publishedMs: ['scheduled', 'cancelled'].includes(e.status) ? 0 : previous && previous.publishedMs || clock(),
         revision: e.revision + 1, createdMs: previous ? previous.createdMs : clock(), updatedMs: clock(), updatedBy: id };
@@ -166,14 +214,19 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   async function prepare(id, e) {
     await authorize(id, 'weekly.submit.own');
     const ext = typeof e.name === 'string' ? e.name.split('.').pop().toLowerCase() : '';
-    if (typeof e.name !== 'string' || !e.name.trim() || e.name.length > 160 || /[\\/\u0000-\u001f]/.test(e.name) || !EXTENSIONS.includes(ext) ||
+    const image = e.kind === 'image';
+    if (typeof e.name !== 'string' || !e.name.trim() || e.name.length > 160 || /[\\/\u0000-\u001f]/.test(e.name) || !(image ? ['png', 'jpg', 'jpeg'] : EXTENSIONS).includes(ext) ||
       !Number.isSafeInteger(e.size) || e.size < 1 || e.size > FILE_LIMIT) reject('INVALID_FILE', '支持 Word、PDF 文档，单个文件不超过5MB。');
     const fid = hash('wf_', randomUUID()), path = 'weekly/' + id + '/' + e.periodId + '/' + fid + '.' + ext;
     await db.runTransaction(async tx => {
       await authorize(id, 'weekly.submit.own', tx);
       const p = await period(tx, e.periodId), r = await read(tx, 'weeklyReports', reportId(p._id, id));
       editable(p, id, r);
+      const field = p.schema && p.schema.sections.flatMap(s => s.fields).find(f => f.id === e.fieldId);
+      if (p.schema && (!field || field.type !== (image ? 'text' : 'attachment')) || image && !p.schema) reject('INVALID_FORM', '请选择有效的表单字段。');
+      if (field && field.type === 'attachment' && e.size > field.maxSizeMB * 1024 * 1024) reject('FILE_LIMIT', '文件超过该字段的大小限制。');
       await tx.collection('weeklyFiles').doc(fid).set({ data: { teamId: TEAM, ownerId: id, periodId: p._id, name: e.name.trim(), size: e.size, ext,
+        fieldId: field ? field.id : '', kind: image ? 'image' : 'attachment',
         path, status: 'uploading', createdMs: clock() } });
     });
     return { ok: true, id: fid, cloudPath: path };
@@ -208,8 +261,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   }
   async function saveDraft(id, e, submit = false) {
     await authorize(id, 'weekly.submit.own');
-    if (!Number.isSafeInteger(e.revision) || e.revision < 0 || !Array.isArray(e.fileIds) || e.fileIds.length > COUNT_LIMIT ||
-      e.fileIds.some(f => !validId(f, 'wf')) || new Set(e.fileIds).size !== e.fileIds.length || (submit && !e.fileIds.length)) reject('INVALID_INPUT', submit ? '请上传周报文件后提交。' : '最多上传5个文件。');
+    if (!Number.isSafeInteger(e.revision) || e.revision < 0) reject('INVALID_INPUT', '周报版本不正确。');
     await db.runTransaction(async tx => {
       await authorize(id, 'weekly.submit.own', tx);
       const p = await period(tx, e.periodId), rid = reportId(p._id, id), r = await read(tx, 'weeklyReports', rid);
@@ -220,10 +272,17 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       if ((r ? r.revision : 0) !== e.revision) reject('CONFLICT', '周报已在其他位置更新，请重新打开。');
       if (submit && !validId(e.requestId, 'ws')) reject('INVALID_INPUT', '提交参数不正确。');
       if (!submit && !validId(e.requestId, 'wd')) reject('INVALID_INPUT', '自动保存参数不正确。');
+      const content = p.schema ? form.answers(p.schema, e.answers || {}, submit) : null;
+      const fileIds = content ? content.fileIds : e.fileIds;
+      if (!Array.isArray(fileIds) || fileIds.length > (content ? 50 : COUNT_LIMIT) || fileIds.some(f => !validId(f, 'wf')) || new Set(fileIds).size !== fileIds.length || (!content && submit && !fileIds.length)) reject('INVALID_INPUT', submit ? '请上传周报文件后提交。' : '最多上传5个文件。');
       const files = [];
-      for (const fileId of e.fileIds) {
+      for (const fileId of fileIds) {
         const f = await read(tx, 'weeklyFiles', fileId);
         if (!f || f.teamId !== TEAM || f.ownerId !== id || f.periodId !== p._id || f.status !== 'ready') reject('FORBIDDEN', '附件尚未完成上传或不属于本次周报。');
+        if (content) {
+          const field = p.schema.sections.flatMap(s => s.fields).find(field => field.type === 'text' ? content.imageFields[fileId] === field.id : field.type === 'attachment' && (content.values[field.id] || []).includes(fileId));
+          if (!field || f.fieldId !== field.id || (field.type === 'text' ? !['png', 'jpg', 'jpeg'].includes(f.ext) : !EXTENSIONS.includes(f.ext) || f.size > field.maxSizeMB * 1024 * 1024)) reject('FORBIDDEN', '附件不属于该字段或超过字段限制。');
+        }
         files.push({ id: fileId, name: f.name, ext: f.ext, size: f.size, fileID: f.fileID, sha256: f.sha256 });
       }
       if (files.reduce((n, f) => n + f.size, 0) > TOTAL_LIMIT) reject('FILE_LIMIT', '每份周报附件合计不超过10MB。');
@@ -231,14 +290,15 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       if (submit && version > 100) reject('VERSION_LIMIT', '本周期提交次数已达100次。');
       const data = { teamId: TEAM, periodId: p._id, ownerId: id, status: submit ? 'submitted' : r && r.status || 'draft',
         revision: e.revision + 1, version, draftFiles: files, files: submit ? files : r && r.files || [],
-        hasChanges: !submit && !!(r && r.status === 'submitted') && JSON.stringify(files.map(f => f.id)) !== JSON.stringify(r.files.map(f => f.id)),
+        draftAnswers: content ? content.values : {}, answers: submit && content ? content.values : r && r.answers || {},
+        hasChanges: !submit && !!(r && r.status === 'submitted') && (JSON.stringify(files.map(f => f.id)) !== JSON.stringify(r.files.map(f => f.id)) || content && JSON.stringify(content.values) !== JSON.stringify(r.answers || {})),
         submittedMs: submit ? now : r && r.submittedMs || 0, firstSubmittedMs: r && r.firstSubmittedMs || (submit ? now : 0),
         late: submit ? now > p.deadlineMs : r && r.late || false, createdMs: r ? r.createdMs : now, updatedMs: now,
         lastSubmitRequest: submit ? e.requestId : r && r.lastSubmitRequest || '', lastDraftRequest: submit ? r && r.lastDraftRequest || '' : e.requestId };
       if (submit) {
         await tx.collection('weeklyVersions').doc(hash('wv_', rid + ':' + version)).set({ data: { teamId: TEAM, reportId: rid, periodId: p._id,
-          ownerId: id, version, files, submittedMs: now, late: data.late } });
-        await audit(tx, id, 'report.submit', rid, { version, fileIds: e.fileIds });
+          ownerId: id, version, files, answers: content ? content.values : {}, submittedMs: now, late: data.late } });
+        await audit(tx, id, 'report.submit', rid, { version, fileIds });
       }
       await tx.collection('weeklyReports').doc(rid).set({ data });
       await sync.bump(tx, ['home', 'weekly']);
@@ -299,6 +359,18 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     if (!value) reject('DOWNLOAD_FAILED', '附件暂时无法下载。');
     return { ok: true, url: value.tempFileURL, file: fileView(f) };
   }
+  async function imageURL(id, e) {
+    await authorize(id, 'weekly.submit.own');
+    if (!validId(e.fileId, 'wf')) reject('INVALID_INPUT', '图片参数不正确。');
+    const f = await read(db, 'weeklyFiles', e.fileId);
+    if (!f || f.teamId !== TEAM || f.ownerId !== id || f.status !== 'ready' || f.kind !== 'image') reject('FORBIDDEN', '无法访问这张图片。');
+    const p = await period(db, f.periodId); editable(p, id, await read(db, 'weeklyReports', reportId(p._id, id)));
+    const result = await cloud.getTempFileURL({ fileList: [f.fileID] });
+    const link = (result.fileList || []).find(f => f.status === 0 && /^https:\/\//.test(f.tempFileURL));
+    await authorize(id, 'weekly.submit.own');
+    if (!link) reject('DOWNLOAD_FAILED', '图片暂时无法加载。');
+    return { ok: true, url: link.tempFileURL };
+  }
   async function downloadChunk(id, e) {
     const { f, permission } = await authorizedFile(id, e);
     if (!Number.isSafeInteger(e.offset) || e.offset < 0 || e.offset >= f.size) reject('INVALID_INPUT', '文件分页参数不正确。');
@@ -316,7 +388,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     return { ok: true, name: '周报提交统计-' + result.period.startDate + '.csv', csv: '\uFEFF' + lines.map(row => row.map(csvCell).join(',')).join('\r\n') };
   }
   const actions = { list, get, roster, configuration, savePeriod, prepareUpload: prepare, finishUpload: finish, saveDraft,
-    submit: (id, e) => saveDraft(id, e, true), team, remind, download, downloadChunk, exportStats };
+    submit: (id, e) => saveDraft(id, e, true), team, remind, download, downloadChunk, exportStats, templates, saveTemplate, imageURL, getVersion };
   return { dispatch: async (id, e) => {
     if (!Object.prototype.hasOwnProperty.call(actions, e.action)) reject('INVALID_ACTION', '不支持的周报操作。');
     await authorize(id);

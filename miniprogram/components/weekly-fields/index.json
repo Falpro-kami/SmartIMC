@@ -1,0 +1,1 @@
+{ "component": true, "usingComponents": { "weekly-editor": "../weekly-editor/index" } }

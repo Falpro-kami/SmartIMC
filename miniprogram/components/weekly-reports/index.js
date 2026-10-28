@@ -1,16 +1,17 @@
 const weekly = require('../../services/weekly');
+const formModel = require('../../utils/weekly-form');
 Component({
   properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' } },
   data: { mode: 'list', loading: true, busy: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
     isLeader: false, canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
-    files: [], versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
-  lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
+    files: [], answers: {}, imageURLs: {}, templatesOpen: false, choosingTemplate: false, formUploading: false, versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
+  lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { clearTimeout(this._draftTimer); this.flushForm(); this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
   pageLifetimes: {
-    show() { this.startLive(); if (!this._initializing && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved && this.data.mode !== 'form') {
+    show() { this.startLive(); if (!this._initializing && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved && !this._formDirty && !this._formPending && !this._formSave && this.data.mode !== 'form') {
       const force = this._livePending === true; this._livePending = false;
       if (this._initialized) this.refresh(force, true); else this.initialize(force);
     } },
-    hide() { if (this._initializing) this._initialInterrupted = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; }
+    hide() { clearTimeout(this._draftTimer); this.flushForm(); if (this._initializing) this._initialInterrupted = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; }
   },
   methods: {
     async initialize(force = false) {
@@ -73,7 +74,7 @@ Component({
     },
     stopLive() { this._visible = false; if (this._unsubscribeLive) this._unsubscribeLive(); this._unsubscribeLive = null; },
     async refreshLive() {
-      if (!this._livePending || this._initializing || this._liveLoading || this._detached || !this._unsubscribeLive || this.data.loading || this.data.busy || this._choosing || this._nativeFile || this._unsaved || this.data.mode === 'form') return;
+      if (!this._livePending || this._initializing || this._liveLoading || this._detached || !this._unsubscribeLive || this.data.loading || this.data.busy || this._choosing || this._nativeFile || this._unsaved || this._formDirty || this._formPending || this._formSave || this.data.mode === 'form') return;
       this._livePending = false;
       this._liveLoading = true;
       try { await this.refresh(true, true); }
@@ -130,14 +131,16 @@ Component({
       try {
         const result = await weekly.call('get', query, force);
         if (epoch === this._epoch && !this._detached) {
-          if (quiet && (this.data.busy || this._choosing || this._nativeFile || this._unsaved || this.data.mode !== 'detail')) { this._livePending = true; return; }
+          if (quiet && (this.data.busy || this._choosing || this._nativeFile || this._unsaved || this._formDirty || this._formPending || this._formSave || this.data.mode !== 'detail')) { this._livePending = true; return; }
           this.accept(result);
         }
       } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
     accept(result) {
+      this._draftRevision = result.report ? result.report.revision : 0;
       this.update({ ...this.rights(result), selected: weekly.periodView(result.period), report: result.report, own: result.own, ownerName: result.ownerName,
+        answers: result.report && result.report.answers || {}, imageURLs: result.imageURLs || {},
         files: (result.report ? result.report.files : []).map(weekly.fileView), submittedLabel: weekly.dateLabel(result.report && result.report.submittedMs),
         versions: result.versions.map(v => ({ ...v, dateLabel: weekly.dateLabel(v.submittedMs), files: v.files.map(weekly.fileView) })) });
     },
@@ -175,6 +178,7 @@ Component({
       return this.retrySave();
     },
     async retrySave() {
+      if (this.data.selected && this.data.selected.schema) return this.flushForm();
       if (!this._unsaved || this.data.busy) return;
       this.update({ busy: true, actionError: '', saveState: '正在自动保存…' });
       try {
@@ -186,18 +190,60 @@ Component({
       finally { this.update({ busy: false }); }
     },
     async submit() {
-      if (this.data.busy || this._unsaved || !this.data.own || !this.data.selected.canEdit || !this.data.files.length) return;
+      if (this.data.busy || this._unsaved || this._formUploading || !this.data.own || !this.data.selected.canEdit || (!this.data.selected.schema && !this.data.files.length)) return;
+      clearTimeout(this._draftTimer);
+      if (this.data.selected.schema) { while (this._formSave || this._formPending || this._formDirty) if (!await this.flushForm()) return; }
       this.update({ busy: true, actionError: '' });
       try {
         const revision = this.data.report ? this.data.report.revision : 0;
         if (!this._submitToken || this._submitRevision !== revision) { this._submitToken = weekly.newId('ws'); this._submitRevision = revision; }
-        const result = await weekly.call('submit', { periodId: this.data.selected.id, revision, fileIds: this.data.files.map(f => f.id), requestId: this._submitToken });
+        const result = await weekly.call('submit', { periodId: this.data.selected.id, revision, fileIds: this.data.files.map(f => f.id), ...(this.data.selected.schema ? { answers: this.data.answers } : {}), requestId: this._submitToken });
         this.accept(result);
         this.update({ saveState: '' });
         if (!this._detached) wx.showToast({ title: '周报已提交', icon: 'success' });
       } catch (error) { this.update({ actionError: error.message }); }
       finally { this.update({ busy: false }); }
     },
+    answersChange(e) {
+      if (this.data.busy || !this.data.own || !this.data.selected.canEdit) return;
+      this._formDirty = true; this._formGeneration = (this._formGeneration || 0) + 1;
+      this.update({ answers: e.detail.answers, saveState: '正在自动保存…', actionError: '' });
+      clearTimeout(this._draftTimer);
+      this._draftTimer = setTimeout(() => this.flushForm(), 700);
+    },
+    formUpload(e) { this._uploads = Math.max(0, (this._uploads || 0) + (e.detail.value ? 1 : -1)); this._formUploading = this._uploads > 0; this._choosing = this._formUploading; this.update({ formUploading: this._formUploading }); if (!this._formUploading && this._formDirty) this.flushForm(); },
+    flushForm() {
+      if (this._formSave) return this._formSave;
+      if (!this.data.selected || !this.data.selected.schema || !this.data.own || this._formUploading || this.data.busy || (!this._formDirty && !this._formPending)) return Promise.resolve(true);
+      if (!this._formPending) {
+        this._formPending = { periodId: this.data.selected.id, revision: this._draftRevision || 0, answers: JSON.parse(JSON.stringify(this.data.answers)), requestId: weekly.newId('wd') };
+        this._savingGeneration = this._formGeneration; this._formDirty = false;
+      }
+      this.update({ saveState: '正在自动保存…', actionError: '' });
+      let failed = false;
+      this._formSave = weekly.call('saveDraft', this._formPending).then(result => {
+        this._draftRevision = result.report.revision; this._formPending = null;
+        if (this._savingGeneration === this._formGeneration) { this.accept(result); this.update({ saveState: '已自动保存' }); }
+        else this.update({ report: result.report, saveState: '正在自动保存…' });
+        return true;
+      }).catch(error => { failed = true; if (['INVALID_FORM', 'FILE_LIMIT', 'INVALID_INPUT'].includes(error.code)) { this._formPending = null; this._formDirty = true; } this.update({ saveState: '自动保存失败', actionError: error.message }); return false; })
+        .finally(() => { this._formSave = null; if (this._formDirty && !failed) this.flushForm(); else this.refreshLive(); });
+      return this._formSave;
+    },
+    fieldFile(e) { return this.useFile({ currentTarget: { dataset: e.detail } }); },
+    async toggleVersion(e) {
+      if (this.data.busy) return;
+      const version = this.data.versions.find(v => v.id === e.currentTarget.dataset.id);
+      if (!version) return;
+      if (version.expanded) { this.update({ versions: this.data.versions.map(v => v.id === version.id ? { ...v, expanded: false } : v) }); return; }
+      this.update({ busy: true, actionError: '' });
+      try { const r = await weekly.call('getVersion', { versionId: version.id }); this.update({ versions: this.data.versions.map(v => v.id === version.id ? { ...v, ...r.version, imageURLs: r.imageURLs, expanded: true } : v) }); }
+      catch (e) { this.update({ actionError: e.message }); }
+      finally { this.update({ busy: false }); }
+    },
+    manageTemplates() { if (this.data.canManage && !this.data.busy) { this._choosing = true; this.update({ templatesOpen: true, choosingTemplate: this.data.mode === 'form' }); } },
+    closeTemplates() { this._choosing = false; this.update({ templatesOpen: false }); this.refreshLive(); },
+    selectTemplate(e) { if (!this.data.form) return; this.update({ 'form.schema': e.detail.schema, 'form.templateName': e.detail.name }); this.closeTemplates(); },
     async useFile(e) {
       if (this.data.busy) return;
       this._nativeFile = true;
@@ -226,8 +272,19 @@ Component({
       } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
-    acceptTeam(result) { const rows = result.rows.map(r => ({ ...r, statusLabel: weekly.statusLabel(r.status), dateLabel: weekly.dateLabel(r.submittedMs) }));
+    acceptTeam(result) { const previous = new Map(this.data.rows.map(r => [r.id, r])); const rows = result.rows.map(r => { const old = previous.get(r.id); return { ...r, ...(old && old.version === r.version && old.status === r.status ? { expanded: old.expanded || false, detail: old.detail || null } : {}), statusLabel: weekly.statusLabel(r.status), dateLabel: weekly.dateLabel(r.submittedMs) }; });
       this.update({ selected: weekly.periodView(result.period), rows, total: result.total, submitted: result.submitted }); this.applyFilter(); },
+    async toggleTeamContent(e) {
+      const row = this.data.rows.find(r => r.id === e.currentTarget.dataset.id);
+      if (!row || row.status !== 'submitted' || this.data.busy) return;
+      if (row.expanded) { this.update({ rows: this.data.rows.map(r => r.id === row.id ? { ...r, expanded: false } : r) }); this.applyFilter(); return; }
+      this.update({ busy: true, actionError: '' });
+      try {
+        const result = await weekly.call('get', { periodId: this.data.selected.id, ownerId: row.id });
+        this.update({ rows: this.data.rows.map(r => r.id === row.id ? { ...r, expanded: true, detail: result } : r) }); this.applyFilter();
+      } catch (error) { this.update({ actionError: error.message }); }
+      finally { this.update({ busy: false }); }
+    },
     setFilter(e) { this.update({ filter: e.currentTarget.dataset.value }); this.applyFilter(); },
     applyFilter() { this.update({ filteredRows: this.data.rows.filter(r => this.data.filter === 'all' || (this.data.filter === 'pending' ? ['draft', 'unsubmitted'].includes(r.status) : r.status === this.data.filter)) }); },
     openTeamReport(e) { const row = this.data.rows.find(r => r.id === e.currentTarget.dataset.id); if (row && row.status === 'submitted' && this.data.selected && this.data.canReadTeam) return this.navigateWeekly(this.data.selected.id, 'detail', row.id); },
@@ -278,6 +335,7 @@ Component({
           const monday = today.getTime() - ((today.getUTCDay() + 6) % 7) * 86400000;
           const date = new Date(monday).toISOString().slice(0, 10), end = new Date(monday + 6 * 86400000).toISOString().slice(0, 10);
           form = { id: weekly.newId('wp'), revision: 0, title: date + ' 至 ' + end + ' 周报', startDate: date, endDate: end, deadlineDate: end,
+            schema: formModel.defaults(), templateName: '默认表单',
             deadlineTime: '18:00', status: 'open', statusIndex: 0, scheduled: false, canSchedule: true, publishDate: today.toISOString().slice(0, 10),
             publishTime: new Date(today.getTime() + 10 * 60000).toISOString().slice(11, 16), allowLateSubmit: true, allowLateEdit: false, roster: [] };
         }
@@ -306,6 +364,7 @@ Component({
         const result = await weekly.call('savePeriod', { id: f.id, revision: f.revision, title: f.title, startDate: f.startDate, endDate: f.endDate,
           deadline: f.deadlineDate + 'T' + f.deadlineTime, status: override === 'cancelled' ? 'cancelled' : f.status, allowLateSubmit: f.allowLateSubmit, allowLateEdit: f.allowLateEdit,
           publishAt: f.scheduled ? f.publishDate + 'T' + f.publishTime : '',
+          schema: f.schema || null, templateName: f.templateName || '',
           roster: this.data.members.filter(m => m.selected).map(m => ({ id: m.id, exempt: m.exempt })) });
         this.update({ busy: false, form: null });
         if (!this.properties.initialPeriod) {

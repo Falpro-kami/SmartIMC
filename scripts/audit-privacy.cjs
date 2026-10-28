@@ -1,6 +1,6 @@
 const { run, ENV } = require('./cloudbase.cjs');
 const CORE = ['equipment', 'userProfiles', 'teamMembers', 'teamSecurity', 'memberAudit', 'teamMessages', 'workbenchUsage', 'adminBackups', 'teamAnnouncements',
-  'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'teamSyncAccess'];
+  'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'weeklyTemplates', 'teamSyncAccess'];
 function api(action, body = {}) { return run(['api', 'tcb', action, '--body', JSON.stringify({ EnvId: ENV, ...body }), '-r', 'ap-shanghai']).data; }
 async function status(url) {
   const response = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, signal: AbortSignal.timeout(30000) });

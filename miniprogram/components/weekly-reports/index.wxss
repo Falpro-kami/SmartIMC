@@ -19,6 +19,11 @@ button[disabled] { opacity: .5; }
 .field:last-child { border-bottom: 0; }
 .card > .meta { margin-top: 8px; }
 .actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.center-actions { justify-content: center; }
+.toolbar-actions { display: flex; gap: 8px; }
+.team-entry { padding-bottom: 12px; border-bottom: 1px solid #dde3ec; }
+.team-entry:last-child { border-bottom: 0; }
+.team-entry .team-row { border-bottom: 0; padding-bottom: 4px; }
 .primary, .secondary, .upload-button { min-height: 44px; padding: 9px 16px; }
 .primary { background: #005bac; color: #fff; }
 .secondary { background: #edf3f8; color: #005bac; }

@@ -1,0 +1,22 @@
+<view class="document {{readonly ? 'readonly' : ''}}">
+  <view wx:if="{{!readonly}}" class="editor-tools">
+    <button class="tool bold {{formats.bold ? 'active' : ''}}" data-name="bold" catchtouchend="format" disabled="{{disabled}}">B</button>
+    <button class="tool italic {{formats.italic ? 'active' : ''}}" data-name="italic" catchtouchend="format" disabled="{{disabled}}">I</button>
+    <button class="tool underline {{formats.underline ? 'active' : ''}}" data-name="underline" catchtouchend="format" disabled="{{disabled}}">U</button>
+    <button class="tool" data-name="list" data-value="bullet" catchtouchend="format" disabled="{{disabled}}">列表</button>
+    <button class="tool" bindtap="image" disabled="{{disabled || uploading}}" loading="{{uploading}}">图片</button>
+    <button class="tool" bindtap="more" disabled="{{disabled}}">更多</button>
+    <block wx:if="{{more}}">
+    <button class="tool {{formats.header ? 'active' : ''}}" data-name="header" data-value="{{2}}" catchtouchend="format" disabled="{{disabled}}">标题</button>
+    <button class="tool" data-name="list" data-value="ordered" catchtouchend="format" disabled="{{disabled}}">编号列表</button>
+    <button class="tool" data-name="align" data-value="left" catchtouchend="format" disabled="{{disabled}}">左对齐</button>
+    <button class="tool" data-name="align" data-value="center" catchtouchend="format" disabled="{{disabled}}">居中</button>
+    <button class="tool" data-name="align" data-value="right" catchtouchend="format" disabled="{{disabled}}">右对齐</button>
+    <button class="tool" data-name="undo" catchtouchend="format" disabled="{{disabled}}">撤销</button>
+    <button class="tool" data-name="redo" catchtouchend="format" disabled="{{disabled}}">重做</button>
+    <button class="tool" data-name="removeFormat" catchtouchend="format" disabled="{{disabled}}">清除格式</button>
+    </block>
+  </view>
+  <editor id="body" class="editor-body" read-only="{{readonly || disabled}}" placeholder="请输入" show-img-size="{{false}}" show-img-toolbar="{{!readonly}}" show-img-resize="{{!readonly}}" bindready="ready" bindinput="input" bindstatuschange="status" />
+  <text wx:if="{{error}}" class="error">{{error}}</text>
+</view>

@@ -11,7 +11,7 @@ const token = (p, n) => p + '_' + n.toString(16).padStart(32, '0');
 const active = roles => ({ teamId: 'IMC', status: 'active', roles });
 const sourceId = file => 'cloud://well-leopon-d5glrufc6e4fd4413.7765-well-leopon-d5glrufc6e4fd4413-1516940081/' + file.path;
 function fixture() {
-  let tables = Object.fromEntries(['teamSync', 'teamMembers', 'userProfiles', 'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'teamMessages'].map(t => [t, new Map()]));
+  let tables = Object.fromEntries(['teamSync', 'teamMembers', 'userProfiles', 'weeklyTemplates', 'weeklyPeriods', 'weeklyReports', 'weeklyVersions', 'weeklyFiles', 'weeklyAudit', 'teamMessages'].map(t => [t, new Map()]));
   tables.teamSync.set('IMC', Object.fromEntries(['home', 'messages', 'approvals', 'weekly', 'members'].map(k => [k, 'initial'])));
   let now = Date.parse('2026-10-27T10:00:00+08:00'), reads = 0, copies = 0;
   const objects = new Map();
@@ -38,8 +38,8 @@ function fixture() {
   }
   const period = (extra = {}) => send(id(1), 'savePeriod', { id: pid(1), revision: 0, title: '本周周报', startDate: '2026-10-26', endDate: '2026-11-01', deadline: '2026-11-01T18:00',
     status: 'open', allowLateSubmit: true, allowLateEdit: false, roster: [2, 3].map(n => ({ id: id(n), exempt: '' })), ...extra });
-  async function upload(owner = id(2), periodId = pid(1), data = Buffer.from('%PDF-1.7\nreport'), name = '周报.pdf') {
-    const p = await send(owner, 'prepareUpload', { periodId, name, size: data.length });
+  async function upload(owner = id(2), periodId = pid(1), data = Buffer.from('%PDF-1.7\nreport'), name = '周报.pdf', options = {}) {
+    const p = await send(owner, 'prepareUpload', { periodId, name, size: data.length, ...options });
     const file = tables.weeklyFiles.get(p.id); objects.set(sourceId(file), data);
     const result = await send(owner, 'finishUpload', { fileId: p.id, fileID: sourceId(file) });
     return result.file;
@@ -50,6 +50,86 @@ function fixture() {
 const denied = (promise, code) => assert.rejects(promise, error => error.businessCode === code);
 const saved = (a, fileIds, revision = 0, request = 1) => a.send(id(2), 'saveDraft', { periodId: pid(1), revision, fileIds, requestId: token('wd', request) });
 const submitted = (a, fileIds, revision = 0, request = 1) => a.send(id(2), 'submit', { periodId: pid(1), revision, fileIds, requestId: token('ws', request) });
+
+const formModel = require('../cloudfunctions/weeklyReport/form');
+const schema = () => formModel.schema({ sections: [{ id: 'work', title: '工作汇报', fields: [
+  { id: 'body', label: '本周工作', type: 'text', required: true, maxLength: 100, width: 'full' },
+  { id: 'hours', label: '工时', type: 'number', required: true, width: 'half' },
+  { id: 'date', label: '完成日期', type: 'date', required: false, width: 'half' },
+  { id: 'stage', label: '阶段', type: 'single', required: false, options: ['进行中', '完成'] },
+  { id: 'tags', label: '分类', type: 'multiple', required: false, options: ['研究', '实验'] },
+  { id: 'docs', label: '附件', type: 'attachment', required: false, maxCount: 2, maxSizeMB: 1 }
+] }] });
+const text = value => ({ ops: [{ insert: value + '\n', attributes: { bold: true } }] });
+
+test('template management is server authorized, revision checked and snapshotted into each period', async () => {
+  const a = fixture(), data = { id: token('wt', 1), revision: 0, name: '研究周报', schema: schema() };
+  for (const n of [2, 4, 5]) for (const action of ['templates', 'saveTemplate']) await denied(a.send(id(n), action, data), 'FORBIDDEN');
+  const saved = await a.send(id(1), 'saveTemplate', data);
+  assert.equal(saved.template.schema.sections[0].fields[0].type, 'text');
+  await denied(a.send(id(1), 'saveTemplate', data), 'CONFLICT');
+  await a.period({ schema: saved.template.schema, templateName: saved.template.name });
+  const changed = schema(); changed.sections[0].fields[0].label = '新的字段';
+  await a.send(id(1), 'saveTemplate', { ...data, revision: 1, schema: changed });
+  assert.equal((await a.send(id(1), 'templates')).templates[0].revision, 2);
+  assert.equal((await a.send(id(2), 'get', { periodId: pid(1) })).period.schema.sections[0].fields[0].label, '本周工作');
+  await denied(a.period({ revision: 1, schema: changed }), 'INVALID_FORM');
+  a.table('teamMembers').set(id(5), active(['super_admin']));
+  assert.equal((await a.send(id(5), 'templates')).templates.length, 1);
+});
+
+test('form validation merges text types, strips unsafe styles and enforces every field rule on submit', () => {
+  assert.deepEqual(formModel.types, ['text', 'number', 'date', 'single', 'multiple', 'attachment']);
+  const s = schema();
+  assert.equal(formModel.answers(s, { body: text(''), hours: 0 }).values.hours, 0);
+  const base = { body: text('进展'), hours: 0, date: '2026-10-28', stage: '完成', tags: ['实验'] };
+  assert.equal(formModel.answers(s, base, true).values.hours, 0);
+  const invalid = [{ ...base, body: text('') }, { ...base, body: text('字'.repeat(101)) }, { ...base, hours: 'NaN' }, { ...base, date: '2026-02-30' }, { ...base, stage: '未知' }, { ...base, tags: ['研究', '研究'] }, { ...base, docs: [token('wf', 1), token('wf', 2), token('wf', 3)] }, { ...base, injected: 'x' }, { ...base, body: { ops: [{ insert: { image: 'https://external.example/image.png' } }] } }];
+  for (const value of invalid) assert.throws(() => formModel.answers(s, value, true), e => e.businessCode === 'INVALID_FORM');
+  const safe = formModel.answers(s, { ...base, body: { ops: [{ insert: '<script>plain text</script>\n', attributes: { bold: true, link: 'javascript:alert(1)', onload: 'alert(1)' } }] } }).values.body;
+  assert.deepEqual(safe.ops[0].attributes, { bold: true });
+  assert.throws(() => formModel.schema({ sections: [null] }));
+  assert.throws(() => formModel.schema({ sections: [{ id: 'x', title: 'x', fields: [{ id: 'x', label: 'x', type: 'text', required: false }] }] }));
+});
+
+test('rich reports preserve submitted text and private inline images while later draft changes stay private', async () => {
+  const a = fixture(); await a.period({ schema: schema() });
+  const image = await a.upload(id(2), pid(1), Buffer.from('89504e470d0a1a0a01020304', 'hex'), '实验.png', { kind: 'image', fieldId: 'body' });
+  const attachment = await a.upload(id(2), pid(1), undefined, '周报.pdf', { fieldId: 'docs' });
+  const answers = { body: { ops: [{ insert: '实验结果\n', attributes: { header: 2 } }, { insert: { image: 'imc-image:' + image.id } }, { insert: '\n' }] }, hours: 0, docs: [attachment.id] };
+  assert.ok((await a.send(id(2), 'imageURL', { fileId: image.id })).url);
+  await denied(a.send(id(3), 'imageURL', { fileId: image.id }), 'FORBIDDEN');
+  await denied(a.send(id(4), 'download', { fileId: image.id }), 'FORBIDDEN');
+  await a.send(id(2), 'saveDraft', { periodId: pid(1), revision: 0, answers, requestId: token('wd', 1) });
+  await denied(a.send(id(4), 'get', { periodId: pid(1), ownerId: id(2) }), 'NOT_FOUND');
+  const first = await a.send(id(2), 'submit', { periodId: pid(1), revision: 1, answers, requestId: token('ws', 1) });
+  assert.equal(first.versions[0].answers, undefined, 'history content is loaded on demand');
+  assert.equal((await a.send(id(4), 'getVersion', { versionId: first.versions[0].id })).version.answers.body.ops[1].insert.image, 'imc-image:' + image.id);
+  await denied(a.send(id(3), 'getVersion', { versionId: first.versions[0].id }), 'FORBIDDEN');
+  assert.equal(first.report.files.length, 2); assert.ok(first.imageURLs[image.id]);
+  const changed = { ...answers, body: text('新的草稿') };
+  const draft = await a.send(id(2), 'saveDraft', { periodId: pid(1), revision: 2, answers: changed, requestId: token('wd', 2) });
+  assert.equal(draft.report.hasChanges, true);
+  const leader = await a.send(id(4), 'get', { periodId: pid(1), ownerId: id(2) });
+  assert.deepEqual(leader.report.answers, answers); assert.equal(leader.report.hasChanges, false);
+  assert.equal((await a.send(id(4), 'download', { fileId: image.id })).file.id, image.id);
+  await a.send(id(2), 'submit', { periodId: pid(1), revision: 3, answers: changed, requestId: token('ws', 2) });
+  await denied(a.send(id(4), 'download', { fileId: image.id }), 'FORBIDDEN');
+  assert.equal((await a.send(id(4), 'download', { fileId: image.id, versionId: first.versions[0].id })).file.id, image.id);
+  for (const r of a.table('weeklyReports').values()) assert.ok(!JSON.stringify(r).includes('https://'));
+  for (const message of a.table('teamMessages').values()) assert.deepEqual(message.readBy, []);
+});
+
+test('structured drafts cannot borrow files across owners, periods or fields, or forge inline images', async () => {
+  const a = fixture(); await a.period({ schema: schema() }); await a.period({ id: pid(2), schema: schema() });
+  const f = await a.upload(id(2), pid(1), undefined, '周报.pdf', { fieldId: 'docs' });
+  const base = { periodId: pid(1), revision: 0, requestId: token('wd', 1), answers: { body: text('工作'), hours: 1, docs: [f.id] } };
+  await denied(a.send(id(3), 'saveDraft', base), 'FORBIDDEN');
+  await denied(a.send(id(2), 'saveDraft', { ...base, periodId: pid(2) }), 'FORBIDDEN');
+  await denied(a.send(id(2), 'saveDraft', { ...base, answers: { body: { ops: [{ insert: { image: 'imc-image:' + f.id } }] }, hours: 1 } }), 'FORBIDDEN');
+  await denied(a.send(id(2), 'prepareUpload', { periodId: pid(1), name: 'picture.png', size: 100, kind: 'image', fieldId: 'hours' }), 'INVALID_FORM');
+  await denied(a.send(id(2), 'prepareUpload', { periodId: pid(1), name: 'big.pdf', size: 2 * 1024 * 1024, fieldId: 'docs' }), 'FILE_LIMIT');
+});
 
 test('publication, submission and the scheduled worker commit live cursors without marking messages read', async () => {
   const a = fixture();
@@ -303,7 +383,7 @@ test('backup file references point only to real immutable objects, including aba
 
 function component(service, wx = {}) {
   let definition;
-  vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: d => { definition = d; }, require: () => service, wx });
+  vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { Component: d => { definition = d; }, require: name => name === '../../utils/weekly-form' ? require('../miniprogram/utils/weekly-form') : service, wx, setTimeout, clearTimeout });
   const panel = { ...definition.methods, data: structuredClone(definition.data), properties: { initialPeriod: '' } };
   panel.setData = values => { for (const [key, value] of Object.entries(values)) { const parts = key.split('.'); let object = panel.data; for (const part of parts.slice(0, -1)) object = object[part]; object[parts.at(-1)] = value; } };
   return panel;
@@ -340,9 +420,49 @@ test('upload and removal save drafts automatically with stable retry IDs and blo
   assert.equal(p._unsaved, null);
 });
 
+test('rich autosave serializes edits, preserves the latest typing and submits the saved revision without a draft button', async t => {
+  const calls = []; let release;
+  const p = component(uiService({ call: async (action, payload) => {
+    calls.push([action, structuredClone(payload)]);
+    if (calls.length === 1) await new Promise(resolve => { release = resolve; });
+    return { ...uiResult(payload.revision + 1, [], action === 'submit'), period: { id: pid(1), canEdit: true, schema: schema() }, report: { revision: payload.revision + 1, status: action === 'submit' ? 'submitted' : 'draft', files: [], answers: payload.answers } };
+  } }), { showToast() {} });
+  t.after(() => clearTimeout(p._draftTimer));
+  p.accept({ ...uiResult(0, []), period: { id: pid(1), canEdit: true, schema: schema() } });
+  p.answersChange({ detail: { answers: { body: text('第一版'), hours: 1 } } });
+  const saving = p.flushForm();
+  p.answersChange({ detail: { answers: { body: text('继续输入的内容'), hours: 2 } } });
+  release(); await saving;
+  while (p._formSave) await p._formSave;
+  assert.equal(p.data.answers.body.ops[0].insert, '继续输入的内容\n');
+  assert.equal(calls.filter(([action]) => action === 'saveDraft').length, 2);
+  assert.equal(calls[1][1].revision, 1);
+  await p.submit();
+  assert.equal(calls.at(-1)[0], 'submit'); assert.equal(calls.at(-1)[1].revision, 2);
+  assert.equal(calls.at(-1)[1].answers.hours, 2);
+});
+
+test('rich autosave retries lost responses with the same ID and allows correction after validation errors', async t => {
+  let failure = 'network'; const requests = [];
+  const p = component(uiService({ call: async (_action, payload) => {
+    requests.push(structuredClone(payload));
+    if (failure) { const e = new Error('保存失败'); if (failure === 'invalid') e.code = 'INVALID_FORM'; throw e; }
+    return { ...uiResult(1, []), period: { id: pid(1), canEdit: true, schema: schema() }, report: { revision: 1, files: [], status: 'draft', answers: payload.answers } };
+  } }));
+  t.after(() => clearTimeout(p._draftTimer));
+  p.accept({ ...uiResult(0, []), period: { id: pid(1), canEdit: true, schema: schema() } });
+  p.answersChange({ detail: { answers: { body: text('输入'), hours: 1 } } }); await p.flushForm();
+  const token = p._formPending.requestId;
+  failure = ''; await p.retrySave(); assert.equal(requests.at(-1).requestId, token);
+  failure = 'invalid'; p.answersChange({ detail: { answers: { body: text('字'.repeat(101)), hours: 1 } } }); await p.flushForm();
+  assert.equal(p._formPending, null);
+  failure = ''; p.answersChange({ detail: { answers: { body: text('已修正'), hours: 1 } } }); await p.flushForm();
+  assert.equal(p.data.saveState, '已自动保存'); assert.equal(p.data.answers.body.ops[0].insert, '已修正\n');
+});
+
 test('new component and module routes are complete without new native pages or a save-draft button', () => {
   const template = fs.readFileSync('miniprogram/components/weekly-reports/index.wxml', 'utf8');
-  assert.ok(!template.includes('保存草稿')); assert.ok(!template.includes('模板'));
+  assert.ok(!template.includes('保存草稿')); assert.ok(template.includes('表单模板'));
   const pages = JSON.parse(fs.readFileSync('miniprogram/app.json')).pages;
   assert.ok(!pages.some(p => p.includes('weekly')));
   assert.equal(fs.readFileSync('cloudfunctions/weeklyReport/access.js', 'utf8'), fs.readFileSync('cloudfunctions/_shared/access.js', 'utf8'));

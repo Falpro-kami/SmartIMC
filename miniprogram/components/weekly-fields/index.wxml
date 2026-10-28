@@ -1,0 +1,20 @@
+<view wx:for="{{sections}}" wx:key="id" wx:for-item="section" class="form-section {{embedded ? 'embedded' : ''}}">
+  <text class="section-title">{{section.title}}</text>
+  <view class="fields">
+    <view wx:for="{{section.fields}}" wx:key="id" class="form-field {{item.width === 'half' ? 'half' : ''}}">
+      <text class="label">{{item.label}}<text wx:if="{{item.required && !readonly}}" class="required"> *</text></text>
+      <weekly-editor wx:if="{{item.type === 'text'}}" value="{{item.delta}}" image-urls="{{imageUrls}}" readonly="{{readonly}}" disabled="{{disabled}}" period-id="{{periodId}}" field-id="{{item.id}}" max-length="{{item.maxLength}}" data-id="{{item.id}}" bindchange="textChange" binduploading="uploading" />
+      <block wx:elif="{{item.type === 'attachment'}}">
+        <view wx:for="{{item.attachments}}" wx:for-item="file" wx:key="id" class="file-row"><text class="filename">{{file.name}}</text><view class="file-actions"><button class="link" data-id="{{file.id}}" bindtap="useFile">查看</button><button wx:if="{{!readonly}}" class="link danger" data-id="{{file.id}}" data-field="{{item.id}}" bindtap="removeFile" disabled="{{disabled || uploading}}">移除</button><button wx:else class="link" data-id="{{file.id}}" data-share="1" bindtap="useFile">下载</button></view></view>
+        <button wx:if="{{!readonly && item.attachments.length < item.maxCount}}" class="upload" data-id="{{item.id}}" bindtap="addFiles" disabled="{{disabled || uploading}}">＋ 上传文件</button>
+        <text wx:if="{{readonly && !item.attachments.length}}">-</text>
+      </block>
+      <text wx:elif="{{readonly}}" class="value">{{item.displayValue}}</text>
+      <input wx:elif="{{item.type === 'number'}}" class="input" type="digit" value="{{item.value}}" data-id="{{item.id}}" bindinput="input" disabled="{{disabled}}" />
+      <picker wx:elif="{{item.type === 'date'}}" mode="date" value="{{item.value}}" data-id="{{item.id}}" bindchange="input" disabled="{{disabled}}"><view class="input picker">{{item.value || '选择日期'}} ›</view></picker>
+      <radio-group wx:elif="{{item.type === 'single'}}" data-id="{{item.id}}" bindchange="input"><label wx:for="{{item.optionsView}}" wx:for-item="option" wx:key="label" class="option"><radio value="{{option.label}}" checked="{{option.checked}}" color="#005bac" disabled="{{disabled}}" />{{option.label}}</label></radio-group>
+      <checkbox-group wx:elif="{{item.type === 'multiple'}}" data-id="{{item.id}}" bindchange="input"><label wx:for="{{item.optionsView}}" wx:for-item="option" wx:key="label" class="option"><checkbox value="{{option.label}}" checked="{{option.checked}}" color="#005bac" disabled="{{disabled}}" />{{option.label}}</label></checkbox-group>
+    </view>
+  </view>
+</view>
+<text wx:if="{{error}}" class="error">{{error}}</text>
