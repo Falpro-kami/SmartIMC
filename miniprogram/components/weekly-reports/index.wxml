@@ -28,7 +28,7 @@
       <view wx:if="{{report && report.submittedMs}}" class="field"><text>最后提交</text><text>{{submittedLabel}}</text></view>
       <view wx:if="{{report && report.hasChanges && own}}" class="meta change-status">有待重新提交的修改</view>
       <view class="actions" wx:if="{{canReadTeam || canManage}}">
-        <button wx:if="{{canReadTeam}}" class="secondary" bindtap="loadTeam" disabled="{{busy}}">团队提交</button>
+        <button wx:if="{{canReadTeam}}" class="secondary" bindtap="openTeam" disabled="{{busy}}">团队提交</button>
         <button wx:if="{{canManage}}" class="secondary" bindtap="editCurrentPeriod" disabled="{{busy}}">周期设置</button>
       </view>
     </view>

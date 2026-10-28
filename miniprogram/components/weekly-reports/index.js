@@ -1,21 +1,79 @@
 const weekly = require('../../services/weekly');
 Component({
-  properties: { initialPeriod: { type: String, value: '' } },
+  properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' } },
   data: { mode: 'list', loading: true, busy: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
     canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
     files: [], versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
-  lifetimes: { attached() { this.startLive(); this.loadList(); }, detached() { this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
+  lifetimes: { attached() { this.startLive(); this.initialize(); }, detached() { this._detached = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; } },
   pageLifetimes: {
-    show() { this.startLive(); if (this._initialized && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved) this.refresh(this._livePending === true); },
-    hide() { this.stopLive(); this._epoch = (this._epoch || 0) + 1; }
+    show() { this.startLive(); if (!this._initializing && !this.data.busy && !this._choosing && !this._nativeFile && !this._unsaved && this.data.mode !== 'form') {
+      const force = this._livePending === true; this._livePending = false;
+      if (this._initialized) this.refresh(force, true); else this.initialize(force);
+    } },
+    hide() { if (this._initializing) this._initialInterrupted = true; this.stopLive(); this._epoch = (this._epoch || 0) + 1; }
   },
   methods: {
+    async initialize(force = false) {
+      if (this._initializing || this._detached) return;
+      this._initializing = true;
+      this._initialInterrupted = false;
+      const epoch = this._epoch = (this._epoch || 0) + 1;
+      try {
+        const periodId = this.properties.initialPeriod;
+        if (!periodId) return await this.loadList(false, force);
+        this._initialized = true;
+        if (this.properties.initialView !== 'team') return await this.openPeriod(periodId, this.properties.initialOwner || '', force);
+        this.update({ mode: 'team', loading: true, error: '' });
+        const result = await weekly.call('get', { periodId }, force);
+        if (this._detached || epoch !== this._epoch) return;
+        this.update({ ...this.rights(result), selected: weekly.periodView(result.period) });
+        if (!this.data.canReadTeam) throw new Error('没有查看团队周报的权限。');
+        await this.loadTeam(force);
+      } catch (error) { if (!this._detached && epoch === this._epoch) this.update({ error: error.message, loading: false }); }
+      finally {
+        this._initializing = false;
+        if (this._initialInterrupted && this._visible && !this._detached) { this._initialInterrupted = false; this.refresh(false, true); }
+        else this.refreshLive();
+      }
+    },
+    navigateWeekly(periodId = '', view = 'detail', ownerId = '', replace = false) {
+      if (this.data.busy || this._navigating || this._detached ||
+        (periodId && !/^wp_[a-f0-9]{32}$/.test(periodId)) || (ownerId && !/^user_[a-f0-9]{32}$/.test(ownerId))) return;
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      const matches = page => {
+        const options = page.options || {};
+        return page.route === 'pages/module/index' && options.id === 'weekly' && (options.period || '') === periodId &&
+          (!periodId || ((options.view === 'team' ? 'team' : 'detail') === view && (view === 'team' || (options.owner || '') === ownerId)));
+      };
+      let delta = 0;
+      for (let i = pages.length - 2; i >= 0; i--) if (matches(pages[i])) { delta = pages.length - 1 - i; break; }
+      this._navigating = true;
+      const callbacks = {
+        fail: () => { if (this._detached) wx.showToast({ title: '页面打开失败，请重试', icon: 'none' }); else this.update({ actionError: '页面打开失败，请重试。' }); },
+        complete: () => { this._navigating = false; }
+      };
+      if (delta) return wx.navigateBack({ delta, ...callbacks });
+      if (!periodId && pages.length && matches(pages[pages.length - 1])) { this._navigating = false; return this.loadList(); }
+      const url = '/pages/module/index?id=weekly' + (periodId ? '&period=' + periodId + (view === 'team' ? '&view=team' : ownerId ? '&owner=' + ownerId : '') : '');
+      // A notification may open a period without a list ancestor. Replace the flow's
+      // first weekly page so "周报列表" cannot lead back into a stale member detail.
+      if (replace && !periodId) {
+        let root = pages.length - 1;
+        while (root > 0 && pages[root - 1].route === 'pages/module/index' && (pages[root - 1].options || {}).id === 'weekly') root--;
+        if (root < pages.length - 1) return wx.navigateBack({ delta: pages.length - 1 - root,
+          success: () => wx.redirectTo({ url, ...callbacks }), fail: callbacks.fail,
+          complete: result => { if (/fail/.test(result.errMsg || '')) callbacks.complete(); }
+        });
+      }
+      return replace ? wx.redirectTo({ url, ...callbacks }) : wx.navigateTo({ url, ...callbacks });
+    },
     startLive() {
+      this._visible = true;
       if (!this._unsubscribeLive && weekly.subscribe) this._unsubscribeLive = weekly.subscribe(() => { this._livePending = true; this.refreshLive(); });
     },
-    stopLive() { if (this._unsubscribeLive) this._unsubscribeLive(); this._unsubscribeLive = null; },
+    stopLive() { this._visible = false; if (this._unsubscribeLive) this._unsubscribeLive(); this._unsubscribeLive = null; },
     async refreshLive() {
-      if (!this._livePending || this._liveLoading || this._detached || !this._unsubscribeLive || this.data.loading || this.data.busy || this._choosing || this._nativeFile || this._unsaved || this.data.mode === 'form') return;
+      if (!this._livePending || this._initializing || this._liveLoading || this._detached || !this._unsubscribeLive || this.data.loading || this.data.busy || this._choosing || this._nativeFile || this._unsaved || this.data.mode === 'form') return;
       this._livePending = false;
       this._liveLoading = true;
       try { await this.refresh(true, true); }
@@ -23,6 +81,8 @@ Component({
     },
     update(data) { if (!this._detached) { this.setData(data); if (data.busy === false || data.loading === false) this.refreshLive(); } },
     async refresh(force = false, quiet = false) {
+      if (this._initializing) return;
+      if (this.properties.initialPeriod && (!this.data.selected || this.properties.initialView === 'team' && !this.data.canReadTeam)) return this.initialize(force === true);
       if (this.data.mode === 'form') return;
       if (this.data.mode === 'team' && this.data.selected) return this.loadTeam(force === true, quiet);
       if (this.data.mode === 'detail' && this.data.selected) return this.openPeriod(this.data.selected.id, this._ownerId, force === true, quiet);
@@ -33,7 +93,7 @@ Component({
       const retainedOffset = this._offset || 0;
       const epoch = this._epoch = (this._epoch || 0) + 1;
       const cached = !more && weekly.peek && weekly.peek('list', { offset: 0 });
-      if (cached) { this._offset = cached.nextOffset; this.update({ ...this.rights(cached), periods: cached.periods.map(weekly.periodView), hasMore: cached.hasMore }); }
+      if (cached && (!quiet || !this.data.periods.length)) { this._offset = cached.nextOffset; this.update({ ...this.rights(cached), periods: cached.periods.map(weekly.periodView), hasMore: cached.hasMore }); }
       this.update({ mode: 'list', loading: quiet ? false : !cached && (!this.data.periods.length || more), error: '', actionError: '' });
       try {
         let result = await weekly.call('list', { offset: more ? this._offset : 0 }, force);
@@ -51,14 +111,14 @@ Component({
         this.update({ ...this.rights(result), periods: (more ? this.data.periods : []).concat(result.periods.map(weekly.periodView)), hasMore: result.hasMore });
         if (!this._initialized) {
           this._initialized = true;
-          if (this.properties.initialPeriod) return this.openPeriod(this.properties.initialPeriod);
         }
       } catch (error) { if (epoch === this._epoch && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) this.update({ error: error.message, periods: [], canManage: false }); }
       finally { if (epoch === this._epoch) this.update({ loading: false }); }
     },
     rights(r) { return { canManage: !!r.canManage, canReadTeam: !!r.canReadTeam, canRemind: !!r.canRemind, canExport: !!r.canExport }; },
     loadMore() { return this.loadList(true); },
-    choosePeriod(e) { return this.openPeriod(e.currentTarget.dataset.id); },
+    choosePeriod(e) { return this.navigateWeekly(e.currentTarget.dataset.id); },
+    openTeam() { if (this.data.selected && this.data.canReadTeam) return this.navigateWeekly(this.data.selected.id, 'team'); },
     async openPeriod(periodId, ownerId = '', force = false, quiet = false) {
       if (this.data.busy) return;
       const epoch = this._epoch = (this._epoch || 0) + 1;
@@ -170,7 +230,7 @@ Component({
       this.update({ selected: weekly.periodView(result.period), rows, total: result.total, submitted: result.submitted }); this.applyFilter(); },
     setFilter(e) { this.update({ filter: e.currentTarget.dataset.value }); this.applyFilter(); },
     applyFilter() { this.update({ filteredRows: this.data.rows.filter(r => this.data.filter === 'all' || (this.data.filter === 'pending' ? ['draft', 'unsubmitted'].includes(r.status) : r.status === this.data.filter)) }); },
-    openTeamReport(e) { const row = this.data.rows.find(r => r.id === e.currentTarget.dataset.id); if (row && row.status === 'submitted') return this.openPeriod(this.data.selected.id, row.id); },
+    openTeamReport(e) { const row = this.data.rows.find(r => r.id === e.currentTarget.dataset.id); if (row && row.status === 'submitted' && this.data.selected && this.data.canReadTeam) return this.navigateWeekly(this.data.selected.id, 'detail', row.id); },
     async remind() {
       if (this.data.busy || !this.data.canRemind) return;
       this.update({ busy: true, actionError: '' });
@@ -248,7 +308,10 @@ Component({
           publishAt: f.scheduled ? f.publishDate + 'T' + f.publishTime : '',
           roster: this.data.members.filter(m => m.selected).map(m => ({ id: m.id, exempt: m.exempt })) });
         this.update({ busy: false, form: null });
-        await this.openPeriod(result.id);
+        if (!this.properties.initialPeriod) {
+          await this.loadList(false, true);
+          if (!this._detached) this.navigateWeekly(result.id);
+        } else await this.openPeriod(result.id, this.properties.initialOwner || this._ownerId || '');
       } catch (error) { this.update({ actionError: error.message }); }
       finally { this.update({ busy: false }); }
     },
@@ -259,7 +322,7 @@ Component({
         if (!confirm.confirm) return;
       }
       this._unsaved = null;
-      return this.loadList();
+      return this.navigateWeekly('', 'detail', '', true);
     }
   }
 });

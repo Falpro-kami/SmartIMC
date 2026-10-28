@@ -187,7 +187,7 @@ test('a weekly push is deferred during editing and an in-flight read cannot over
   const weekly = { subscribe: fn => { listener = fn; return () => {}; }, periodView: x => x, fileView: x => x, dateLabel: () => '',
     call: async () => { calls++; return new Promise(resolve => { release = resolve; }); } };
   vm.runInNewContext(fs.readFileSync('miniprogram/components/weekly-reports/index.js', 'utf8'), { require: () => weekly, Component: value => { definition = value; } });
-  const p = { ...definition.methods, data: { ...structuredClone(definition.data), loading: false, mode: 'form', form: { title: '正在编辑' } }, setData(values) { Object.assign(this.data, values); } };
+  const p = { ...definition.methods, properties: { initialPeriod: '', initialView: 'detail', initialOwner: '' }, data: { ...structuredClone(definition.data), loading: false, mode: 'form', form: { title: '正在编辑' } }, setData(values) { Object.assign(this.data, values); } };
   p.startLive(); listener(); await settle();
   assert.equal(calls, 0); assert.equal(p.data.form.title, '正在编辑');
   p.data.mode = 'detail'; p.data.selected = { id: 'period' }; p.data.files = [{ id: 'local' }];
