@@ -123,5 +123,30 @@ test('a mounted header receives unread changes immediately and a cached identity
   await a.service.messages(0); assert.equal(header.data.hasUnread, true);
   await header.loadIdentity(); assert.equal(header.data.hasUnread, true);
   await a.service.readMessage('message'); assert.equal(header.data.hasUnread, false);
+  for (const count of [1, 99, 100, 101]) {
+    a.pendingUnread(async () => ({ result: { ok: true, hasUnread: true, unreadCount: count } }));
+    await a.service.notifications(true);
+    assert.equal(header.data.unreadCount, Math.min(count, 100));
+    assert.equal(header.data.unreadLabel, count > 99 ? '99+' : String(count));
+  }
+  let release;
+  a.pendingUnread(() => new Promise(resolve => { release = resolve; }));
+  const stale = a.service.notifications(true);
+  await a.service.readMessage('message');
+  release({ result: { ok: true, hasUnread: true, unreadCount: 99 } }); await stale;
+  assert.equal(header.data.hasUnread, false); assert.equal(header.data.unreadLabel, '');
+  assert.equal(a.service.notificationCountCurrent(), 0);
   definition.lifetimes.detached.call(header);
+});
+
+test('a stale identity cannot overwrite a newer numeric unread count even when both responses report unread messages', async () => {
+  const a = accessFixture(); await a.service.get(); let release;
+  a.pendingIdentity(() => new Promise(resolve => { release = resolve; }));
+  const pending = a.service.get(true);
+  a.pendingUnread(async () => ({ result: { ok: true, hasUnread: true, unreadCount: 37 } }));
+  await a.service.notifications(true);
+  release({ result: { ok: true, accountCode: 'account', member: { teamId: 'IMC', status: 'active', roles: [], revision: 1 }, hasUnread: true, unreadCount: 2 } });
+  await pending;
+  assert.equal(a.service.notificationCountCurrent(), 37);
+  assert.equal((await a.service.get()).unreadCount, 37);
 });

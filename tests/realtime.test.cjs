@@ -46,6 +46,7 @@ function client(s, time, options = {}) {
       if (data.action === 'notificationState') result.hasUnread = s.messages.some(m => !m.read);
       if (data.action === 'readMessage') { s.messages.find(m => m.id === data.id).read = true; result.hasUnread = s.messages.some(m => !m.read); }
       if (data.action === 'messages') result = { ...result, messages: structuredClone(s.messages.slice(data.offset, data.offset + 50)), nextOffset: Math.min(s.messages.length, data.offset + 50), hasMore: s.messages.length > data.offset + 50, hasUnread: s.messages.some(m => !m.read) };
+      if (['get', 'notificationState', 'readMessage', 'messages'].includes(data.action)) result.unreadCount = Math.min(s.messages.filter(m => !m.read).length, 100);
       if (data.action === 'approvals') { const rows = data.scope === 'pending' ? s.pending : data.scope === 'done' ? s.done : []; result = { ...result, requests: structuredClone(rows), nextOffset: rows.length, hasMore: false }; }
       return { result };
     },
@@ -154,6 +155,11 @@ test('two independent visible clients receive a new weekly task and unread badge
   assert.equal(p.updates.slice(before).some(row => row.loading === true), false);
   assert.equal(b.calls.filter(c => c === 'get').length, identityReads, 'ordinary business pushes do not revalidate identity');
   assert.equal(s.messages[0].read, false);
+  assert.equal(b.access.notificationCountCurrent(), 1);
+  s.messages.push(...Array.from({ length: 102 }, (_, i) => ({ id: 'extra-' + i, title: '新通知', read: false })));
+  s.push(['messages']); await t.advance(200); assert.equal(b.access.notificationCountCurrent(), 100);
+  s.messages.slice(0, 5).forEach(m => { m.read = true; });
+  s.push(['messages']); await t.advance(200); assert.equal(b.access.notificationCountCurrent(), 98);
   p.onHide(); s.todos = []; s.push(['home']); await t.advance(200);
   assert.equal(p.data.todos.length, 1, 'hidden pages stop refreshing but lose their stale cache');
   await p.onShow(); assert.equal(p.data.todos.length, 0);

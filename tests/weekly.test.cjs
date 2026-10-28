@@ -251,6 +251,45 @@ test('activity appearing after the initial check still requires a revision, incl
   assert.equal(b.table('weeklyPeriods').size, 1);
 });
 
+test('deleting a published period is manager-only, revision checked and idempotent, preserves original records and removes list/todo entries', async () => {
+  const a = fixture(); await a.period(); const file = await a.upload(); const submission = await submitted(a, [file.id]);
+  const draftFile = await a.upload(id(3));
+  await a.send(id(3), 'saveDraft', { periodId: pid(1), revision: 0, fileIds: [draftFile.id], requestId: token('wd', 1) });
+  const reports = structuredClone(a.table('weeklyReports')), versions = structuredClone(a.table('weeklyVersions')), files = structuredClone(a.table('weeklyFiles'));
+  const originalNotice = [...a.table('teamMessages').keys()][0]; a.table('teamMessages').get(originalNotice).readBy = [id(2)];
+  const payload = { periodId: pid(1), revision: 1, confirmDelete: true };
+  for (const n of [2, 3, 4, 5]) await denied(a.send(id(n), 'deletePeriod', payload), 'FORBIDDEN');
+  await denied(a.send(id(1), 'deletePeriod', { ...payload, confirmDelete: false }), 'INVALID_INPUT');
+  await denied(a.send(id(1), 'deletePeriod', { ...payload, revision: 0 }), 'CONFLICT');
+  assert.equal(a.table('weeklyPeriods').get(pid(1)).status, 'open');
+  await a.send(id(1), 'deletePeriod', payload);
+  assert.equal(a.table('weeklyPeriods').get(pid(1)).status, 'deleted');
+  assert.deepEqual(a.table('weeklyReports'), reports); assert.deepEqual(a.table('weeklyVersions'), versions); assert.deepEqual(a.table('weeklyFiles'), files);
+  for (const n of [1, 2, 4]) assert.equal((await a.send(id(n), 'list')).periods.length, 0);
+  assert.equal((await require('../cloudfunctions/memberAccess/weekly-home')(a.db, id(3))).length, 0);
+  const old = await a.send(id(3), 'get', { periodId: pid(1) }); assert.equal(old.period.canEdit, false); assert.equal(old.report.files[0].id, draftFile.id);
+  assert.equal((await a.send(id(4), 'getVersion', { versionId: submission.versions[0].id })).version.files[0].id, file.id);
+  assert.equal((await a.send(id(4), 'download', { fileId: file.id })).ok, true);
+  await denied(a.upload(), 'CLOSED'); await denied(a.send(id(1), 'configuration', { periodId: pid(1) }), 'DELETED');
+  await denied(a.period({ revision: 2 }), 'DELETED');
+  const count = a.table('teamMessages').size, auditCount = a.table('weeklyAudit').size;
+  await a.send(id(1), 'deletePeriod', payload);
+  assert.equal(a.table('teamMessages').size, count); assert.equal(a.table('weeklyAudit').size, auditCount);
+  assert.deepEqual(a.table('teamMessages').get(originalNotice).readBy, [id(2)]);
+  assert.equal([...a.table('weeklyAudit').values()].filter(r => r.action === 'period.delete').length, 1);
+});
+
+test('a deleted scheduled period cannot publish or expose its unpublished form to members', async () => {
+  const a = fixture(); await a.period({ status: 'scheduled', publishAt: '2026-10-27T10:02', schema: schema() });
+  await a.send(id(1), 'deletePeriod', { periodId: pid(1), revision: 1, confirmDelete: true });
+  a.time(Date.parse('2026-10-27T10:03:00+08:00'));
+  assert.equal((await require('../cloudfunctions/weeklyReport/publisher')(a.db, access, a.clock)()).published, 0);
+  assert.equal(a.table('teamMessages').size, 0);
+  await denied(a.send(id(2), 'get', { periodId: pid(1) }), 'NOT_FOUND');
+  await denied(a.send(id(4), 'team', { periodId: pid(1) }), 'NOT_FOUND');
+  assert.equal((await a.send(id(1), 'get', { periodId: pid(1) })).period.status, 'deleted');
+});
+
 test('rich reports preserve submitted text and private inline images while later draft changes stay private', async () => {
   const a = fixture(); await a.period({ schema: schema() });
   const image = await a.upload(id(2), pid(1), Buffer.from('89504e470d0a1a0a01020304', 'hex'), '实验.png', { kind: 'image', fieldId: 'body' });

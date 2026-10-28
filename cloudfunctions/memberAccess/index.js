@@ -14,7 +14,7 @@ function document(result) { return Array.isArray(result.data) ? result.data[0] :
 async function self(id) {
   const member = await access.readMember(db, id);
   return { ok: true, accountCode: id, member: access.present(member), roleOptions: access.allowed(member, 'equipment.read') ? access.ROLES : [],
-    hasUnread: access.allowed(member, 'equipment.read') ? await messages.unread(id, member) : false };
+    ...(access.allowed(member, 'equipment.read') ? await messages.state(id, member) : { hasUnread: false, unreadCount: 0 }) };
 }
 
 exports.main = async (event = {}) => {
@@ -29,7 +29,7 @@ exports.main = async (event = {}) => {
     if (event.action === 'syncConnect') return await sync.connect(db, access, id, cloud.getWXContext().OPENID);
     if (event.action === 'syncState') return { ok: true, state: await sync.state(db) };
     if (event.action === 'home') return await home.dashboard(id);
-    if (event.action === 'notificationState') return { ok: true, hasUnread: await messages.unread(id, await access.readMember(db, id)) };
+    if (event.action === 'notificationState') return { ok: true, ...await messages.state(id, await access.readMember(db, id)) };
     if (event.action === 'announcements') return await home.list(id, event);
     if (event.action === 'announcement') return await home.get(id, event);
     if (event.action === 'saveAnnouncement') return await home.save(id, event);

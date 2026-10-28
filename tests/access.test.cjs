@@ -66,6 +66,25 @@ function harness(options = {}) {
     table: name => tables[name] };
 }
 
+test('unread counts are scoped to the viewer, capped for 99+, and change only after explicit marking', async () => {
+  const app = harness({ sort: true }), owner = userId('owner'), peer = userId('peer'), ordinary = userId('ordinary');
+  app.table('teamMembers').set(owner, active(['super_admin'])); app.table('teamMembers').set(peer, active(['super_admin'])); app.table('teamMembers').set(ordinary, active([]));
+  const ids = Array.from({ length: 103 }, (_, i) => 'msg_' + crypto.createHash('sha256').update('unread-' + i).digest('hex').slice(0, 32));
+  ids.forEach((id, i) => app.table('teamMessages').set(id, { teamId: 'IMC', recipientKey: owner, title: '测试通知', body: '测试内容', state: i % 2 ? 'resolved' : 'open', readBy: [], createdMs: i }));
+  const roleId = 'msg_' + 'b'.repeat(32);
+  app.table('teamMessages').set(roleId, { teamId: 'IMC', recipientKey: 'role:super_admin', title: '团队通知', state: 'open', readBy: [], createdMs: 104 });
+  assert.equal((await app.member({ action: 'get' })).unreadCount, 100);
+  await app.member({ action: 'openMessage', id: ids[0] }); assert.equal((await app.member({ action: 'notificationState' })).unreadCount, 100);
+  for (const id of ids.slice(0, 5)) await app.member({ action: 'readMessage', id });
+  assert.equal((await app.member({ action: 'notificationState' })).unreadCount, 99);
+  assert.equal((await app.member({ action: 'messages', offset: 50 })).unreadCount, 99, 'the badge is independent of the current list page');
+  assert.equal((await app.member({ action: 'readMessage', id: ids[0] })).unreadCount, 99, 'repeated marking must not decrement twice');
+  await app.member({ action: 'readMessage', id: roleId });
+  app.as('peer'); assert.equal((await app.member({ action: 'notificationState' })).unreadCount, 1);
+  app.as('ordinary'); assert.equal((await app.member({ action: 'notificationState' })).unreadCount, 0);
+  app.table('teamMembers').get(ordinary).status = 'removed'; assert.equal((await app.member({ action: 'get' })).unreadCount, 0);
+});
+
 test('business roles are additive and isolated; an active super administrator has every permission', () => {
   assert.equal(access.allowed(active([]), 'equipment.read'), true);
   assert.equal(access.allowed(active([]), 'equipment.create'), false);

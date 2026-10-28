@@ -28,6 +28,7 @@ function harness(origin = 'pages/workbench/index', manage = false) {
     if (data.action === 'configuration') return { result: { ok: true, period: { ...p, revision: 1, roster: rows.map(r => ({ id: r.id, name: r.name, exempt: '' })) } } };
     if (data.action === 'templates') return { result: { ok: true, templates: structuredClone(templateRows) } };
     if (data.action === 'saveTemplate') { const template = { ...data, revision: data.revision + 1 }; const index = templateRows.findIndex(t => t.id === data.id); if (index < 0) templateRows.push(template); else templateRows[index] = template; return { result: { ok: true, template } }; }
+    if (data.action === 'deletePeriod') { periods.splice(periods.findIndex(p => p.id === data.periodId), 1); return { result: { ok: true, id: data.periodId } }; }
     if (data.action === 'savePeriod') { const p = { ...periods[0], ...data }; const index = periods.findIndex(p => p.id === data.id); if (index < 0) periods.unshift(p); else periods[index] = p; return { result: { ok: true, id: data.id } }; }
     throw new Error('Unexpected action ' + data.action);
   } };
@@ -274,4 +275,15 @@ test('editing the period snapshot uses a separate native page and does not save 
   assert.equal(a.reads.filter(r => ['saveTemplate', 'savePeriod'].includes(r.action)).length, 0);
   a.push('/pages/module/index?id=weekly&view=templates'); await settle();
   assert.notEqual(a.top().template.data.templates[0].schema.sections[0].fields[0].label, '本期修正的字段');
+});
+
+test('cancelling deletion preserves the current detail and confirming returns to the same refreshed list', async () => {
+  const a = harness('pages/workbench/index', true); a.push('/pages/module/index?id=weekly'); await settle(); const list = a.top();
+  list.panel.choosePeriod(tap(periodId(1))); await settle(); const detail = a.top();
+  a.confirm(false); await detail.panel.deletePeriod(tap(periodId(1))); await settle();
+  assert.equal(a.top(), detail); assert.equal(a.reads.filter(r => r.action === 'deletePeriod').length, 0);
+  a.confirm(true); await detail.panel.deletePeriod(tap(periodId(1))); await settle();
+  assert.equal(a.top(), list); assert.ok(!list.panel.data.periods.some(p => p.id === periodId(1)));
+  assert.equal(a.reads.filter(r => r.action === 'deletePeriod').length, 1);
+  assert.equal(list.panel.data.busy, false);
 });

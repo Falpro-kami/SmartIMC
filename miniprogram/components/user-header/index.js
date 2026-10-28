@@ -11,7 +11,7 @@ Component({
     top: 32, statusBarHeight: 24, navHeight: 44, titleWidth: 120,
     identityWidth: 230, loading: true, error: '', name: '正在识别',
     avatar: '', initials: '人', teamName: team.name,
-    drawerOpen: false, roleTags: [], hasUnread: false
+    drawerOpen: false, roleTags: [], hasUnread: false, unreadCount: 0, unreadLabel: ''
   },
   lifetimes: {
     attached() {
@@ -27,7 +27,7 @@ Component({
         identityWidth: Math.max(160, capsuleLeft - 32)
       });
       this._unsubscribe = profiles.subscribe(result => this.renderProfile(result));
-      if (access.subscribeUnread) this._unsubscribeUnread = access.subscribeUnread(value => { if (!this._detached) this.setData({ hasUnread: value }); });
+      if (access.subscribeUnread) this._unsubscribeUnread = access.subscribeUnread((value, count) => this.renderUnread(value, count));
       if (access.subscribeChanges) this._unsubscribeChanges = access.subscribeChanges('members', () => { if (this._visible) this.loadIdentity(); });
       this.loadProfile();
       this.startNotifications();
@@ -36,10 +36,15 @@ Component({
   },
   pageLifetimes: { show() { this.loadProfile(); this.startNotifications(); }, hide() { this.closeDrawer(); this.stopNotifications(); } },
   methods: {
+    renderUnread(value, count) {
+      if (this._detached) return;
+      const unreadCount = Number.isSafeInteger(count) && count >= 0 ? count : value ? Math.max(this.data.unreadCount || 0, 1) : 0;
+      this.setData({ hasUnread: unreadCount > 0, unreadCount, unreadLabel: unreadCount > 99 ? '99+' : unreadCount ? String(unreadCount) : '' });
+    },
     startNotifications() {
       this._visible = true;
       const loading = this.loadIdentity();
-      if (access.notifications) access.notifications().then(value => { if (!this._detached && typeof value === 'boolean') this.setData({ hasUnread: value }); }).catch(() => {});
+      if (access.notifications) access.notifications().then(value => { if (typeof value === 'boolean') this.renderUnread(value, access.notificationCountCurrent && access.notificationCountCurrent()); }).catch(() => {});
       return loading;
     },
     stopNotifications() { this._visible = false; },
@@ -58,7 +63,8 @@ Component({
           if (!roleTags.length) roleTags = [{ value: 'member', label: '普通成员' }];
         } else if (member) roleTags = [{ value: 'inactive', label: { pending: '待审核', disabled: '已停用', removed: '已移出' }[member.status] || '-' }];
         const currentUnread = access.notificationCurrent ? access.notificationCurrent() : result.hasUnread;
-        this.setData({ roleTags, hasUnread: currentUnread === true });
+        this.setData({ roleTags });
+        this.renderUnread(currentUnread === true, access.notificationCountCurrent ? access.notificationCountCurrent() : result.unreadCount);
       } catch (_) { /* Keep the last server-confirmed identity; avoid extra header explanatory text. */ }
       finally { this._identityLoading = false; }
     },

@@ -11,12 +11,12 @@
   <view wx:elif="{{error}}" class="error"><text>{{error}}</text><button class="secondary" bindtap="refresh">重试</button></view>
   <block wx:elif="{{mode === 'list'}}">
     <view wx:if="{{!periods.length}}" class="card empty">暂无周报周期</view>
-    <button wx:for="{{periods}}" wx:key="id" class="card period-row" data-id="{{item.id}}" bindtap="choosePeriod">
+    <view wx:for="{{periods}}" wx:key="id" class="card period-card"><button class="period-row" data-id="{{item.id}}" bindtap="choosePeriod">
       <view class="heading"><text class="row-title">{{item.title}}</text><text wx:if="{{!isLeader}}" class="badge {{item.ownStatus === 'submitted' ? 'success' : ''}}">{{item.statusLabel}}</text></view>
       <text class="meta">{{item.startDate}} 至 {{item.endDate}}</text>
       <text wx:if="{{item.edition > 1 || item.supersededBy}}" class="meta">第{{item.edition || 1}}版{{item.supersededBy ? ' · 已修订' : ''}}</text>
       <view class="heading"><text class="meta">截止 {{item.deadlineLabel}}</text><text class="meta">{{item.periodLabel}} ›</text></view>
-    </button>
+    </button><view wx:if="{{canManage}}" class="period-actions"><button class="text-button danger" data-id="{{item.id}}" bindtap="deletePeriod" disabled="{{busy}}">删除</button></view></view>
     <button wx:if="{{hasMore}}" class="secondary wide" bindtap="loadMore">加载更多</button>
   </block>
   <block wx:elif="{{mode === 'detail' && selected}}">
@@ -33,7 +33,8 @@
       <view wx:if="{{report && report.hasChanges && own && !isLeader}}" class="meta change-status">有待重新提交的修改</view>
       <view class="actions {{isLeader ? 'center-actions' : ''}}" wx:if="{{canReadTeam || canManage}}">
         <button wx:if="{{canReadTeam}}" class="secondary" bindtap="openTeam" disabled="{{busy}}">查看团队提交</button>
-        <button wx:if="{{canManage && !selected.supersededBy}}" class="secondary" bindtap="editCurrentPeriod" disabled="{{busy}}">周期设置</button>
+        <button wx:if="{{canManage && !selected.supersededBy && selected.status !== 'deleted'}}" class="secondary" bindtap="editCurrentPeriod" disabled="{{busy}}">周期设置</button>
+        <button wx:if="{{canManage && selected.status !== 'deleted'}}" class="secondary danger" data-id="{{selected.id}}" bindtap="deletePeriod" disabled="{{busy}}">删除周报</button>
       </view>
       <text wx:if="{{selected.edition > 1 || selected.supersededBy}}" class="meta">第{{selected.edition || 1}}版{{selected.supersededBy ? ' · 已修订' : ''}}</text>
       <view wx:if="{{selected.previousPeriodId || selected.supersededBy}}" class="actions"><button wx:if="{{selected.previousPeriodId}}" class="secondary" data-id="{{selected.previousPeriodId}}" bindtap="openEdition">查看上一版</button><button wx:if="{{selected.supersededBy}}" class="secondary" data-id="{{selected.supersededBy}}" bindtap="openEdition">查看新版</button></view>

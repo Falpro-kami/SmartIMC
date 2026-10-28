@@ -51,6 +51,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     return row;
   }
   const target = (p, id) => p.roster.find(row => row.id === id);
+  const unpublished = p => ['scheduled', 'cancelled'].includes(p.status) || p.status === 'deleted' && ['scheduled', 'cancelled'].includes(p.deletedFromStatus);
   const formKey = p => hash('form_', p._id + ':' + JSON.stringify(p.schema ? form.schema(p.schema) : null));
   function checkForm(p, key) { if ((key || (p.schemaRevision || 1) > 1) && key !== formKey(p)) reject('FORM_CHANGED', '本期表单已修改，请重新打开周报后填写；当前尚未保存的输入请先保留。'); }
   async function hasActivity(p) {
@@ -61,6 +62,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   function editable(p, id, report) {
     const person = target(p, id);
     if (!person || person.exempt) reject('NOT_REQUIRED', '本周期无需你提交周报。');
+    if (p.status === 'deleted') reject('CLOSED', '该周报已删除，原内容已保留。');
     if (p.supersededBy) reject('CLOSED', '这版周报已被修订，原内容已保留，请打开新版填写。');
     if (p.status !== 'open') reject('CLOSED', p.status === 'archived' ? '该周期已归档。' : '该周期已关闭。');
     if (clock() < dateMs(p.startDate)) reject('NOT_STARTED', '本周期尚未开始。');
@@ -89,7 +91,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     const actor = await authorize(id);
     const offset = event.offset === undefined ? 0 : event.offset;
     if (!Number.isSafeInteger(offset) || offset < 0) reject('INVALID_INPUT', '分页参数不正确。');
-    const periods = (await db.collection('weeklyPeriods').where({ teamId: TEAM, ...(access.allowed(actor, 'weekly.manage') ? {} : { status: db.command.in(['open', 'closed', 'archived']) }) }).orderBy('startDate', 'desc').orderBy('_id', 'desc').skip(offset).limit(21).get()).data;
+    const periods = (await db.collection('weeklyPeriods').where({ teamId: TEAM, status: db.command.in(access.allowed(actor, 'weekly.manage') ? ['scheduled', 'cancelled', 'open', 'closed', 'archived'] : ['open', 'closed', 'archived']) }).orderBy('startDate', 'desc').orderBy('_id', 'desc').skip(offset).limit(21).get()).data;
     const rows = periods.slice(0, 20);
     const own = rows.length ? (await db.collection('weeklyReports').where({ teamId: TEAM, ownerId: id, periodId: db.command.in(rows.map(p => p._id)) }).limit(20).get()).data : [];
     const reports = new Map(own.map(r => [r.periodId, r]));
@@ -101,7 +103,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
     const p = await period(db, event.periodId);
     const ownerId = event.ownerId || id;
     const viewer = await authorize(id, ownerId === id ? 'weekly.read.own' : 'weekly.read.team');
-    if (['scheduled', 'cancelled'].includes(p.status) && !access.allowed(viewer, 'weekly.manage')) reject('NOT_FOUND', '周报周期尚未发布。');
+    if (unpublished(p) && !access.allowed(viewer, 'weekly.manage')) reject('NOT_FOUND', '周报周期尚未发布。');
     const r = await read(db, 'weeklyReports', reportId(p._id, ownerId));
     if (ownerId !== id && (!r || r.status !== 'submitted')) reject('NOT_FOUND', '该成员尚未提交周报。');
     const versions = (await db.collection('weeklyVersions').where({ teamId: TEAM, reportId: reportId(p._id, ownerId) }).orderBy('version', 'desc').limit(100).get()).data;
@@ -167,6 +169,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   async function configuration(id, event) {
     await authorize(id, 'weekly.manage');
     const p = await period(db, event.periodId);
+    if (p.status === 'deleted') reject('DELETED', '该周报已删除，无法继续修改。');
     if (p.supersededBy) reject('SUPERSEDED', '这版周报已被修订，请打开新版设置。');
     return { ok: true, period: { ...periodView(p, id), roster: p.roster } };
   }
@@ -199,6 +202,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       await authorize(id, 'weekly.manage', tx);
       const previous = await read(tx, 'weeklyPeriods', e.id);
       if (previous && previous.teamId !== TEAM) reject('NOT_FOUND', '周报周期不存在。');
+      if (previous && previous.status === 'deleted') reject('DELETED', '该周报已删除，无法继续修改。');
       if (previous && previous.supersededBy) reject('SUPERSEDED', '这版周报已被修订，请打开新版设置。');
       if ((previous ? previous.revision : 0) !== e.revision) reject('CONFLICT', '周期已更新，请重新打开后编辑。');
       if (!previous && !['open', 'scheduled'].includes(e.status)) reject('INVALID_INPUT', '请选择立即发布或定时发布。');
@@ -247,6 +251,22 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       await sync.bump(tx, ['home', 'weekly']);
     });
     return result;
+  }
+  async function deletePeriod(id, e) {
+    await authorize(id, 'weekly.manage');
+    if (e.confirmDelete !== true || !Number.isSafeInteger(e.revision) || e.revision < 0) reject('INVALID_INPUT', '请确认删除并提供当前周报版本。');
+    const active = new Set((await roster(id)).members.map(m => m.id));
+    await db.runTransaction(async tx => {
+      await authorize(id, 'weekly.manage', tx);
+      const p = await period(tx, e.periodId);
+      if (p.status === 'deleted') return;
+      if (p.revision !== e.revision) reject('CONFLICT', '周报已更新，请重新打开后再删除。');
+      await tx.collection('weeklyPeriods').doc(p._id).update({ data: { status: 'deleted', deletedFromStatus: p.status, deletedMs: clock(), deletedBy: id, revision: p.revision + 1, updatedMs: clock(), updatedBy: id } });
+      if (!['scheduled', 'cancelled'].includes(p.status)) await notice(tx, p, p.roster.map(m => m.id).filter(id => active.has(id)), 'delete', '周报已删除', p.title + (p.edition > 1 || p.supersededBy ? '（第' + (p.edition || 1) + '版）' : '') + '\n该周报已从列表和待办移除，原内容保留。');
+      await audit(tx, id, 'period.delete', p._id, { before: p, after: { status: 'deleted' } });
+      await sync.bump(tx, ['home', 'weekly']);
+    });
+    return { ok: true, id: e.periodId };
   }
   async function prepare(id, e) {
     await authorize(id, 'weekly.submit.own');
@@ -352,7 +372,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
   async function team(id, e, permission = 'weekly.read.team') {
     const actor = await authorize(id, permission);
     const p = await period(db, e.periodId), reports = await all('weeklyReports', { teamId: TEAM, periodId: p._id });
-    if (['scheduled', 'cancelled'].includes(p.status) && !access.allowed(actor, 'weekly.manage')) reject('NOT_FOUND', '周报周期尚未发布。');
+    if (unpublished(p) && !access.allowed(actor, 'weekly.manage')) reject('NOT_FOUND', '周报周期尚未发布。');
     const map = new Map(reports.map(r => [r.ownerId, r]));
     const rows = p.roster.map(person => {
       const r = map.get(person.id);
@@ -431,7 +451,7 @@ module.exports = function weekly(db, cloud, access, clock = Date.now, storage = 
       r.version || '', r.late ? '是' : '', r.exemption, r.files.map(f => f.name).join('；')]);
     return { ok: true, name: '周报提交统计-' + result.period.startDate + '.csv', csv: '\uFEFF' + lines.map(row => row.map(csvCell).join(',')).join('\r\n') };
   }
-  const actions = { list, get, roster, configuration, savePeriod, prepareUpload: prepare, finishUpload: finish, saveDraft,
+  const actions = { list, get, roster, configuration, savePeriod, deletePeriod, prepareUpload: prepare, finishUpload: finish, saveDraft,
     submit: (id, e) => saveDraft(id, e, true), team, remind, download, downloadChunk, exportStats, templates, saveTemplate, imageURL, getVersion };
   return { dispatch: async (id, e) => {
     if (!Object.prototype.hasOwnProperty.call(actions, e.action)) reject('INVALID_ACTION', '不支持的周报操作。');

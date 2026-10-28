@@ -13,11 +13,11 @@ async function request(action, data = {}) {
     error.code = result && result.code;
     throw error;
   }
-  if (['savePeriod', 'saveDraft', 'submit', 'saveTemplate'].includes(action)) { cache.invalidate('weekly:'); cache.invalidate('home:'); }
-  if (['savePeriod', 'saveDraft', 'submit', 'remind', 'saveTemplate'].includes(action) && cache.publish) {
-    cache.publish(['home', 'weekly', ...(['savePeriod', 'remind'].includes(action) ? ['messages'] : [])]);
+  if (['savePeriod', 'deletePeriod', 'saveDraft', 'submit', 'saveTemplate'].includes(action)) { cache.invalidate('weekly:'); cache.invalidate('home:'); }
+  if (['savePeriod', 'deletePeriod', 'saveDraft', 'submit', 'remind', 'saveTemplate'].includes(action) && cache.publish) {
+    cache.publish(['home', 'weekly', ...(['savePeriod', 'deletePeriod', 'remind'].includes(action) ? ['messages'] : [])]);
   }
-  if (['savePeriod', 'remind'].includes(action)) {
+  if (['savePeriod', 'deletePeriod', 'remind'].includes(action)) {
     const access = require('./access');
     if (access.notifications) access.notifications(true).catch(() => {});
   }
@@ -35,7 +35,7 @@ function dateLabel(ms) {
 const statusLabel = status => ({ unsubmitted: '未提交', draft: '草稿', submitted: '已提交', exempt: '免交', outside: '无需提交' }[status] || '-');
 const fileView = f => ({ ...f, sizeLabel: f.size < 1024 * 1024 ? Math.ceil(f.size / 1024) + ' KB' : (f.size / 1024 / 1024).toFixed(1) + ' MB' });
 const periodView = p => ({ ...p, deadlineLabel: dateLabel(p.deadlineMs), publishLabel: dateLabel(p.publishAtMs), statusLabel: p.status === 'scheduled' ? '待发布' : p.status === 'cancelled' ? '已取消' : statusLabel(p.ownStatus),
-  periodLabel: { scheduled: '待发布', cancelled: '已取消发布', open: '开放中', closed: '已关闭', archived: '已归档' }[p.status] || '-' });
+  periodLabel: { scheduled: '待发布', cancelled: '已取消发布', open: '开放中', closed: '已关闭', archived: '已归档', deleted: '已删除' }[p.status] || '-' });
 async function upload(file, periodId, fieldId = '', kind = 'attachment', formKey) {
   const prepared = await call('prepareUpload', { periodId, name: file.name, size: file.size, fieldId, kind, ...(formKey ? { formKey } : {}) });
   const uploaded = await wx.cloud.uploadFile({ cloudPath: prepared.cloudPath, filePath: file.path });

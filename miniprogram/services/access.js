@@ -1,7 +1,7 @@
 const config = require('../config/cloud');
 const cache = require('./session-cache');
 const unreadListeners = new Set();
-let unread = null, unreadAt = 0, unreadRequest = null, unreadVersion = 0;
+let unread = null, unreadCount = null, unreadAt = 0, unreadRequest = null, unreadVersion = 0;
 let scope = '';
 let identity = null;
 let identityRequest = null;
@@ -31,8 +31,8 @@ function get(force = false) {
       const nextScope = JSON.stringify([result.accountCode, result.member && result.member.status, result.member && result.member.revision, result.member && result.member.roles]);
       const changed = scope && scope !== nextScope;
       if (changed) cache.clear();
-      scope = nextScope; identity = { ...result, hasUnread: version !== unreadVersion && unread !== null ? unread : result.hasUnread };
-      if (version === unreadVersion) publishUnread(result.hasUnread === true);
+      scope = nextScope; identity = { ...result, hasUnread: version !== unreadVersion && unread !== null ? unread : result.hasUnread, unreadCount: version !== unreadVersion && unreadCount !== null ? unreadCount : result.unreadCount };
+      if (version === unreadVersion) publishUnread(result.hasUnread === true, result.unreadCount);
       if (changed && cache.publish) cache.publish(['members']);
     }
     return result;
@@ -46,16 +46,17 @@ async function mutate(data) {
   unreadVersion++;
   identity = data.action === 'apply' ? result : null;
   if (data.action === 'readMessage') cache.invalidate('access:messages'); else cache.clear();
-  if (typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread);
+  if (typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread, result.unreadCount);
   else unreadAt = 0;
   if (cache.publish) cache.publish(data.action === 'readMessage' ? ['messages'] : ['home', 'messages', 'approvals', 'members', 'weekly']);
   return result;
 }
-function publishUnread(value) {
-  unread = value; unreadAt = Date.now();
-  if (identity) identity = { ...identity, hasUnread: value };
-  unreadListeners.forEach(listener => listener(value));
-  return value;
+function publishUnread(value, count) {
+  unreadCount = Number.isSafeInteger(count) && count >= 0 ? Math.min(count, 100) : value ? Math.max(unreadCount || 0, 1) : 0;
+  unread = unreadCount > 0; unreadAt = Date.now();
+  if (identity) identity = { ...identity, hasUnread: unread, unreadCount };
+  unreadListeners.forEach(listener => listener(unread, unreadCount));
+  return unread;
 }
 function notifications(force = false) {
   if (!force && unread !== null && Date.now() - unreadAt < 5000) return Promise.resolve(unread);
@@ -63,12 +64,12 @@ function notifications(force = false) {
   const epoch = identityEpoch;
   const version = ++unreadVersion;
   unreadRequest = call({ action: 'notificationState' }).then(result => {
-    if (epoch === identityEpoch && version === unreadVersion) return publishUnread(result.hasUnread === true);
+    if (epoch === identityEpoch && version === unreadVersion) return publishUnread(result.hasUnread === true, result.unreadCount);
     return unread;
   }).finally(() => { unreadRequest = null; });
   return unreadRequest;
 }
-function subscribeUnread(listener) { unreadListeners.add(listener); if (unread !== null) listener(unread); return () => unreadListeners.delete(listener); }
+function subscribeUnread(listener) { unreadListeners.add(listener); if (unread !== null) listener(unread, unreadCount); return () => unreadListeners.delete(listener); }
 function refreshUnread() {
   unreadAt = 0; unreadVersion++;
   // A push received during an older read must get a second, post-commit read.
@@ -81,13 +82,13 @@ function read(action, data, force = false) { return cache.load('access:' + actio
 module.exports = { get, refreshIdentity, apply: () => mutate({ action: 'apply' }),
   sync: action => call({ action }),
   subscribeChanges: (channel, listener) => cache.subscribe(channel, listener),
-  notifications, refreshUnread, subscribeUnread, notificationCurrent: () => unread,
+  notifications, refreshUnread, subscribeUnread, notificationCurrent: () => unread, notificationCountCurrent: () => unreadCount,
   peek: (action, data) => cache.peek('access:' + action + ':' + JSON.stringify(data)),
   approvals: (scope, offset, force) => read('approvals', { scope, offset }, force),
   directory: (offset, force) => read('directory', { offset }, force),
   messages: async offset => { const epoch = identityEpoch, version = ++unreadVersion;
     const result = await call({ action: 'messages', offset });
-    if (epoch === identityEpoch && version === unreadVersion && typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread);
+    if (epoch === identityEpoch && version === unreadVersion && typeof result.hasUnread === 'boolean') publishUnread(result.hasUnread, result.unreadCount);
     return result; },
   readMessage: id => mutate({ action: 'readMessage', id }),
   openMessage: id => call({ action: 'openMessage', id }),

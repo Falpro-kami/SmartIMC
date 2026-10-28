@@ -372,6 +372,23 @@ Component({
     },
     newPeriod() { return this.navigateEditor('publish'); },
     editCurrentPeriod() { return this.navigateEditor('settings'); },
+    async deletePeriod(e) {
+      if (this.data.busy || !this.data.canManage) return;
+      const id = e.currentTarget.dataset.id, p = this.data.periods.find(p => p.id === id) || (this.data.selected && this.data.selected.id === id ? this.data.selected : null);
+      if (!p || p.status === 'deleted') return;
+      this.update({ busy: true, actionError: '' });
+      try {
+        const edition = p.edition > 1 || p.supersededBy ? '（第' + (p.edition || 1) + '版）' : '';
+        const choice = await wx.showModal({ title: '删除周报', content: '确认删除“' + p.title + '”' + edition + '？删除后不再显示在列表和待办中，已有草稿、提交和文件保留。' + (edition ? '其他版本不受影响。' : ''), confirmText: '删除', confirmColor: '#ad4037' });
+        if (!choice.confirm || this._detached) return;
+        await weekly.call('deletePeriod', { periodId: p.id, revision: p.revision, confirmDelete: true });
+        if (this._detached) return;
+        this.update({ busy: false });
+        if (this.data.mode === 'list') await this.loadList(false, true);
+        else return this.navigateWeekly('', 'detail', '', true);
+      } catch (error) { this.update({ actionError: error.message }); }
+      finally { this.update({ busy: false }); }
+    },
     async editPeriod(existing) {
       if (this.data.busy || !this.data.canManage) return;
       const epoch = this._epoch = (this._epoch || 0) + 1;

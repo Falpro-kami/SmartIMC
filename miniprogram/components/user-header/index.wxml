@@ -5,8 +5,8 @@
     <view class="avatar"><image wx:if="{{avatar}}" src="{{avatar}}" mode="aspectFill" binderror="avatarFailed" /><text wx:else>{{initials}}</text></view>
     <view class="identity-text"><text class="user-name">{{name}}</text><text class="team-name">{{teamName}}</text><view wx:if="{{roleTags.length}}" class="role-tags"><text wx:for="{{roleTags}}" wx:key="value" class="role-tag role-{{item.value}}">{{item.label}}</text></view></view>
   </button>
-  <button class="notification-button" bindtap="openMessages" hover-class="identity-pressed" aria-label="消息通知">
-    <view class="bell-icon"><view class="bell-body" /><view class="bell-clapper" /><view wx:if="{{hasUnread}}" class="notification-dot" /></view>
+  <button class="notification-button" bindtap="openMessages" hover-class="identity-pressed" aria-label="{{hasUnread ? '消息通知，' + unreadLabel + '条未读' : '消息通知'}}">
+    <view class="bell-icon"><view class="bell-body" /><view class="bell-clapper" /><text wx:if="{{hasUnread}}" class="notification-badge">{{unreadLabel}}</text></view>
     <text class="notification-label">消息</text>
   </button>
   </view>

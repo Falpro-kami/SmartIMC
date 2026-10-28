@@ -11,10 +11,12 @@ module.exports = function messages(db, access) {
     return { teamId: access.TEAM_ID, recipientKey: db.command.in(recipients),
       ...(unreadOnly ? { readBy: db.command.nin([id]) } : {}) };
   }
-  async function unread(id, member) {
-    const result = await db.collection(collection).where(filter(id, member, true)).limit(1).get();
-    return result.data.length > 0;
+  async function state(id, member) {
+    const result = await db.collection(collection).where(filter(id, member, true)).field({ _id: true }).limit(100).get();
+    const unreadCount = result.data.length;
+    return { hasUnread: unreadCount > 0, unreadCount };
   }
+  async function unread(id, member) { return (await state(id, member)).hasUnread; }
   function present(message, id) {
     return { id: message._id, title: message.title, body: message.body,
       createdMs: message.createdMs, read: (message.readBy || []).includes(id),
@@ -28,7 +30,7 @@ module.exports = function messages(db, access) {
       .orderBy('createdMs', 'desc').orderBy('_id', 'desc').skip(offset).limit(51).get();
     const rows = result.data.slice(0, 50);
     return { ok: true, messages: rows.map(row => present(row, id)), nextOffset: offset + rows.length, hasMore: result.data.length > 50,
-      hasUnread: rows.some(row => !(row.readBy || []).includes(id)) || await unread(id, member) };
+      ...await state(id, member) };
   }
   async function read(id, event, markRead = true) {
     if (typeof event.id !== 'string' || !/^msg_[a-f0-9]{32}$/.test(event.id)) return { ok: false, code: 'INVALID_INPUT', message: '消息参数不正确。' };
@@ -59,7 +61,7 @@ module.exports = function messages(db, access) {
     const response = result && result.result || result;
     if (response.ok && markRead) {
       const member = await access.readMember(db, id);
-      response.hasUnread = access.allowed(member, 'equipment.read') ? await unread(id, member) : false;
+      Object.assign(response, access.allowed(member, 'equipment.read') ? await state(id, member) : { hasUnread: false, unreadCount: 0 });
     }
     return response;
   }
@@ -86,6 +88,6 @@ module.exports = function messages(db, access) {
     await transaction.collection(collection).doc(_id).set({ data });
     await sync.bump(transaction, ['messages']);
   }
-  return { unread, list, read, open: (id, event) => read(id, event, false), applicationData, changeData, put,
+  return { unread, state, list, read, open: (id, event) => read(id, event, false), applicationData, changeData, put,
     applicationId };
 };

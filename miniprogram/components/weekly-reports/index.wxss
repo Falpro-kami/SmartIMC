@@ -62,5 +62,7 @@ button[disabled] { opacity: .5; }
 .empty { display: block; color: #526173; text-align: center; padding: 24px 12px; }
 .action-error { margin-top: 16px; }
 .danger { color: #ad4037; }
+.period-card .period-row { padding: 0; margin: 0; border: 0; border-radius: 0; background: #fff; }
+.period-actions { display: flex; justify-content: flex-end; padding-top: 4px; }
 .change-status { color: #005bac; }
 @media (max-width: 350px) { .card { padding-left: 12px; padding-right: 12px; } .heading { gap: 8px; } .section-title { font-size: 20px; } .field { align-items: flex-start; } .badge { padding: 0 5px; } }
