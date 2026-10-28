@@ -1,5 +1,5 @@
 <view class="weekly imc-theme">
-  <weekly-template wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" bindclose="closeTemplates" bindselect="selectTemplate" />
+  <weekly-template id="template-panel" wx:if="{{templatesOpen}}" choose="{{choosingTemplate}}" edit-id="{{initialTemplate}}" bindedit="editTemplate" binddone="closeTemplates" bindclose="closeTemplates" bindselect="selectTemplate" />
   <block wx:else>
   <view class="toolbar">
     <text class="section-title">{{mode === 'list' ? (isLeader ? '周报列表' : '我的周报') : mode === 'team' ? '团队提交' : mode === 'form' ? (form.revision ? '周期设置' : '发布周报') : '周报详情'}}</text>

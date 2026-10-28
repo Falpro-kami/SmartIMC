@@ -1,13 +1,31 @@
 const weekly = require('../../services/weekly');
 const model = require('../../utils/weekly-form');
 Component({
-  properties: { choose: Boolean },
+  properties: { choose: Boolean, editId: String },
   data: { templates: [], loading: true, busy: false, error: '', editing: null, types: model.labels },
   lifetimes: { attached() { this.load(); }, detached() { this._detached = true; } },
+  pageLifetimes: { show() { if (!this.properties.editId) this.load(); } },
   methods: {
-    async load() { this.setData({ loading: true, error: '' }); try { const r = await weekly.call('templates', {}, true); if (!this._detached) this.setData({ templates: r.templates }); } catch (e) { if (!this._detached) this.setData({ error: e.message }); } finally { if (!this._detached) this.setData({ loading: false }); } },
-    newTemplate() { this.setData({ editing: { id: weekly.newId('wt'), revision: 0, name: '', schema: model.defaults() }, error: '' }); },
-    edit(e) { const t = this.data.templates.find(t => t.id === e.currentTarget.dataset.id); if (t) { const editing = JSON.parse(JSON.stringify(t)); editing.schema.sections.forEach(s => s.fields.forEach(f => { f.optionsText = (f.options || []).join('\n'); })); this.setData({ editing, error: '' }); } },
+    async load() {
+      if (this._loading) return;
+      this._loading = true; this.setData({ loading: true, error: '' });
+      try {
+        const r = await weekly.call('templates', {}, true);
+        if (this._detached) return;
+        this.setData({ templates: r.templates });
+        if (this.properties.editId && !this._loaded) {
+          const found = this.properties.editId === 'new' ? { id: weekly.newId('wt'), revision: 0, name: '', schema: model.defaults() } : r.templates.find(t => t.id === this.properties.editId);
+          if (!found) throw new Error('模板不存在，请返回后重新打开。');
+          const editing = JSON.parse(JSON.stringify(found));
+          editing.schema.sections.forEach(s => s.fields.forEach(f => { f.optionsText = (f.options || []).join('\n'); }));
+          this.setData({ editing });
+        }
+        this._loaded = true;
+      } catch (e) { if (!this._detached) this.setData({ error: e.message }); }
+      finally { this._loading = false; if (!this._detached) this.setData({ loading: false }); }
+    },
+    newTemplate() { this.triggerEvent('edit', { id: 'new' }); },
+    edit(e) { const t = this.data.templates.find(t => t.id === e.currentTarget.dataset.id); if (t) this.triggerEvent('edit', { id: t.id }); },
     chooseTemplate(e) { const t = this.data.templates.find(t => t.id === e.currentTarget.dataset.id); if (t) this.triggerEvent('select', t); },
     name(e) { this.setData({ 'editing.name': e.detail.value }); },
     mutate(e, callback) {
@@ -36,13 +54,13 @@ Component({
     async save() {
       if (this.data.busy || !this.data.editing) return;
       this.setData({ busy: true, error: '' });
-      try { const r = await weekly.call('saveTemplate', this.data.editing); if (!this._detached) { this.setData({ editing: null }); await this.load(); this.triggerEvent('saved', r.template); } }
+      try { const r = await weekly.call('saveTemplate', this.data.editing); if (!this._detached) { this.triggerEvent('saved', r.template); this.triggerEvent('done'); } }
       catch (e) { if (!this._detached) this.setData({ error: e.message }); }
       finally { if (!this._detached) this.setData({ busy: false }); }
     },
     async back() {
       if (this.data.busy) return;
-      if (this.data.editing) { const r = await wx.showModal({ title: '离开模板编辑', content: '放弃尚未保存的模板修改？', confirmText: '离开' }); if (r.confirm) this.setData({ editing: null, error: '' }); }
+      if (this.data.editing) { const r = await wx.showModal({ title: '离开模板编辑', content: '放弃尚未保存的模板修改？', confirmText: '离开' }); if (r.confirm) this.triggerEvent('close'); }
       else this.triggerEvent('close');
     }
   }

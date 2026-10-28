@@ -1,7 +1,7 @@
 const weekly = require('../../services/weekly');
 const formModel = require('../../utils/weekly-form');
 Component({
-  properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' } },
+  properties: { initialPeriod: { type: String, value: '' }, initialView: { type: String, value: 'detail' }, initialOwner: { type: String, value: '' }, initialTemplate: String, chooseTemplate: Boolean },
   data: { mode: 'list', loading: true, busy: false, error: '', actionError: '', saveState: '', periods: [], hasMore: false,
     isLeader: false, canManage: false, canReadTeam: false, canRemind: false, canExport: false, selected: null, report: null, own: true,
     files: [], answers: {}, imageURLs: {}, templatesOpen: false, choosingTemplate: false, formUploading: false, versions: [], rows: [], filteredRows: [], filter: 'all', total: 0, submitted: 0, form: null, members: [], memberQuery: '', shownMembers: [] },
@@ -21,6 +21,20 @@ Component({
       const epoch = this._epoch = (this._epoch || 0) + 1;
       try {
         const periodId = this.properties.initialPeriod;
+        const view = this.properties.initialView;
+        if (['publish', 'settings', 'templates', 'template-edit'].includes(view)) {
+          const rights = await weekly.call('list', { offset: 0 }, force);
+          if (this._detached || epoch !== this._epoch) return;
+          this.update(this.rights(rights));
+          if (!this.data.canManage) throw new Error('没有周报管理权限。');
+          if (view === 'templates' || view === 'template-edit') {
+            this._initialized = true;
+            this.update({ mode: 'templates', templatesOpen: true, choosingTemplate: this.properties.chooseTemplate, loading: false });
+            return;
+          }
+          if (periodId) this.update({ selected: { id: periodId } });
+          return await this.editPeriod(view === 'settings');
+        }
         if (!periodId) return await this.loadList(false, force);
         this._initialized = true;
         if (this.properties.initialView !== 'team') return await this.openPeriod(periodId, this.properties.initialOwner || '', force);
@@ -44,7 +58,7 @@ Component({
       const matches = page => {
         const options = page.options || {};
         return page.route === 'pages/module/index' && options.id === 'weekly' && (options.period || '') === periodId &&
-          (!periodId || ((options.view === 'team' ? 'team' : 'detail') === view && (view === 'team' || (options.owner || '') === ownerId)));
+          (!periodId ? !['publish', 'templates', 'template-edit', 'settings'].includes(options.view) : ((options.view || 'detail') === view && (view === 'team' || (options.owner || '') === ownerId)));
       };
       let delta = 0;
       for (let i = pages.length - 2; i >= 0; i--) if (matches(pages[i])) { delta = pages.length - 1 - i; break; }
@@ -83,6 +97,11 @@ Component({
     update(data) { if (!this._detached) { this.setData(data); if (data.busy === false || data.loading === false) this.refreshLive(); } },
     async refresh(force = false, quiet = false) {
       if (this._initializing) return;
+      if (['publish', 'settings', 'templates', 'template-edit'].includes(this.properties.initialView)) {
+        if (!this._initialized) return this.initialize(force === true);
+        if (this.properties.initialView === 'templates' && force && this.selectComponent) { const child = this.selectComponent('#template-panel'); if (child) return child.load(); }
+        return;
+      }
       if (this.properties.initialPeriod && (!this.data.selected || this.properties.initialView === 'team' && !this.data.canReadTeam)) return this.initialize(force === true);
       if (this.data.mode === 'form') return;
       if (this.data.mode === 'team' && this.data.selected) return this.loadTeam(force === true, quiet);
@@ -241,9 +260,32 @@ Component({
       catch (e) { this.update({ actionError: e.message }); }
       finally { this.update({ busy: false }); }
     },
-    manageTemplates() { if (this.data.canManage && !this.data.busy) { this._choosing = true; this.update({ templatesOpen: true, choosingTemplate: this.data.mode === 'form' }); } },
-    closeTemplates() { this._choosing = false; this.update({ templatesOpen: false }); this.refreshLive(); },
-    selectTemplate(e) { if (!this.data.form) return; this.update({ 'form.schema': e.detail.schema, 'form.templateName': e.detail.name }); this.closeTemplates(); },
+    navigateEditor(view, templateId = '') {
+      if (!this.data.canManage || this.data.busy || this._navigating || this._detached || !['publish', 'settings', 'templates', 'template-edit'].includes(view)) return;
+      if (view === 'template-edit' && templateId !== 'new' && !/^wt_[a-f0-9]{32}$/.test(templateId)) return;
+      const periodId = view === 'settings' && this.data.selected && this.data.selected.id;
+      if (view === 'settings' && !periodId) return;
+      const choose = view === 'templates' && this.data.mode === 'form';
+      const url = '/pages/module/index?id=weekly&view=' + view + (periodId ? '&period=' + periodId : '') + (templateId ? '&template=' + templateId : '') + (choose ? '&choose=1' : '');
+      this._navigating = true;
+      return wx.navigateTo({ url, events: { weeklyTemplateSelected: template => {
+        if (!this._detached && this.data.form && this.data.canManage) this.update({ 'form.schema': template.schema, 'form.templateName': template.name });
+      } }, fail: () => this.update({ actionError: '页面打开失败，请重试。' }), complete: () => { this._navigating = false; } });
+    },
+    manageTemplates() { return this.navigateEditor('templates'); },
+    editTemplate(e) { return this.navigateEditor('template-edit', e.detail.id); },
+    closeTemplates() {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      if (pages.length > 1) return wx.navigateBack();
+      return this.navigateWeekly('', 'detail', '', true);
+    },
+    selectTemplate(e) {
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [], page = pages[pages.length - 1];
+      const channel = page && page.getOpenerEventChannel && page.getOpenerEventChannel();
+      if (!this.properties.chooseTemplate || !channel || !channel.emit) { this.update({ actionError: '请从发布周报页面选择模板。' }); return; }
+      channel.emit('weeklyTemplateSelected', e.detail);
+      return this.closeTemplates();
+    },
     async useFile(e) {
       if (this.data.busy) return;
       this._nativeFile = true;
@@ -312,18 +354,20 @@ Component({
       } catch (error) { if (!/cancel/i.test(error.errMsg || '')) this.update({ actionError: error.message || '导出失败，请重试。' }); }
       finally { this._nativeFile = false; this.update({ busy: false }); }
     },
-    newPeriod() { return this.editPeriod(false); },
-    editCurrentPeriod() { return this.editPeriod(true); },
+    newPeriod() { return this.navigateEditor('publish'); },
+    editCurrentPeriod() { return this.navigateEditor('settings'); },
     async editPeriod(existing) {
       if (this.data.busy || !this.data.canManage) return;
-      this._epoch = (this._epoch || 0) + 1;
+      const epoch = this._epoch = (this._epoch || 0) + 1;
       const currentId = this.data.selected && this.data.selected.id;
       this.update({ busy: true, actionError: '' });
       try {
         const roster = await weekly.call('roster');
+        if (this._detached || epoch !== this._epoch) return;
         let form;
         if (existing) {
           const result = await weekly.call('configuration', { periodId: currentId });
+          if (this._detached || epoch !== this._epoch) return;
           const p = result.period, deadline = weekly.dateLabel(p.deadlineMs);
           const publish = weekly.dateLabel(p.publishAtMs);
           form = { ...p, scheduled: p.status === 'scheduled', canSchedule: ['scheduled', 'cancelled'].includes(p.status), publishDate: p.publishAtMs ? publish.slice(0, 10) : new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10), publishTime: p.publishAtMs ? publish.slice(11) : '18:00',
@@ -340,8 +384,9 @@ Component({
             publishTime: new Date(today.getTime() + 10 * 60000).toISOString().slice(11, 16), allowLateSubmit: true, allowLateEdit: false, roster: [] };
         }
         const members = roster.members.map(m => { const selected = form.roster.find(r => r.id === m.id); return { ...m, selected: existing ? !!selected : true, exempt: selected && selected.exempt || '' }; });
-        this.update({ mode: 'form', form, members, memberQuery: '', shownMembers: members, error: '', actionError: '' });
-      } catch (error) { this.update({ actionError: error.message }); }
+        this._initialized = true;
+        this.update({ mode: 'form', loading: false, form, members, memberQuery: '', shownMembers: members, error: '', actionError: '' });
+      } catch (error) { this.update({ loading: false, actionError: error.message, ...(!this._initialized ? { error: error.message } : {}) }); }
       finally { this.update({ busy: false }); }
     },
     formInput(e) { const field = e.currentTarget.dataset.field; if (['title', 'startDate', 'endDate', 'deadlineDate', 'deadlineTime', 'publishDate', 'publishTime', 'allowLateSubmit', 'allowLateEdit'].includes(field)) this.update({ ['form.' + field]: e.detail.value }); },
@@ -366,8 +411,10 @@ Component({
           publishAt: f.scheduled ? f.publishDate + 'T' + f.publishTime : '',
           schema: f.schema || null, templateName: f.templateName || '',
           roster: this.data.members.filter(m => m.selected).map(m => ({ id: m.id, exempt: m.exempt })) });
-        this.update({ busy: false, form: null });
-        if (!this.properties.initialPeriod) {
+        this.update({ busy: false, form: ['publish', 'settings'].includes(this.properties.initialView) ? { ...f, revision: f.revision + 1 } : null });
+        if (['publish', 'settings'].includes(this.properties.initialView)) {
+          if (!this._detached) this.navigateWeekly(result.id, 'detail', '', true);
+        } else if (!this.properties.initialPeriod) {
           await this.loadList(false, true);
           if (!this._detached) this.navigateWeekly(result.id);
         } else await this.openPeriod(result.id, this.properties.initialOwner || this._ownerId || '');
