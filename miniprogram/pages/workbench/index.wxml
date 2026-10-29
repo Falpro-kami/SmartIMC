@@ -2,29 +2,23 @@
 <view class="tab-page imc-theme">
 <user-header title="工作台" />
 <view class="workbench-page">
-  <view class="app-section">
-    <text class="section-title">常用应用</text>
+  <view wx:for="{{applicationGroups}}" wx:for-item="group" wx:key="id" class="app-section">
+    <text class="section-title">{{group.title}}</text>
     <view class="tools-grid">
-      <button wx:for="{{commonTools}}" wx:key="id" class="tool-entry" hover-class="tool-entry--pressed" aria-label="{{item.name}}" data-id="{{item.id}}" bindtap="openTool"><image class="tool-icon" src="{{item.icon}}" mode="aspectFit" /><text class="tool-label">{{item.label}}</text></button>
+      <button
+        wx:for="{{group.tools}}"
+        wx:for-item="tool"
+        wx:key="id"
+        class="tool-entry"
+        hover-class="tool-entry--pressed"
+        aria-label="{{tool.name}}"
+        data-id="{{tool.id}}"
+        bindtap="openTool"
+      >
+        <image class="tool-icon" src="{{tool.icon}}" mode="aspectFit" />
+        <text class="tool-label">{{tool.name}}</text>
+      </button>
     </view>
-  </view>
-  <view class="app-section all-apps">
-  <text class="section-title">全部应用</text>
-  <view class="tools-grid">
-    <button
-      wx:for="{{tools}}"
-      wx:key="id"
-      class="tool-entry"
-      hover-class="tool-entry--pressed"
-      aria-label="{{item.name}}"
-      data-url="{{item.url}}"
-      data-id="{{item.id}}"
-      bindtap="openTool"
-    >
-      <image class="tool-icon" src="{{item.icon}}" mode="aspectFit"></image>
-      <text class="tool-label">{{item.label}}</text>
-    </button>
-  </view>
   </view>
 </view>
 </view>
