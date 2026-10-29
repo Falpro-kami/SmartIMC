@@ -3,7 +3,7 @@
   <view class="account-panel">
     <button class="manage-link standalone" bindtap="openProfile"><view class="entry-label"><imc-icon name="user" tone="muted" size="{{20}}" /><text>个人资料</text></view><text class="arrow">›</text></button>
     <view class="profile-section">
-      <view class="panel-heading"><view class="icon-heading"><imc-icon name="folder" tone="primary" size="{{16}}" background /><text>我的事务</text></view></view>
+      <view class="panel-heading"><text>我的事务</text></view>
       <button wx:for="{{personalEntries}}" wx:key="id" class="section-link" data-id="{{item.id}}" bindtap="openPersonal" hover-class="row-pressed"><view class="entry-label"><imc-icon name="{{item.icon}}" tone="muted" /><text>{{item.title}}</text></view><text class="arrow">›</text></button>
     </view>
     <text wx:if="{{error}}" class="error">{{error}}</text>
@@ -11,7 +11,7 @@
     <button class="manage-link standalone" bindtap="openTeamMembers"><view class="entry-label"><imc-icon name="users" tone="muted" size="{{20}}" /><text>团队成员</text></view><text class="arrow">›</text></button>
     <button wx:if="{{!loading && !error && canManage}}" class="manage-link standalone" bindtap="openMembers"><view class="entry-label"><imc-icon name="shield" tone="muted" size="{{20}}" /><text>成员与权限</text></view><text class="arrow">›</text></button>
     <view wx:if="{{!loading && !error && canManage}}" class="profile-section">
-      <view class="panel-heading"><view class="icon-heading"><imc-icon name="cloud" tone="primary" size="{{16}}" background /><text>数据与服务</text></view></view>
+      <view class="panel-heading"><text>数据与服务</text></view>
       <button class="section-link" bindtap="openDataBackup" hover-class="row-pressed"><view class="entry-label"><imc-icon name="backup" tone="muted" size="{{20}}" /><text>数据备份</text></view><text class="arrow">›</text></button>
       <button class="section-link" bindtap="openServiceExpiry" hover-class="row-pressed"><view class="entry-label"><imc-icon name="clock" tone="muted" size="{{20}}" /><text>到期提醒</text></view><view class="admin-row-end"><text class="expiry-label {{expiryWarning ? 'expiry-warning' : ''}}">{{expiryLabel}}</text><text class="arrow">›</text></view></button>
     </view>

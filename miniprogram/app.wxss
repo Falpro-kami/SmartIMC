@@ -1,4 +1,6 @@
-/* 智慧IMC 已确认视觉：协作蓝。浅灰画布 #f3f5f9、白色分区、14px 圆角、双色功能图标；主色 #2860cf。工作台固定四列，页头固定，周报阅读姓名居中且无分区卡片。关键颜色和尺寸使用明确值。 */
+/* 智慧IMC 已确认视觉：协作蓝。浅灰画布 #f3f5f9、白色分区、14px 圆角、双色功能图标；主色 #2860cf。工作台固定四列，页头固定，周报阅读姓名居中且无分区卡片。关键颜色和尺寸使用明确值。
+ * 图标必须服务于入口识别、信息类型区分或明确操作；非交互分区标题默认纯文字，不为装饰统一配图标。应用与导航、消息类型、可点击说明等按实际作用保留。
+ */
 @import "styles/controls.wxss";
 page { background: #f3f5f9; color: #101b2b; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 button, input, textarea { font-family: inherit; }

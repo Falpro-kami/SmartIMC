@@ -7,7 +7,7 @@
     <view wx:elif="{{adminError}}" class="admin-error"><text>{{adminError}}</text><button bindtap="loadAdminData">重试</button></view>
     <block wx:elif="{{billing}}">
       <view wx:if="{{adminMode === 'expiry'}}" class="admin-card">
-        <view class="admin-title"><view class="icon-heading"><imc-icon name="cloud" tone="primary" size="{{16}}" background /><text>云服务</text></view></view>
+        <view class="admin-title"><text>云服务</text></view>
         <view class="admin-field"><text>当前套餐</text><text>{{billing.packageName}}</text></view>
         <view class="admin-field"><text>到期时间</text><text>{{billing.expiresAt || '-'}}</text></view>
         <view class="admin-field"><text>到期提醒</text><text class="{{expiryWarning ? 'admin-warning' : ''}}">{{expiryLabel}}</text></view>
@@ -16,7 +16,7 @@
       </view>
       <block wx:if="{{adminMode === 'backup'}}">
         <view class="admin-card">
-          <view class="admin-title"><view class="icon-heading"><imc-icon name="backup" tone="primary" size="{{16}}" background /><text>创建备份</text></view></view>
+          <view class="admin-title"><text>创建备份</text></view>
           <text class="backup-label">备份密码</text>
           <input class="backup-password" password maxlength="128" value="{{password}}" bindinput="onBackupPassword" placeholder="12至128个字符" disabled="{{creating}}" />
           <text class="backup-label password-confirm-label">确认密码</text>
@@ -24,7 +24,7 @@
           <button class="admin-primary" bindtap="createBackup" disabled="{{creating || downloading}}" loading="{{creating}}">{{creating ? '正在创建' : '创建加密备份'}}</button>
         </view>
         <view class="admin-card">
-          <view class="admin-title"><view class="icon-heading"><imc-icon name="folder" tone="primary" size="{{16}}" background /><text>备份记录</text></view></view>
+          <view class="admin-title"><text>备份记录</text></view>
           <text wx:if="{{!backups.length}}" class="admin-empty">暂无备份</text>
           <view wx:for="{{backups}}" wx:key="id" class="backup-record">
             <view class="backup-record-head"><text>{{item.dateLabel}}</text><text class="backup-size">{{item.sizeLabel}}</text></view>

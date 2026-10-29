@@ -93,7 +93,7 @@
   </block>
   <block wx:elif="{{mode === 'form' && form}}">
     <view class="card">
-      <view class="section-title icon-heading"><imc-icon name="calendar" tone="primary" size="{{16}}" background /><text>{{form.revision ? '周期信息' : '发布信息'}}</text></view>
+      <view class="section-title"><text>{{form.revision ? '周期信息' : '发布信息'}}</text></view>
       <view class="field"><text>表单模板</text><button class="text-button" bindtap="manageTemplates" disabled="{{busy}}">{{form.templateName || '选择模板'}} ›</button></view>
       <button class="text-button edit-period-form" bindtap="editPeriodForm" disabled="{{busy}}">编辑本期表单</button>
       <text class="label">周报名称</text><input class="input" value="{{form.title}}" data-field="title" bindinput="formInput" maxlength="60" disabled="{{busy}}" />
@@ -106,7 +106,7 @@
       <view class="field"><text>允许逾期修改</text><switch checked="{{form.allowLateEdit}}" data-field="allowLateEdit" bindchange="formInput" color="#2860cf" disabled="{{busy}}" /></view>
       <view wx:if="{{form.revision && !form.canSchedule}}" class="field"><text>周期状态</text><picker range="{{['开放中', '已关闭', '已归档']}}" value="{{form.statusIndex}}" bindchange="statusInput" disabled="{{busy}}"><view class="picker-value">{{form.statusIndex === 0 ? '开放中' : form.statusIndex === 1 ? '已关闭' : '已归档'}} ›</view></picker></view>
     </view>
-    <view class="card"><view class="section-title icon-heading"><imc-icon name="users" tone="primary" size="{{16}}" background /><text>应交成员</text></view><input class="input member-search" value="{{memberQuery}}" bindinput="searchMembers" placeholder="搜索成员" />
+    <view class="card"><view class="section-title"><text>应交成员</text></view><input class="input member-search" value="{{memberQuery}}" bindinput="searchMembers" placeholder="搜索成员" />
       <view wx:for="{{shownMembers}}" wx:key="id" class="member-item"><button class="member-select" data-id="{{item.id}}" bindtap="toggleMember" disabled="{{busy}}"><text class="check {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</text><text>{{item.name}}</text></button><input wx:if="{{item.selected}}" class="input exemption" value="{{item.exempt}}" data-id="{{item.id}}" bindinput="exemptionInput" maxlength="80" placeholder="免交原因（选填）" disabled="{{busy}}" /></view>
     </view>
     <view class="period-form-footer"><button class="primary wide" bindtap="savePeriod" disabled="{{busy}}" loading="{{busy}}">{{form.scheduled ? '保存定时发布' : form.revision ? '更新周期' : '发布周报'}}</button></view>
