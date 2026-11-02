@@ -52,7 +52,7 @@ Page(require('../../utils/member-page')({
     wx.navigateTo({ url: '/pages/team-members/index' });
   },
   openSettings() {
-    wx.navigateTo({ url: '/pages/module/index?id=settings' });
+    wx.navigateTo({ url: '/pages/settings/index' });
   },
   async loadAdminStatus(epoch) {
     try {

@@ -1,5 +1,6 @@
 const cloudConfig = require('./config/cloud');
 const realtime = require('./services/realtime');
+const updates = require('./services/updates');
 
 App({
   globalData: {
@@ -22,6 +23,7 @@ App({
   },
 
   onLaunch() {
+    updates.init();
     if (!wx.cloud) {
       console.error('当前基础库不支持云开发，请升级微信或调试基础库。');
       return;

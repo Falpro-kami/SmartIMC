@@ -1,0 +1,74 @@
+<block wx:if="{{membershipAllowed}}">
+<view class="settings-page imc-theme">
+  <block wx:if="{{view === 'main'}}">
+    <view class="settings-group">
+      <text class="group-title">账户与隐私</text>
+      <view class="settings-card">
+        <button class="settings-row" bindtap="openProfile" hover-class="row-pressed"><text>个人资料</text><text class="arrow">›</text></button>
+        <button class="settings-row" data-view="account" bindtap="openView" hover-class="row-pressed"><text>账号信息</text><text class="arrow">›</text></button>
+        <button class="settings-row" data-view="privacy" bindtap="openView" hover-class="row-pressed"><text>隐私与授权</text><text class="arrow">›</text></button>
+      </view>
+    </view>
+    <view class="settings-group">
+      <text class="group-title">通用</text>
+      <view class="settings-card"><button class="settings-row" data-view="storage" bindtap="openView" hover-class="row-pressed"><text>存储管理</text><view class="row-end"><text class="row-value">{{storageSize}}</text><text class="arrow">›</text></view></button></view>
+    </view>
+    <view class="settings-group">
+      <text class="group-title">帮助与关于</text>
+      <view class="settings-card">
+        <button class="settings-row" data-view="help" bindtap="openView" hover-class="row-pressed"><text>使用帮助</text><text class="arrow">›</text></button>
+        <button class="settings-row" open-type="feedback" hover-class="row-pressed"><text>意见反馈</text><text class="arrow">›</text></button>
+        <button class="settings-row" data-view="about" bindtap="openView" hover-class="row-pressed"><text>关于智慧IMC</text><view class="row-end"><text class="row-value">{{versionLabel}}</text><text class="arrow">›</text></view></button>
+      </view>
+    </view>
+    <button class="exit-button" bindtap="exitApp" disabled="{{exiting}}">退出小程序</button>
+  </block>
+  <block wx:elif="{{view === 'account'}}">
+    <view wx:if="{{accountLoading}}" class="state">正在读取账号信息…</view>
+    <view wx:elif="{{accountError}}" class="error-card"><text>{{accountError}}</text><button class="secondary" bindtap="loadAccount">重试</button></view>
+    <block wx:else>
+      <view class="settings-card info-card"><view wx:for="{{accountFields}}" wx:key="label" class="info-row"><text class="info-label">{{item.label}}</text><view class="info-value"><text>{{item.value}}</text><button wx:if="{{item.copy}}" class="text-button" bindtap="copyAccount">复制</button></view></view></view>
+      <view class="settings-card action-card"><button class="settings-row" bindtap="openProfile" hover-class="row-pressed"><text>修改个人资料</text><text class="arrow">›</text></button><button class="settings-row" open-type="feedback" hover-class="row-pressed"><text>账号与数据问题反馈</text><text class="arrow">›</text></button></view>
+    </block>
+  </block>
+  <block wx:elif="{{view === 'privacy'}}">
+    <view class="settings-card content-card">
+      <text class="card-title">信息使用说明</text>
+      <view class="content-section"><text class="content-title">身份与资料</text><text class="body-text">通过微信身份识别本人，姓名和头像用于个人展示与团队成员目录。</text></view>
+      <view class="content-section"><text class="content-title">业务内容与附件</text><text class="body-text">周报、申请和附件用于对应业务办理与查阅，访问范围按团队角色和业务权限校验。</text></view>
+      <view class="content-section"><text class="content-title">数据与备份</text><text class="body-text">业务数据存储在云端。超级管理员可在“我的 → 数据与服务”创建并导出加密备份。</text></view>
+      <button wx:if="{{privacyContractAvailable}}" class="secondary" bindtap="openPrivacyContract">查看隐私保护指引</button>
+    </view>
+    <view class="settings-card content-card">
+      <text class="card-title">微信授权</text>
+      <text wx:if="{{privacyLoading}}" class="body-text">正在读取授权状态…</text>
+      <text wx:elif="{{privacyError}}" class="body-text">{{privacyError}}</text>
+      <block wx:elif="{{authRows.length}}"><view wx:for="{{authRows}}" wx:key="key" class="info-row"><text>{{item.label}}</text><text class="muted">{{item.value}}</text></view></block>
+      <text wx:else class="body-text">尚未使用需要单独授权的微信权限。</text>
+      <button class="secondary" bindtap="openPermissions">管理微信授权</button>
+    </view>
+  </block>
+  <block wx:elif="{{view === 'storage'}}">
+    <view class="settings-card content-card storage-summary"><text class="muted">可清理下载文件</text><text class="storage-size">{{storageSize}}</text><text class="muted">{{storageCount}} 个文件</text></view>
+    <view class="settings-card content-card">
+      <text class="card-title">清理范围</text>
+      <text class="body-text">已下载的周报文件副本、导出的统计副本，以及页面读取缓存。需要时可以重新获取。</text>
+      <text class="body-text paragraph">云端原件、自动保存的草稿、提交记录、偏好设置和加密备份保留。</text>
+      <text wx:if="{{activeDownloads}}" class="body-text paragraph">正在下载的文件会跳过清理。</text>
+      <view wx:if="{{storageError}}" class="inline-error"><text>{{storageError}}</text><button class="text-button" bindtap="loadStorage" disabled="{{clearing}}">重新读取</button></view>
+      <button class="primary" bindtap="clearCache" disabled="{{clearing || storageLoading || storageError}}" loading="{{clearing}}">{{clearing ? '正在清理' : '清理缓存'}}</button>
+    </view>
+  </block>
+  <block wx:elif="{{view === 'help'}}">
+    <view class="settings-card faq-card"><view wx:for="{{faqs}}" wx:key="id" class="faq-item"><button class="faq-question" data-id="{{item.id}}" bindtap="toggleFaq" aria-expanded="{{openFaq === item.id}}" hover-class="row-pressed"><text>{{item.title}}</text><text class="faq-chevron {{openFaq === item.id ? 'expanded' : ''}}">›</text></button><text wx:if="{{openFaq === item.id}}" class="faq-answer">{{item.content}}</text></view></view>
+    <button class="secondary" open-type="feedback">问题反馈</button>
+  </block>
+  <view wx:elif="{{view === 'feedback'}}" class="settings-card content-card"><text class="card-title">意见反馈</text><text class="body-text">通过微信反馈页面描述问题并附上截图，便于开发人员核实处理。</text><button class="primary" open-type="feedback">提交反馈</button></view>
+  <block wx:elif="{{view === 'about'}}">
+    <view class="about-brand"><text class="brand-mark">IMC</text><text class="brand-name">智慧IMC</text><text class="muted">{{versionLabel}}</text></view>
+    <view class="settings-card content-card"><text class="card-title">版本更新</text><text class="body-text">{{updateLabel}}</text><button wx:if="{{updateStatus === 'ready'}}" class="primary" bindtap="applyUpdate" loading="{{updating}}" disabled="{{updating}}">重启更新</button></view>
+    <view class="settings-card action-card"><button class="settings-row" bindtap="copyVersion" hover-class="row-pressed"><text>复制版本信息</text><text class="arrow">›</text></button><button class="settings-row" data-view="privacy" bindtap="openView" hover-class="row-pressed"><text>隐私与授权</text><text class="arrow">›</text></button><button class="settings-row" open-type="feedback" hover-class="row-pressed"><text>意见反馈</text><text class="arrow">›</text></button></view>
+  </block>
+</view>
+</block>
+<membership-gate wx:else />

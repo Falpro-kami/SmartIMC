@@ -1,5 +1,6 @@
 const config = require('../config/cloud');
 const cache = require('./session-cache');
+const localCache = require('./local-cache');
 const READS = ['list', 'get', 'roster', 'configuration', 'team', 'templates'];
 const cacheKey = (action, data) => 'weekly:' + action + ':' + JSON.stringify(data);
 async function request(action, data = {}) {
@@ -80,30 +81,35 @@ async function download(fileId, versionId) {
   try {
     const response = await wx.downloadFile({ url: result.url });
     if (response.statusCode !== 200) throw new Error('文件下载失败');
+    localCache.remember(response.tempFilePath);
     return { filePath: response.tempFilePath, fileName: result.file.name, ext: result.file.ext };
   } catch (_) { /* Cloud-function transfer also works when downloadFile domains have not been configured. */ }
   const filePath = wx.env.USER_DATA_PATH + '/weekly-' + fileId + '.' + result.file.ext;
-  let offset = 0;
-  await fsCall('writeFile', { filePath, data: '' });
-  try {
-    while (offset < result.file.size) {
-      const chunk = await call('downloadChunk', { fileId, versionId: versionId || '', offset });
-      const bytes = wx.base64ToArrayBuffer(chunk.data);
-      if (chunk.total !== result.file.size || !Number.isSafeInteger(chunk.nextOffset) || chunk.nextOffset <= offset || chunk.nextOffset > result.file.size ||
-        bytes.byteLength !== chunk.nextOffset - offset || chunk.complete !== (chunk.nextOffset === result.file.size)) throw new Error('文件下载校验失败，请重试。');
-      await fsCall('appendFile', { filePath, data: bytes });
-      offset = chunk.nextOffset;
+  return localCache.withFile(filePath, async () => {
+    let offset = 0;
+    await fsCall('writeFile', { filePath, data: '' });
+    try {
+      while (offset < result.file.size) {
+        const chunk = await call('downloadChunk', { fileId, versionId: versionId || '', offset });
+        const bytes = wx.base64ToArrayBuffer(chunk.data);
+        if (chunk.total !== result.file.size || !Number.isSafeInteger(chunk.nextOffset) || chunk.nextOffset <= offset || chunk.nextOffset > result.file.size ||
+          bytes.byteLength !== chunk.nextOffset - offset || chunk.complete !== (chunk.nextOffset === result.file.size)) throw new Error('文件下载校验失败，请重试。');
+        await fsCall('appendFile', { filePath, data: bytes });
+        offset = chunk.nextOffset;
+      }
+      return { filePath, fileName: result.file.name, ext: result.file.ext };
+    } catch (error) {
+      try { await fsCall('unlink', { filePath }); } catch (_) {}
+      throw error;
     }
-    return { filePath, fileName: result.file.name, ext: result.file.ext };
-  } catch (error) {
-    try { await fsCall('unlink', { filePath }); } catch (_) {}
-    throw error;
-  }
+  });
 }
 async function exportStats(periodId) {
   const result = await call('exportStats', { periodId });
   const filePath = wx.env.USER_DATA_PATH + '/weekly-statistics.csv';
-  await fsCall('writeFile', { filePath, data: result.csv, encoding: 'utf8' });
-  return { filePath, fileName: result.name };
+  return localCache.withFile(filePath, async () => {
+    await fsCall('writeFile', { filePath, data: result.csv, encoding: 'utf8' });
+    return { filePath, fileName: result.name };
+  });
 }
 module.exports = { call, subscribe: listener => cache.subscribe('weekly', listener), peek: (action, data = {}) => cache.peek(cacheKey(action, data)), upload, download, exportStats, newId, dateLabel, statusLabel, fileView, periodView, listEntry, listLayout };

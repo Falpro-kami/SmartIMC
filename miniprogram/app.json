@@ -10,7 +10,8 @@
     "pages/team-members/index",
     "pages/profile/edit",
     "pages/messages/index",
-    "pages/approvals/index"
+    "pages/approvals/index",
+    "pages/settings/index"
   ],
   "lazyCodeLoading": "requiredComponents",
   "usingComponents": {

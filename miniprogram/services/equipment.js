@@ -2,6 +2,7 @@ const config = require('../config/cloud');
 let cache = null;
 let cachedAt = 0;
 let inFlight = null;
+let generation = 0;
 
 async function request(data) {
   if (!getApp().globalData.cloudReady) throw new Error('云开发尚未初始化，请重新打开小程序。');
@@ -29,6 +30,7 @@ async function request(data) {
 function loadAll(force = false) {
   if (inFlight) return inFlight;
   if (!force && cache && Date.now() - cachedAt < 60000) return Promise.resolve(cache);
+  const epoch = generation;
   inFlight = (async () => {
     const records = [];
     let offset = 0;
@@ -45,8 +47,7 @@ function loadAll(force = false) {
     if (new Set(records.map(record => record._id)).size !== records.length) {
       throw new Error('设备清单发生变化，请下拉刷新后重试。');
     }
-    cache = records;
-    cachedAt = Date.now();
+    if (epoch === generation) { cache = records; cachedAt = Date.now(); }
     return records;
   })().finally(() => { inFlight = null; });
   return inFlight;
@@ -57,4 +58,4 @@ async function getDetail(id) {
   return result.record;
 }
 
-module.exports = { loadAll, getDetail, peek: () => cache };
+module.exports = { loadAll, getDetail, peek: () => cache, clearCache() { generation++; cache = null; cachedAt = 0; } };

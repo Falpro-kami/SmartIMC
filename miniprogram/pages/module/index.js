@@ -1,4 +1,5 @@
 const adminData = require('../../services/admin-data');
+const SETTINGS_VIEWS = { settings: '', privacy: 'privacy', feedback: 'feedback', 'account-data': 'account', about: 'about' };
 const MODULES = {
   announcements: { title: '团队公告', announcementsMode: true },
   finance: { title: '财务报销', icon: 'finance', description: '报销申请与办理记录将在这里展示' },
@@ -11,26 +12,18 @@ const MODULES = {
   'my-equipment': { title: '我的设备', uiIcon: 'monitor' },
   'my-submissions': { title: '我的提交', uiIcon: 'file' },
   'my-favorites': { title: '我的收藏', uiIcon: 'star' },
-  privacy: { title: '隐私与授权', uiIcon: 'lock' },
-  feedback: { title: '意见反馈', uiIcon: 'chat' },
-  'account-data': { title: '账号与数据', uiIcon: 'shield' },
-  about: { title: '关于智慧IMC', uiIcon: 'info' },
   'data-backup': { title: '数据备份', adminMode: 'backup' },
-  'service-expiry': { title: '到期提醒', adminMode: 'expiry' },
-  settings: {
-    title: '设置与帮助',
-    entries: [
-      { id: 'privacy', title: '隐私与授权', icon: 'lock' },
-      { id: 'feedback', title: '意见反馈', icon: 'chat' },
-      { id: 'account-data', title: '账号与数据', icon: 'shield' },
-      { id: 'about', title: '关于智慧IMC', icon: 'info' }
-    ]
-  }
+  'service-expiry': { title: '到期提醒', adminMode: 'expiry' }
 };
 Page(require('../../utils/member-page')({
-  data: { title: '', icon: '', uiIcon: 'folder', description: '', entries: [], weeklyMode: false, weeklyPeriod: '', weeklyView: 'detail', weeklyOwner: '', weeklyTemplate: '', weeklyChooseTemplate: false, announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
+  data: { title: '', icon: '', uiIcon: 'folder', description: '', settingsTarget: '', settingsRedirectError: false, weeklyMode: false, weeklyPeriod: '', weeklyView: 'detail', weeklyOwner: '', weeklyTemplate: '', weeklyChooseTemplate: false, announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
     billing: null, expiryLabel: '-', expiryWarning: false, backups: [], password: '', passwordConfirm: '', creating: false, downloading: '', progress: 0, exportedId: '' },
-  onLoad(options) {
+  onLoad(options = {}) {
+    if (Object.prototype.hasOwnProperty.call(SETTINGS_VIEWS, options.id)) {
+      this.setData({ settingsTarget: '/pages/settings/index' + (SETTINGS_VIEWS[options.id] ? '?view=' + SETTINGS_VIEWS[options.id] : '') });
+      this.openSettingsRedirect();
+      return;
+    }
     const module = Object.prototype.hasOwnProperty.call(MODULES, options.id) ? MODULES[options.id] : null;
     if (!module) { this.setData({ title: '页面不存在', description: '请返回工作台选择功能' }); return; }
     const weeklyView = ['publish', 'templates', 'template-edit', 'template-preview', 'period-form'].includes(options.view) ? options.view : /^wp_[a-f0-9]{32}$/.test(options.period || '') && ['team', 'settings', 'submission-preview'].includes(options.view) ? options.view : 'detail';
@@ -52,9 +45,10 @@ Page(require('../../utils/member-page')({
     if (weekly) await weekly.refresh(true);
     else if (this.data.adminMode) await this.loadAdminData(true);
   } finally { wx.stopPullDownRefresh(); } },
-  openEntry(event) {
-    const entry = this.data.entries.find(item => item.id === event.currentTarget.dataset.id);
-    if (entry) wx.navigateTo({ url: '/pages/module/index?id=' + entry.id });
+  openSettingsRedirect() {
+    if (!this.data.settingsTarget) return;
+    this.setData({ settingsRedirectError: false });
+    wx.redirectTo({ url: this.data.settingsTarget, fail: () => { if (!this._unloaded) this.setData({ settingsRedirectError: true }); } });
   },
   async loadAdminData(force = false) {
     if (!this.data.adminMode || this.data.adminLoading) return;

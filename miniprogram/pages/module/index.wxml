@@ -1,6 +1,7 @@
 <block wx:if="{{membershipAllowed}}">
-<view class="module-page imc-theme {{entries.length ? 'settings-page' : ''}} {{weeklyView === 'template-preview' || weeklyView === 'submission-preview' ? 'document-page' : ''}}">
-  <team-announcements wx:if="{{announcementsMode}}" initial-id="{{announcementId}}" compose="{{composeAnnouncement}}" />
+<view class="module-page imc-theme {{weeklyView === 'template-preview' || weeklyView === 'submission-preview' ? 'document-page' : ''}}">
+  <view wx:if="{{settingsTarget}}"><view wx:if="{{settingsRedirectError}}" class="admin-error"><text>设置页面打开失败，请重试。</text><button bindtap="openSettingsRedirect">重试</button></view><view wx:else class="admin-state">正在打开设置…</view></view>
+  <team-announcements wx:elif="{{announcementsMode}}" initial-id="{{announcementId}}" compose="{{composeAnnouncement}}" />
   <weekly-reports id="weekly-panel" wx:elif="{{weeklyMode}}" initial-period="{{weeklyPeriod}}" initial-view="{{weeklyView}}" initial-owner="{{weeklyOwner}}" initial-template="{{weeklyTemplate}}" choose-template="{{weeklyChooseTemplate}}" />
   <block wx:elif="{{adminMode}}">
     <view wx:if="{{adminLoading}}" class="admin-state">正在读取…</view>
@@ -36,9 +37,6 @@
       </block>
     </block>
   </block>
-  <view wx:elif="{{entries.length}}" class="settings-card">
-    <button wx:for="{{entries}}" wx:key="id" class="settings-row" data-id="{{item.id}}" bindtap="openEntry" hover-class="row-pressed"><view class="entry-label"><imc-icon name="{{item.icon || 'info'}}" tone="muted" /><text>{{item.title}}</text></view><text class="arrow">›</text></button>
-  </view>
   <view wx:else class="module-card"><image wx:if="{{icon}}" src="/assets/workbench/{{icon}}.png" mode="aspectFit" /><imc-icon wx:if="{{!icon}}" name="{{uiIcon}}" size="{{28}}" background /><text class="module-title">{{title}}</text><text class="module-status">功能筹备中</text></view>
 </view>
 </block>

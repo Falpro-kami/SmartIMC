@@ -3,12 +3,6 @@
 .module-card image { width: 48px; height: 48px; margin-bottom: 20px; }
 .module-title { color: #101b2b; font-size: 20px; font-weight: 600; }
 .module-status { color: #526173; font-size: 14px; margin-top: 12px; }
-.settings-page { padding-top: 20px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); color: #101b2b; }
-.settings-card { padding: 0 16px; border: 1px solid #e5eaf2; border-radius: 9px; background: #fff; }
-.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 60px; margin: 0; padding: 16px 0; border-bottom: 1px solid #e5eaf2; border-radius: 0; color: #101b2b; background: #fff; text-align: left; font-size: 16px; line-height: 26px; }
-.settings-row:last-child { border-bottom: 0; }
-.arrow { color: #101b2b; font-size: 24px; font-weight: 400; line-height: 1; }
-.row-pressed { background: #f4f6f9; }
 .admin-card { margin-bottom: 14px; padding: 18px 16px; border: 1px solid #e5eaf2; border-radius: 9px; background: #fff; color: #101b2b; }
 .admin-title { display: block; margin-bottom: 16px; color: #101b2b; font-size: 20px; font-weight: 600; line-height: 28px; }
 .admin-field { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid #e5eaf2; font-size: 16px; line-height: 26px; }
@@ -40,8 +34,6 @@
 .module-card > imc-icon { margin-bottom: 17px; }
 .module-title { font-size: 19px; line-height: 29px; }
 .module-status { font-size: 15px; color: #718095; }
-.settings-card { border-radius: 14px; border-color: #e9edf5; }
-.settings-row { min-height: 60px; border-bottom-color: #edf0f4; padding: 11px 0; }
 .admin-card { border-radius: 14px; border-color: #e9edf5; padding: 18px; }
 .admin-title { font-size: 19px; line-height: 29px; margin-bottom: 15px; }
 .admin-field { min-height: 53px; padding: 13px 0; border-color: #edf0f4; font-size: 15px; }
