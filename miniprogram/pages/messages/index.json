@@ -2,6 +2,6 @@
   "navigationStyle": "default",
   "navigationBarTitleText": "消息",
   "navigationBarBackgroundColor": "#ffffff",
-  "backgroundColor": "#f3f5f9",
+  "backgroundColor": "#ffffff",
   "onReachBottomDistance": 160
 }

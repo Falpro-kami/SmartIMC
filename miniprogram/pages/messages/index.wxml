@@ -1,11 +1,44 @@
 <block wx:if="{{membershipAllowed}}">
-<view class="messages-page imc-theme">
-  <view wx:if="{{messages.length}}" class="messages-toolbar"><button class="mark-read" bindtap="markAllRead" loading="{{readingAll}}" disabled="{{!hasUnread || readingAll}}">全部已读</button></view>
-  <view wx:if="{{loading}}" class="state">正在读取消息…</view>
-  <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadMessages">重试</button></view>
-  <view wx:if="{{!loading && !error && !messages.length}}" class="state">暂无消息</view>
-  <view wx:for="{{messages}}" wx:key="id" class="message-row" data-id="{{item.id}}" bindtap="openMessage"><view class="message-symbol"><imc-icon name="{{item.icon || 'file'}}" size="{{20}}" background /></view><view class="message-heading"><text class="message-title">{{item.title}}</text><view wx:if="{{!item.read}}" class="unread-dot" /></view><text class="message-body">{{item.body}}</text><view class="message-footer"><text>{{item.timeLabel}}</text><view class="message-actions"><text wx:if="{{item.resolved}}">已处理</text><button wx:if="{{!item.read}}" class="mark-read" data-id="{{item.id}}" catchtap="markRead" disabled="{{readingAll}}">标记已读</button></view></view></view>
-  <button wx:if="{{hasMore}}" class="more" bindtap="loadMore">加载更多</button>
-</view>
+  <view class="messages-page imc-theme">
+    <view class="messages-toolbar">
+      <view class="message-filters">
+        <button class="filter-button {{filter === 'all' ? 'filter-active' : ''}}" data-filter="all" bindtap="changeFilter" aria-label="{{filter === 'all' ? '全部消息，已选中' : '全部消息'}}">全部<text wx:if="{{allCountLabel}}" class="filter-count">{{allCountLabel}}</text></button>
+        <button class="filter-button {{filter === 'unread' ? 'filter-active' : ''}}" data-filter="unread" bindtap="changeFilter" aria-label="{{filter === 'unread' ? '未读消息，已选中' : '未读消息'}}">未读<text wx:if="{{unreadLabel}}" class="filter-count">{{unreadLabel}}</text></button>
+      </view>
+      <button class="mark-read mark-all" bindtap="markAllRead" loading="{{readingAll}}" disabled="{{!hasUnread || readingAll || readingId}}">全部已读</button>
+    </view>
+    <view wx:if="{{loading}}" class="state">正在读取消息…</view>
+    <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="retryMessages">重试</button></view>
+    <view wx:if="{{!loading && !error && !visibleMessages.length && (!hasMore || (filter === 'unread' && !hasUnread))}}" class="state">{{filter === 'unread' ? '暂无未读消息' : '暂无消息'}}</view>
+    <view wx:for="{{visibleMessages}}" wx:key="id" class="message-row {{item.read ? 'message-read' : ''}}">
+      <button class="message-summary" data-id="{{item.id}}" bindtap="toggleMessage" aria-expanded="{{item.expanded}}" aria-label="{{(item.expanded ? '收起' : '展开') + item.title + (item.read ? '，已读' : '，未读')}}">
+        <view class="message-summary-main">
+          <view class="message-heading">
+            <view class="message-title-group"><text class="message-title">{{item.title}}</text><view wx:if="{{!item.read}}" class="unread-dot" /></view>
+            <text class="message-time">{{item.shortTime}}</text>
+          </view>
+          <text class="message-preview">{{item.summary}}</text>
+        </view>
+        <view class="message-chevron {{item.expanded ? 'message-chevron-up' : ''}}" aria-hidden="true" />
+      </button>
+      <view wx:if="{{item.expanded}}" class="message-details">
+        <text class="message-body" selectable>{{item.body || '暂无正文'}}</text>
+        <view class="message-footer">
+          <text class="message-date">{{item.timeLabel}}</text>
+          <view class="message-actions">
+            <text wx:if="{{item.resolved}}" class="message-status">已处理</text>
+            <text wx:if="{{item.read}}" class="message-status">已读</text>
+            <button wx:else class="mark-read" data-id="{{item.id}}" bindtap="markRead" loading="{{readingId === item.id}}" disabled="{{readingAll || readingId}}">标记已读</button>
+          </view>
+        </view>
+        <button wx:if="{{item.targetAvailable}}" class="related-message" data-id="{{item.id}}" bindtap="openMessage">查看相关内容</button>
+        <text wx:elif="{{item.targetLoading}}" class="target-loading">正在读取入口…</text>
+        <button wx:elif="{{item.targetError}}" class="related-message" data-id="{{item.id}}" bindtap="retryTarget">重试读取入口</button>
+      </view>
+    </view>
+    <view wx:if="{{moreError}}" class="error"><text>{{moreError}}</text><button bindtap="loadMore">重试加载</button></view>
+    <button wx:elif="{{hasMore && (filter === 'all' || hasUnread)}}" class="more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loadingMore || readingAll || readingId}}">{{loadingMore ? (filter === 'unread' && !visibleMessages.length ? '正在查找更早的未读消息' : '正在读取消息') : '加载更早消息'}}</button>
+    <text wx:elif="{{!loading && !error && visibleMessages.length}}" class="messages-end">{{filter === 'unread' ? '已显示全部未读消息' : '已显示全部消息'}}</text>
+  </view>
 </block>
 <membership-gate wx:else />
