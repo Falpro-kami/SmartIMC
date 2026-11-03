@@ -15,7 +15,7 @@
         <view class="message-summary-main">
           <view class="message-heading">
             <view class="message-title-group"><text class="message-title">{{item.title}}</text><view wx:if="{{!item.read}}" class="unread-dot" /></view>
-            <text class="message-time">{{item.dateLabel}}</text>
+            <text class="message-time">{{item.timeLabel}}</text>
           </view>
           <text class="message-preview">{{item.summary}}</text>
         </view>

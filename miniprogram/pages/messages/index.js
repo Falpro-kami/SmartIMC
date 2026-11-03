@@ -1,12 +1,14 @@
 const access = require('../../services/access');
 
-function labels(timestamp) {
+function labels(timestamp, now) {
   const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return { timeLabel: '-', dateLabel: '-' };
+  if (Number.isNaN(date.getTime())) return { timeLabel: '-' };
   const pad = value => String(value).padStart(2, '0');
-  const dateLabel = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const sameDay = other => date.getFullYear() === other.getFullYear() && date.getMonth() === other.getMonth() && date.getDate() === other.getDate();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const dateLabel = sameDay(now) ? '今天' : sameDay(yesterday) ? '昨天' : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  return { timeLabel: `${dateLabel} ${time}`, dateLabel };
+  return { timeLabel: `${dateLabel} ${time}` };
 }
 function checkPage(result, offset) {
   if (!result || !Array.isArray(result.messages) || !Number.isSafeInteger(result.nextOffset) ||
@@ -46,13 +48,14 @@ Page(require('../../utils/member-page')({
     else if (typeof result.hasUnread === 'boolean') this._unreadCount = result.hasUnread ? Math.max(this._unreadCount || 0, 1) : 0;
   },
   present(messages) {
+    const now = new Date();
     return messages.map(message => {
       const body = typeof message.body === 'string' ? message.body : '';
       const target = this._targets && this._targets.get(message.id);
-      return { ...message, body, ...labels(message.createdMs),
+      return { ...message, body, ...labels(message.createdMs, now),
         summary: body.split(/\r?\n/).map(line => line.trim()).find(Boolean) || '暂无正文',
         read: message.read || !!(this._locallyRead && this._locallyRead.has(message.id)),
-        expanded: !!(this._expanded && this._expanded.has(message.id)),
+        expanded: this._expandedId === message.id,
         targetAvailable: !!(target && target.url), targetLoading: !!(target && target.loading), targetError: !!(target && target.error) };
     });
   },
@@ -73,10 +76,9 @@ Page(require('../../utils/member-page')({
   toggleMessage(event) {
     const id = event.currentTarget.dataset.id;
     if (!this.data.messages.some(message => message.id === id)) return;
-    if (!this._expanded) this._expanded = new Set();
-    if (this._expanded.has(id)) this._expanded.delete(id); else this._expanded.add(id);
+    this._expandedId = this._expandedId === id ? '' : id;
     this.updateView();
-    if (this._expanded.has(id)) return this.resolveTarget(id);
+    if (this._expandedId === id) return this.resolveTarget(id);
   },
   async resolveTarget(id) {
     if (!this._visible || this._unloaded || !this.data.messages.some(message => message.id === id)) return;
