@@ -15,11 +15,10 @@
         <view class="message-summary-main">
           <view class="message-heading">
             <view class="message-title-group"><text class="message-title">{{item.title}}</text><view wx:if="{{!item.read}}" class="unread-dot" /></view>
-            <text class="message-time">{{item.shortTime}}</text>
+            <text class="message-time">{{item.dateLabel}}</text>
           </view>
           <text class="message-preview">{{item.summary}}</text>
         </view>
-        <view class="message-chevron {{item.expanded ? 'message-chevron-up' : ''}}" aria-hidden="true" />
       </button>
       <view wx:if="{{item.expanded}}" class="message-details">
         <text class="message-body" selectable>{{item.body || '暂无正文'}}</text>

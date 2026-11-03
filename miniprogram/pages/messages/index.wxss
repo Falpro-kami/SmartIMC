@@ -13,17 +13,15 @@ page { background: #ffffff; }
 .mark-all { min-width: 52px; flex-shrink: 0; }
 .mark-read[disabled] { color: #8490a0; opacity: 1; }
 .message-row { margin: 0; border-bottom: 1px solid #e9edf2; }
-.message-summary { width: 100%; display: flex; align-items: center; gap: 10px; margin: 0; padding: 17px 0; border-radius: 0; background: transparent; text-align: left; line-height: 1.55; }
-.message-summary-main { flex: 1; min-width: 0; }
+.message-summary { width: 100%; display: block; margin: 0; padding: 17px 0; border-radius: 0; background: transparent; text-align: left; line-height: 1.55; }
+.message-summary-main { min-width: 0; }
 .message-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .message-title-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .message-title { min-width: 0; font-size: 15px; line-height: 23px; font-weight: 600; color: #172332; overflow-wrap: anywhere; }
 .message-read .message-title { font-weight: 400; }
 .unread-dot { width: 5px; height: 5px; border-radius: 50%; background: #e34c56; flex-shrink: 0; }
-.message-time { flex-shrink: 0; color: #788497; font-size: 11px; line-height: 23px; }
+.message-time { flex-shrink: 0; color: #788497; font-size: 11px; line-height: 23px; white-space: nowrap; }
 .message-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-height: 44px; overflow: hidden; margin-top: 5px; color: #526279; font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
-.message-chevron { width: 7px; height: 7px; margin: -4px 4px 0 2px; border-right: 1.5px solid #8b98aa; border-bottom: 1.5px solid #8b98aa; transform: rotate(45deg); flex-shrink: 0; }
-.message-chevron-up { transform: rotate(225deg); margin-top: 3px; }
 .message-details { padding: 10px 0 8px; border-top: 1px dashed #e2e7ee; }
 .message-body { display: block; font-size: 13px; line-height: 1.8; color: #526279; white-space: pre-wrap; overflow-wrap: anywhere; }
 .message-footer { display: flex; align-items: center; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; margin-top: 3px; }

@@ -1,14 +1,12 @@
 const access = require('../../services/access');
 
 function labels(timestamp) {
-  const date = new Date(timestamp), now = new Date();
-  if (Number.isNaN(date.getTime())) return { timeLabel: '-', shortTime: '-' };
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return { timeLabel: '-', dateLabel: '-' };
   const pad = value => String(value).padStart(2, '0');
-  const day = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const dateLabel = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  const sameYear = date.getFullYear() === now.getFullYear();
-  const today = sameYear && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
-  return { timeLabel: `${date.getFullYear()}-${day} ${time}`, shortTime: today ? time : sameYear ? day : `${date.getFullYear()}-${day}` };
+  return { timeLabel: `${dateLabel} ${time}`, dateLabel };
 }
 function checkPage(result, offset) {
   if (!result || !Array.isArray(result.messages) || !Number.isSafeInteger(result.nextOffset) ||
