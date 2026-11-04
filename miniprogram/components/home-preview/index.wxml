@@ -1,0 +1,15 @@
+<view class="preview-section">
+  <view class="preview-heading"><text>团队动态</text><text class="preview-counter">{{current + 1}} / {{slides.length}}</text></view>
+  <swiper class="preview-swiper" current="{{current}}" autoplay="{{autoplay && slides.length > 1}}" interval="5000" duration="500" circular="{{slides.length > 1}}" bindchange="changeSlide">
+    <swiper-item wx:for="{{slides}}" wx:key="id">
+      <button class="preview-card" data-id="{{item.id}}" bindtap="openSlide" aria-label="{{item.category + '：' + item.title}}">
+        <image class="preview-image" src="{{item.image}}" mode="aspectFill" />
+        <view class="preview-shade"></view>
+        <view class="preview-top"><text class="preview-category">{{item.category}}</text><text wx:if="{{item.placeholder}}" class="preview-placeholder">示意图片</text></view>
+        <view class="preview-copy"><text class="preview-title">{{item.title}}</text><view class="preview-bottom"><text class="preview-subtitle">{{item.subtitle}}</text><text class="preview-arrow">↗</text></view></view>
+      </button>
+    </swiper-item>
+  </swiper>
+  <view class="preview-dots"><view wx:for="{{slides}}" wx:key="id" class="preview-dot {{index === current ? 'active' : ''}}"></view></view>
+  <view wx:if="{{error}}" class="preview-error"><text>动态预览暂时无法完整加载</text><button bindtap="retry">重试</button></view>
+</view>

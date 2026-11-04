@@ -4,6 +4,9 @@ const TABLE = 'adminBackups';
 const PREFIX = 'admin-backups/';
 const CHUNK = 128 * 1024;
 const LIMIT = 32 * 1024 * 1024;
+const PRIVATE_TABLES = new Set(['sharingTasks', 'sharingFiles', 'sharingAudit', 'challengeEvents', 'challengeTeams', 'challengeFiles', 'challengeClaims', 'challengeSettings', 'challengeAudit']);
+const PRIVATE_PATH = /^(sharing|challenge)-(files|uploads)\//;
+const SCOPE_VERSION = 2;
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
 function createService({ db, cloud, access, resources, envId, now = Date.now }) {
@@ -26,12 +29,12 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
     for (let offset = 0; ; offset += 100) {
       const result = await api('ListTables', { Tag: tag, MgoLimit: 100, MgoOffset: offset });
       const batch = result.Tables || [];
-      names.push(...batch.map(item => item.TableName).filter(name => name !== TABLE));
+      names.push(...batch.map(item => item.TableName).filter(name => name !== TABLE && !PRIVATE_TABLES.has(name)));
       if (batch.length < 100) return names.sort();
     }
   }
   const present = row => ({ id: row._id, createdAt: row.createdAt, status: row.status, bytes: row.bytes || 0,
-    documentCount: row.documentCount || 0, fileCount: row.fileCount || 0, collectionCount: row.collectionCount || 0 });
+    documentCount: row.documentCount || 0, fileCount: row.fileCount || 0, collectionCount: row.collectionCount || 0, canExport: row.scopeVersion === SCOPE_VERSION });
   async function status(id) {
     const { api } = await resources();
     const result = await api('DescribeBillingInfo');
@@ -72,7 +75,7 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
         if (name === 'teamSync') acl.safeRule = await api('DescribeSafeRule', { CollectionName: name });
         collections.push({ name, documents: JSON.parse(format.json(documents)), acl, indexes });
       }
-      const inventory = async () => (await manager.storage.listDirectoryFiles('')).filter(file => !file.Key.startsWith(PREFIX) && !file.Key.endsWith('/')).sort((a, b) => a.Key.localeCompare(b.Key));
+      const inventory = async () => (await manager.storage.listDirectoryFiles('')).filter(file => !file.Key.startsWith(PREFIX) && !PRIVATE_PATH.test(file.Key) && !file.Key.endsWith('/')).sort((a, b) => a.Key.localeCompare(b.Key));
       const initial = await inventory();
       const files = [];
       let total = Buffer.byteLength(format.json(collections));
@@ -99,7 +102,8 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
       }
       collections.forEach(collection => checkReferences(collection.documents));
       const storageRules = await api('DescribeStorageSafeRule', { Bucket: env.Storages[0].Bucket });
-      const payload = { version: 1, envId, createdAt: started, collections, files, environment: env, storageRules };
+      const payload = { version: 1, envId, createdAt: started, collections, files, environment: env, storageRules,
+        scope: { version: SCOPE_VERSION, excludedCollections: Array.from(PRIVATE_TABLES), excludedStoragePrefixes: ['sharing-files/', 'sharing-uploads/', 'challenge-files/', 'challenge-uploads/'] } };
       const encrypted = format.encode(payload, event.password);
       format.decode(encrypted, event.password);
       await authorize(id);
@@ -110,10 +114,10 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
         await authorize(id, transaction);
         await transaction.collection(TABLE).doc(jobId).update({ data: { status: 'ready', bytes: encrypted.length,
           fileID: upload.fileID, sha256: format.sha256(encrypted), collectionCount: collections.length,
-          documentCount: collections.reduce((sum, collection) => sum + collection.documents.length, 0), fileCount: files.length } });
+          documentCount: collections.reduce((sum, collection) => sum + collection.documents.length, 0), fileCount: files.length, scopeVersion: SCOPE_VERSION } });
       });
       return { ok: true, backup: { id: jobId, status: 'ready', createdAt: started, bytes: encrypted.length, collectionCount: collections.length,
-        documentCount: collections.reduce((sum, collection) => sum + collection.documents.length, 0), fileCount: files.length } };
+        documentCount: collections.reduce((sum, collection) => sum + collection.documents.length, 0), fileCount: files.length, canExport: true } };
     } catch (error) {
       try { await db.collection(TABLE).doc(jobId).update({ data: { status: 'failed' } }); } catch (_) {}
       throw error;
@@ -131,6 +135,7 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
     if (!/^backup_[a-f0-9-]{36}$/.test(event.id || '') || !Number.isSafeInteger(event.offset) || event.offset < 0 || event.offset % CHUNK !== 0) reject('INVALID_INPUT', '备份参数不正确。');
     const backup = document(await db.collection(TABLE).doc(event.id).get());
     if (!backup || backup.status !== 'ready' || backup.bytes > LIMIT * 2) reject('BACKUP_NOT_FOUND', '备份不存在或尚未完成。');
+    if (backup.scopeVersion !== SCOPE_VERSION) reject('BACKUP_SCOPE_CHANGED', '请创建新备份后导出。旧备份未隔离分享和挑战赛的私密数据。');
     if (event.offset >= backup.bytes || !backup.fileID?.endsWith('/' + PREFIX + event.id + '.imcbak')) reject('INVALID_INPUT', '备份参数不正确。');
     const response = await cloud.downloadFile({ fileID: backup.fileID });
     const buffer = response.fileContent;

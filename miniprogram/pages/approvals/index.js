@@ -1,4 +1,5 @@
 const access = require('../../services/access');
+const sharingConfig = require('../../config/sharing');
 const EMPTY = { mine: '暂无申请记录', pending: '暂无待审批事项', done: '暂无已审批记录' };
 function dateLabel(value) {
   if (!value) return '';
@@ -8,13 +9,17 @@ function dateLabel(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 Page(require('../../utils/member-page')({
-  data: { loading: true, error: '', requests: [], canReviewMembers: false,
+  data: { loading: true, error: '', requests: [], canReviewMembers: false, canReviewSharing: false,
+    source: 'members', sources: [{ id: 'members', label: '成员入组' }, { id: 'sharing', label: '每周分享' }],
     activeTab: 'mine', emptyText: EMPTY.mine,
     tabs: [{ id: 'mine', label: '我的申请' }, { id: 'pending', label: '待我审批' }, { id: 'done', label: '我已审批' }] },
-  onLoad(options = {}) { if (this.data.tabs.some(tab => tab.id === options.scope)) this.setData({ activeTab: options.scope, emptyText: EMPTY[options.scope] }); },
+  onLoad(options = {}) {
+    if (this.data.tabs.some(tab => tab.id === options.scope)) this.setData({ activeTab: options.scope, emptyText: EMPTY[options.scope] });
+    if (options.source === 'sharing') this.setData({ source: 'sharing' });
+  },
   onShow() {
     if (!this._unsubscribeLive && access.subscribeChanges) this._unsubscribeLive = access.subscribeChanges('approvals', () => {
-      this._views = { [this.data.activeTab]: this.data.requests };
+      this._views = {};
       this.loadApprovals(true, true);
     });
     return this.loadApprovals();
@@ -27,25 +32,33 @@ Page(require('../../utils/member-page')({
     this.setData({ activeTab: tab, emptyText: EMPTY[tab] });
     return this.loadApprovals();
   },
+  switchSource(event) {
+    const source = event.currentTarget.dataset.id;
+    if (!this.data.sources.some(item => item.id === source) || source === this.data.source) return;
+    this.setData({ source, requests: [] });
+    return this.loadApprovals();
+  },
   async loadApprovals(force = false, quiet = false) {
     const epoch = this._epoch = (this._epoch || 0) + 1;
     const tab = this.data.activeTab;
+    const source = this.data.source, viewKey = source + ':' + tab;
     const currentRequest = () => !this._unloaded && this._epoch === epoch;
     this._views = this._views || {};
-    const first = access.peek && access.peek('approvals', { scope: tab, offset: 0 });
-    const view = this._views[tab] || (first && !first.hasMore ? first.requests.map(row => ({ ...row, dateLabel: dateLabel(row.createdMs) })) : null);
+    const first = access.peek && access.peek('approvals', { scope: tab, offset: 0, source });
+    const view = this._views[viewKey] || (first && !first.hasMore ? first.requests.map(row => ({ ...row, dateLabel: dateLabel(row.createdMs) })) : null);
     if (!quiet) this.setData({ loading: !view, error: '', requests: view || [], canReviewMembers: false });
     try {
       const current = await access.get();
       if (!currentRequest()) return;
       const canReviewMembers = access.can(current.member, 'members.manage');
-      this.setData({ canReviewMembers });
-      if (tab !== 'mine' && !canReviewMembers) { delete this._views[tab]; this.setData({ requests: [] }); return; }
+      const canReviewSharing = !!current.member && current.member.status === 'active' && current.member.id === sharingConfig.reviewerId && (current.member.roles || []).includes('sharing_reviewer');
+      this.setData({ canReviewMembers, canReviewSharing });
+      if (tab !== 'mine' && !(source === 'sharing' ? canReviewSharing : canReviewMembers)) { delete this._views[viewKey]; this.setData({ requests: [] }); return; }
       const requests = new Map();
       let offset = 0;
       let hasMore = true;
       while (hasMore) {
-        const result = await access.approvals(tab, offset, force);
+        const result = await access.approvals(tab, offset, force, source);
         if (!currentRequest()) return;
         if (!Array.isArray(result.requests) || !Number.isSafeInteger(result.nextOffset) ||
           result.nextOffset < offset || (result.hasMore && result.nextOffset <= offset)) {
@@ -55,13 +68,16 @@ Page(require('../../utils/member-page')({
         offset = result.nextOffset;
         hasMore = result.hasMore === true;
       }
-      this._views[tab] = Array.from(requests.values());
-      this.setData({ error: '', requests: this._views[tab] });
-    } catch (error) { if (currentRequest() && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) { delete this._views[tab]; this.setData({ error: error.message, requests: [], canReviewMembers: false }); } }
+      this._views[viewKey] = Array.from(requests.values());
+      this.setData({ error: '', requests: this._views[viewKey] });
+    } catch (error) { if (currentRequest() && (!quiet || ['MEMBERSHIP_REQUIRED', 'FORBIDDEN'].includes(error.code))) { delete this._views[viewKey]; this.setData({ error: error.message, requests: [], canReviewMembers: false, canReviewSharing: false }); } }
     finally { if (currentRequest()) this.setData({ loading: false }); }
   },
   openApproval(event) {
     const request = this.data.requests.find(item => item.id === event.currentTarget.dataset.id);
+    if (request && /^sh_20\d{6}$/.test(request.sharingTaskId || '')) {
+      wx.navigateTo({ url: '/pages/module/index?id=weekly-sharing&task=' + request.sharingTaskId }); return;
+    }
     if (this.data.activeTab !== 'pending' || !this.data.canReviewMembers || !request || !request.memberId) return;
     wx.navigateTo({ url: '/pages/members/index?id=' + encodeURIComponent(request.memberId),
       fail() { wx.showToast({ title: '页面打开失败，请重试', icon: 'none' }); } });

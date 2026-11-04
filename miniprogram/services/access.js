@@ -80,12 +80,12 @@ function refreshIdentity() {
   return identityRequest ? identityRequest.catch(() => {}).then(() => get(true)) : get(true);
 }
 function read(action, data, force = false) { return cache.load('access:' + action + ':' + JSON.stringify(data), () => call({ ...data, action }), 30000, force); }
-module.exports = { get, refreshIdentity, apply: () => mutate({ action: 'apply' }),
+module.exports = { get, refreshIdentity, identityScope: () => scope, apply: () => mutate({ action: 'apply' }),
   sync: action => call({ action }),
   subscribeChanges: (channel, listener) => cache.subscribe(channel, listener),
   notifications, refreshUnread, subscribeUnread, notificationCurrent: () => unread, notificationCountCurrent: () => unreadCount,
   peek: (action, data) => cache.peek('access:' + action + ':' + JSON.stringify(data)),
-  approvals: (scope, offset, force) => read('approvals', { scope, offset }, force),
+  approvals: (scope, offset, force, source = 'members') => read('approvals', { scope, offset, source }, force),
   directory: (offset, force) => read('directory', { offset }, force),
   messages: async offset => { const epoch = identityEpoch, version = ++unreadVersion;
     const result = await call({ action: 'messages', offset });

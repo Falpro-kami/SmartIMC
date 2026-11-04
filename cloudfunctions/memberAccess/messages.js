@@ -1,5 +1,6 @@
 const { createHash } = require('node:crypto');
 const sync = require('./sync');
+const sharingPolicy = require('./sharing-policy');
 const collection = 'teamMessages';
 function key(value) { return 'msg_' + createHash('sha256').update(value).digest('hex').slice(0, 32); }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
@@ -8,6 +9,7 @@ module.exports = function messages(db, access) {
   function filter(id, member, unreadOnly = false) {
     const recipients = [id];
     if (access.allowed(member, 'members.manage')) recipients.push('role:super_admin');
+    if (sharingPolicy.reviewer(member)) recipients.push('role:sharing_reviewer');
     return { teamId: access.TEAM_ID, recipientKey: db.command.in(recipients),
       ...(unreadOnly ? { readBy: db.command.nin([id]) } : {}) };
   }
@@ -20,7 +22,8 @@ module.exports = function messages(db, access) {
   function visible(message, id, member) {
     return message && message.teamId === access.TEAM_ID && (message.recipientKey === id ||
       Array.isArray(message.recipientKey) && message.recipientKey.includes(id) ||
-      message.recipientKey === 'role:super_admin' && access.allowed(member, 'members.manage'));
+      message.recipientKey === 'role:super_admin' && access.allowed(member, 'members.manage') ||
+      message.recipientKey === 'role:sharing_reviewer' && sharingPolicy.reviewer(member));
   }
   async function readAll(id, event) {
     const now = Date.now(), readBeforeMs = event.readBeforeMs === undefined ? now : event.readBeforeMs;
@@ -68,8 +71,7 @@ module.exports = function messages(db, access) {
       const reference = transaction.collection(collection).doc(event.id);
       const message = document(await reference.get());
       const canManage = access.allowed(member, 'members.manage');
-      if (!message || message.teamId !== access.TEAM_ID ||
-        (message.recipientKey !== id && !(Array.isArray(message.recipientKey) && message.recipientKey.includes(id)) && !(message.recipientKey === 'role:super_admin' && canManage))) {
+      if (!visible(message, id, member)) {
         return { ok: false, code: 'FORBIDDEN', message: '无法访问这条消息。' };
       }
       if (message.kind === 'member_application' && message.state === 'open' && canManage) {
@@ -77,6 +79,12 @@ module.exports = function messages(db, access) {
       }
       if (message.kind === 'weekly' && /^wp_[a-f0-9]{32}$/.test(message.subjectId || '')) {
         url = '/pages/module/index?id=weekly&period=' + message.subjectId;
+      }
+      if (message.kind === 'sharing' && /^sh_20\d{6}$/.test(message.subjectId || '')) {
+        url = '/pages/module/index?id=weekly-sharing&task=' + message.subjectId;
+      }
+      if (message.kind === 'challenge' && /^ce_[a-f0-9]{32}$/.test(message.subjectId || '')) {
+        url = '/pages/module/index?id=ai-challenge&event=' + message.subjectId;
       }
       if (markRead && !(message.readBy || []).includes(id)) {
         await reference.update({ data: { readBy: db.command.addToSet(id) } });

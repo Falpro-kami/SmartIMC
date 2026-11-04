@@ -2,7 +2,8 @@
   "navigationBarTitleText": "首页",
   "enablePullDownRefresh": true,
   "usingComponents": {
-    "user-header": "/components/user-header/index"
+    "user-header": "/components/user-header/index",
+    "home-preview": "/components/home-preview/index"
   },
   "backgroundColor": "#f3f5f9"
 }

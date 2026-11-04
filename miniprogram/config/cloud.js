@@ -5,5 +5,6 @@ module.exports = {
   profileFunction: 'userProfile',
   adminDataFunction: 'adminData',
   accessFunction: 'memberAccess',
-  weeklyFunction: 'weeklyReport'
+  weeklyFunction: 'weeklyReport',
+  sharingFunction: 'weeklySharing'
 };

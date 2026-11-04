@@ -5,9 +5,11 @@ function milliseconds(value) {
   return Number.isFinite(date.getTime()) ? date.getTime() : 0;
 }
 module.exports = function approvals(db, access, messages) {
+  const sharingList = require('./sharing-approvals')(db, access);
   const decided = row => row.before && row.before.status === 'pending' && row.after && ['active', 'disabled'].includes(row.after.status);
   const outcome = status => status === 'active' ? '已通过' : status === 'disabled' ? '未通过' : status === 'removed' ? '已终止' : '待审批';
   async function list(id, event) {
+    if (event.source === 'sharing') return sharingList(id, event);
     const { scope } = event;
     const offset = event.offset === undefined ? 0 : event.offset;
     if (!['mine', 'pending', 'done'].includes(scope) || !Number.isSafeInteger(offset) || offset < 0) {

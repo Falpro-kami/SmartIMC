@@ -23,11 +23,15 @@ Page(require('../../utils/member-page')({
   },
   renderHome(result) { const allTodos = result.todos.map(home.present); this._loaded = true;
     this.setData({ allTodos, todos: this.data.expandedTodos ? allTodos : allTodos.slice(0, 5), announcements: result.announcements.map(home.present), canManage: result.canManage }); },
-  async onPullDownRefresh() { try { await this.loadHome(true); } finally { wx.stopPullDownRefresh(); } },
+  async onPullDownRefresh() { try {
+    const preview = this.selectComponent('#home-preview');
+    await Promise.all([this.loadHome(true), preview ? preview.load(true) : Promise.resolve()]);
+  } finally { wx.stopPullDownRefresh(); } },
   openTodo(event) {
     const todo = this.data.todos.find(item => item.id === event.currentTarget.dataset.id);
     if (todo && /^user_[a-f0-9]{32}$/.test(todo.memberId)) wx.navigateTo({ url: '/pages/members/index?id=' + encodeURIComponent(todo.memberId) });
     else if (todo && /^wp_[a-f0-9]{32}$/.test(todo.periodId)) wx.navigateTo({ url: '/pages/module/index?id=weekly&period=' + todo.periodId });
+    else if (todo && /^sh_20\d{6}$/.test(todo.sharingTaskId)) wx.navigateTo({ url: '/pages/module/index?id=weekly-sharing&task=' + todo.sharingTaskId });
   },
   toggleTodos() { const expandedTodos = !this.data.expandedTodos; this.setData({ expandedTodos, todos: expandedTodos ? this.data.allTodos : this.data.allTodos.slice(0, 5) }); },
   openApprovals() { wx.navigateTo({ url: '/pages/approvals/index?scope=pending' }); },

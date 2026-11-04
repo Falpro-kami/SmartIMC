@@ -1,5 +1,6 @@
 const TABLE = 'teamAnnouncements';
 const weeklyTodos = require('./weekly-home');
+const sharingTodos = require('./sharing-home');
 const sync = require('./sync');
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
@@ -43,8 +44,9 @@ module.exports = function home(db, access, approvals) {
     const result = await list(id, { offset: 0 });
     if (!access.allowed(await authorize(id), 'members.manage')) todos = [];
     const weekly = await weeklyTodos(db, id);
+    const sharing = await sharingTodos(db, access, id);
     await authorize(id);
-    return { ok: true, todos: todos.concat(weekly), announcements: result.announcements.slice(0, 3), canManage: result.canManage };
+    return { ok: true, todos: todos.concat(weekly, sharing), announcements: result.announcements.slice(0, 3), canManage: result.canManage };
   }
   async function get(id, event) {
     await authorize(id);

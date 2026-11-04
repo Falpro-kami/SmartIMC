@@ -7,16 +7,18 @@ const ROLES = [
   { value: 'five_s_admin', label: '5S管理员' },
   { value: 'finance_admin', label: '财务管理员' },
   { value: 'weekly_admin', label: '周报管理员' },
+  { value: 'sharing_reviewer', label: '分享审批人（高创）' },
   { value: 'super_admin', label: '超级管理员' }
 ];
 const BASE_PERMISSIONS = ['equipment.read', 'equipment.request.own', 'weekly.submit.own',
-  'weekly.read.own', 'finance.submit.own', 'finance.read.own', 'activities.read', 'activities.join', 'academic.read'];
+  'weekly.read.own', 'finance.submit.own', 'finance.read.own', 'activities.read', 'activities.join', 'academic.read', 'sharing.read', 'sharing.submit.own'];
 const EXTRA_PERMISSIONS = {
   leader: ['team.overview', 'weekly.read.team', 'academic.read.team'],
   academic_admin: ['academic.manage', 'academic.read.team'],
   five_s_admin: ['equipment.create', 'equipment.update', 'equipment.approve', 'five_s.manage'],
   finance_admin: ['finance.read.team', 'finance.review', 'finance.manage'],
   weekly_admin: ['weekly.read.team', 'weekly.manage', 'weekly.remind', 'weekly.export'],
+  sharing_reviewer: ['sharing.manage', 'sharing.review'],
   super_admin: ['*']
 };
 function identity(context) {
