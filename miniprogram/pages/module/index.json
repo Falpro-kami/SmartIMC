@@ -6,6 +6,8 @@
   "enablePullDownRefresh": true,
   "usingComponents": {
     "team-announcements": "/components/team-announcements/index",
-    "weekly-reports": "/components/weekly-reports/index"
+    "weekly-reports": "/components/weekly-reports/index",
+    "weekly-sharing": "/components/weekly-sharing/index",
+    "ai-challenge": "/components/ai-challenge/index"
   }
 }

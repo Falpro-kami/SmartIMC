@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk');
 const { randomUUID } = require('node:crypto');
 const access = require('./access');
+const sharingPolicy = require('./sharing-policy');
 const sync = require('./sync');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database({ throwOnNotFound: false });
@@ -139,13 +140,18 @@ exports.main = async (event = {}) => {
       if (target.status === 'removed') reject('NOT_FOUND', '成员已移出团队。');
       if ((target.revision || 0) !== event.revision) reject('CONFLICT', '此成员权限已更新，请重新加载后操作。');
       const superIds = new Set(security.superAdminIds);
+      const existingReviewerId = security.sharingReviewerId || '';
+      const assigningReviewer = event.status === 'active' && event.roles.includes('sharing_reviewer');
+      if (event.roles.includes('sharing_reviewer') && event.id !== sharingPolicy.REVIEWER_ID) reject('FORBIDDEN', '每周分享维护与审批权限仅允许绑定高创账号。');
+      if (assigningReviewer && existingReviewerId && existingReviewerId !== event.id) reject('SHARING_REVIEWER_EXISTS', '已有分享审批人，请先解除原审批人的角色后再设置高创账号。');
+      const sharingReviewerId = assigningReviewer ? event.id : existingReviewerId === event.id ? '' : existingReviewerId;
       if (event.status === 'active' && event.roles.includes('super_admin')) superIds.add(event.id);
       else superIds.delete(event.id);
       if (!superIds.size) reject('LAST_SUPER_ADMIN', '至少需要保留一名启用中的超级管理员。');
       await targetRef.update({ data: { roles: event.roles, status: event.status,
         revision: event.revision + 1, updatedAt: db.serverDate(), updatedBy: id } });
       await sync.membership(transaction, target, event.status);
-      await securityRef.update({ data: { superAdminIds: Array.from(superIds), updatedAt: db.serverDate() } });
+      await securityRef.update({ data: { superAdminIds: Array.from(superIds), sharingReviewerId, updatedAt: db.serverDate() } });
       await transaction.collection('memberAudit').doc(auditId).set({ data: { actorId: id, targetId: event.id,
         applicationId,
         before: { status: target.status, roles: target.roles || [] }, after: { status: event.status, roles: event.roles },

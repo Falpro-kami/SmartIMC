@@ -1,0 +1,94 @@
+{
+  "description": "每周分享云数据库部署清单；按 docs/weekly-sharing.md 在云端创建并配置，不会由小程序自动应用。",
+  "collections": [
+    {
+      "name": "sharingTasks",
+      "permission": "ADMINONLY",
+      "indexes": [
+        {
+          "name": "sharing_weeks",
+          "fields": {
+            "teamId": 1,
+            "weekStart": -1,
+            "_id": -1
+          }
+        },
+        {
+          "name": "sharing_states",
+          "fields": {
+            "teamId": 1,
+            "reviewState": 1,
+            "weekStart": -1,
+            "_id": -1
+          }
+        },
+        {
+          "name": "sharing_mine",
+          "fields": {
+            "teamId": 1,
+            "assigneeIds": 1,
+            "weekStart": -1,
+            "_id": -1
+          }
+        },
+        {
+          "name": "sharing_deadlines",
+          "fields": {
+            "teamId": 1,
+            "reviewState": 1,
+            "endMs": 1
+          }
+        },
+        {
+          "name": "sharing_due",
+          "fields": {
+            "teamId": 1,
+            "nextReminderMs": 1
+          }
+        },
+        {
+          "name": "sharing_submissions",
+          "fields": {
+            "teamId": 1,
+            "submission.ownerId": 1,
+            "weekStart": -1
+          }
+        },
+        {
+          "name": "sharing_home",
+          "fields": {
+            "teamId": 1,
+            "assigneeIds": 1,
+            "startMs": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "sharingFiles",
+      "permission": "ADMINONLY",
+      "indexes": []
+    },
+    {
+      "name": "sharingAudit",
+      "permission": "ADMINONLY",
+      "indexes": [
+        {
+          "name": "sharing_review_history",
+          "fields": {
+            "teamId": 1,
+            "actorId": 1,
+            "createdMs": -1,
+            "_id": -1
+          }
+        }
+      ]
+    }
+  ],
+  "function": "weeklySharing",
+  "trigger": {
+    "name": "weekly-sharing-reminders",
+    "type": "timer",
+    "config": "0 */5 * * * * *"
+  }
+}

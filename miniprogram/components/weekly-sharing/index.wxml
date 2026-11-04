@@ -1,0 +1,62 @@
+<view class="sharing">
+  <block wx:if="{{mode === 'list'}}">
+    <view class="heading calendar-heading"><text>值班安排</text><button wx:if="{{canManage}}" class="primary compact" bindtap="openSchedule">＋ 排班</button></view>
+    <view class="arrangement-toolbar"><button wx:if="{{canManage}}" class="text-button import-link" bindtap="openRoster">导入排班</button><view wx:else class="toolbar-spacer"></view><view class="mine-filter"><text>只看我的值班</text><view class="mine-toggle"><switch checked="{{mine}}" color="#2860cf" bindchange="toggleMine" aria-label="只看我的值班" /></view></view></view>
+    <text wx:if="{{importMessage}}" class="notice">{{importMessage}}</text>
+    <view class="calendar-card">
+      <view class="calendar-header"><text>{{calendar.label}}</text><view class="calendar-nav"><button data-step="-1" bindtap="changeMonth" aria-label="上个月">‹</button><button data-step="1" bindtap="changeMonth" aria-label="下个月">›</button></view></view>
+      <view class="calendar-grid"><text wx:for="{{weekdays}}" wx:key="*this" class="weekday">{{item}}</text></view>
+      <view class="calendar-grid"><button wx:for="{{calendar.days}}" wx:key="date" class="calendar-cell {{item.classes}}" data-date="{{item.date}}" bindtap="selectDay" hover-class="{{item.hasTask ? 'calendar-day-pressed' : 'none'}}" aria-disabled="{{!item.hasTask}}" aria-label="{{item.date}}"><text class="day-number">{{item.day}}</text><view wx:if="{{item.showDot}}" class="duty-dot {{item.dotClass}}"></view></button></view>
+      <view class="calendar-footer"><view class="calendar-legend"><text><text class="legend-dot current-dot">●</text> 本周</text><text><text class="legend-dot">●</text> 已排班</text></view><button wx:if="{{!calendar.isCurrentMonth}}" class="text-button calendar-reset" bindtap="currentMonth">回到本月</button></view>
+    </view>
+    <scroll-view scroll-x class="filter-scroll"><view class="filters"><button wx:for="{{filters}}" wx:key="id" class="filter {{filter === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="changeFilter">{{item.label}}<view wx:if="{{filter === item.id}}" class="filter-line"></view></button><button wx:if="{{isReviewer}}" class="filter {{filter === 'review' ? 'active' : ''}}" data-id="review" bindtap="changeFilter">待我审批<view wx:if="{{filter === 'review'}}" class="filter-line"></view></button></view></scroll-view>
+    <view class="arrangement-section"><text>值班记录</text><button wx:if="{{selectedWeek}}" class="text-button" bindtap="clearWeek">查看全部</button></view>
+    <view wx:if="{{!loading && !error && !tasks.length}}" class="state">暂无值班任务</view>
+    <view wx:if="{{!error}}" class="task-list"><button wx:for="{{tasks}}" wx:key="id" class="task-row calendar-task-row" data-id="{{item.id}}" bindtap="openTask"><view class="week-chip"><text>{{item.monthLabel}}</text><text class="week-day">{{item.dayLabel}}</text></view><view class="row-main"><text class="row-title"><text wx:if="{{item.current}}" class="current-label">本周 </text>{{item.rangeLabel}}</text><text class="meta">{{item.assigneeName}} · {{item.reviewLabel}}</text><text wx:if="{{canManage && item.unboundNames.length}}" class="binding-meta">负责人账号待绑定</text><text wx:if="{{item.archived}}" class="meta">已归档，停止跟进</text></view><text class="badge {{item.status}}">{{item.statusLabel}}</text><text class="arrow">›</text></button></view>
+    <button wx:if="{{hasMore && !loading}}" class="secondary more-button" bindtap="loadMore">加载更多</button>
+  </block>
+  <block wx:elif="{{mode === 'schedule'}}">
+    <view class="heading"><text>{{form.taskId ? '调整值班' : '设置值班'}}</text><button class="text-button" bindtap="cancelSchedule" disabled="{{busy}}">取消</button></view>
+    <view wx:if="{{!loading && !error}}" class="card">
+      <text class="label">值班周（选择该周任意日期）</text><picker mode="date" value="{{form.weekStart}}" disabled="{{busy || form.taskId}}" bindchange="changeWeek"><view class="field">{{form.weekStart}} 起的一周<text class="arrow">›</text></view></picker>
+      <text class="label">值班负责人（选择两人，共同完成一份分享）</text><checkbox-group bindchange="changeMembers" class="member-options"><label wx:for="{{members}}" wx:key="id" class="member-option"><checkbox value="{{item.id}}" checked="{{item.selected}}" disabled="{{busy || selectedMemberIds.length >= 2 && !item.selected}}" color="#2860cf" /><text>{{item.name}}</text></label></checkbox-group>
+      <button class="primary" bindtap="saveSchedule" loading="{{busy}}" disabled="{{busy || selectedMemberIds.length !== 2}}">保存值班安排</button>
+    </view>
+  </block>
+  <block wx:elif="{{mode === 'roster'}}">
+    <view class="heading"><text>导入值班排班</text><button class="text-button" bindtap="backToList" disabled="{{busy}}">取消</button></view>
+    <view wx:if="{{roster && !error}}" class="card"><text class="hint">来源：{{roster.source}}</text><text class="hint">已有周次会保留；未绑定的成员需由高创确认账号后维护。</text><view wx:for="{{roster.weeks}}" wx:key="weekStart" class="roster-row"><text class="row-title">{{item.weekStart}} — {{item.endDate}}</text><view class="assignee-line"><text wx:for="{{item.assignees}}" wx:for-item="person" wx:key="name">{{person.name}}{{person.status === 'matched' ? '' : person.status === 'ambiguous' ? '（同名待确认）' : '（账号待绑定）'}}</text></view></view><button class="primary" bindtap="importRoster" disabled="{{busy}}" loading="{{busy}}">导入未创建的周次</button></view>
+  </block>
+  <block wx:elif="{{mode === 'detail' && selected && !loading && !error}}">
+    <view class="heading"><text>值班任务</text><button class="text-button" bindtap="backToList" disabled="{{busy}}">值班安排</button></view>
+    <view class="card">
+      <view class="detail-heading"><text class="section-title task-info-title">任务信息</text><text class="badge {{selected.status}}">{{selected.statusLabel}}</text></view>
+      <text wx:if="{{selected.canViewSchedule}}" class="detail-line">负责人：{{selected.assigneeName}}</text><text class="detail-line">内容状态：{{selected.reviewLabel}}</text>
+      <text wx:if="{{selected.archived}}" class="notice">已归档 · {{selected.archivedLabel}}。保留未完成记录，已停止提醒和待办跟进。</text>
+      <text wx:if="{{selected.canViewSchedule && selected.unboundNames.length}}" class="notice">部分负责人尚未绑定成员账号，请联系高创确认。</text>
+      <button wx:if="{{selected.canEdit}}" class="text-button edit-link" bindtap="openSchedule">调整值班安排</button>
+      <button wx:if="{{selected.canArchive || selected.canRestore}}" class="text-button edit-link" bindtap="changeArchive" disabled="{{busy}}">{{selected.archived ? '恢复跟进' : '归档未完成任务'}}</button>
+    </view>
+    <view wx:if="{{selected.submission}}" class="card">
+      <image wx:if="{{coverPath && !selected.canUpload}}" class="sharing-cover" src="{{coverPath}}" mode="aspectFill" />
+      <text class="section-title">{{selected.submission.title}}</text><text class="meta">第{{selected.submission.version}}次提交 · {{selected.submission.submittedLabel}}</text>
+      <text wx:if="{{selected.submission.note}}" class="content">{{selected.submission.note}}</text>
+      <button wx:for="{{selected.submission.files}}" wx:key="id" class="file-row" data-id="{{item.id}}" bindtap="openFile" disabled="{{busy || downloadId}}"><view class="row-main"><text>{{item.name}}</text><text class="meta">{{item.sizeLabel}}</text></view><text class="file-action">{{downloadId === item.id ? progress + '%' : '查看'}}</text></button>
+      <view wx:if="{{selected.submission.reviewedMs}}" class="review-result"><text>审批结果：{{selected.reviewLabel}} · {{selected.submission.reviewedLabel}}</text><text wx:if="{{selected.submission.reviewComment}}" class="content">{{selected.submission.reviewComment}}</text></view>
+    </view>
+    <view wx:elif="{{selected.reviewState !== 'none'}}" class="card"><text class="hint">分享内容尚未公开，审批通过后可以查看。</text></view>
+    <view wx:if="{{selected.canUpload}}" class="card">
+      <text class="section-title">{{selected.reviewState === 'rejected' ? '修改后重新提交' : '上传本周分享'}}</text><text class="hint">审批通过前，内容仅上传人和高创可见。</text>
+      <text class="label">分享主题</text><input class="field" value="{{title}}" maxlength="80" placeholder="填写本周分享主题" bindinput="changeTitle" disabled="{{busy}}" />
+      <text class="label">首页封面</text><text class="hint">JPG、PNG，最大2MB；建议横向图片。封面和主题随分享一起审批。</text>
+      <image wx:if="{{coverPath}}" class="sharing-cover" src="{{coverPath}}" mode="aspectFill" />
+      <button class="secondary" bindtap="chooseCover" disabled="{{busy}}">{{cover ? '更换封面' : '选择并上传封面'}}</button>
+      <text class="label">内容说明（选填）</text><textarea class="field textarea" value="{{note}}" maxlength="3000" placeholder="补充分享内容或文件说明" bindinput="changeNote" disabled="{{busy}}" />
+      <text class="label">分享文件</text><text class="hint">PDF、Word、PPT、Excel；最多5个，单个20MB，合计50MB。</text>
+      <view wx:for="{{files}}" wx:key="id" class="file-row"><view class="row-main"><text>{{item.name}}</text><text class="meta">{{item.sizeLabel}}</text></view><button class="text-button danger" data-id="{{item.id}}" bindtap="removeFile" disabled="{{busy}}">移除</button></view>
+      <button class="secondary" bindtap="chooseFiles" loading="{{busy}}" disabled="{{busy || files.length >= 5}}">选择并上传文件</button><button class="primary" bindtap="submit" disabled="{{busy || !files.length || !title || !cover}}" loading="{{busy}}">提交高创审批</button>
+    </view>
+    <view wx:if="{{selected.canReview}}" class="card"><text class="section-title">审批分享</text><text class="hint">通过后向团队公开，并将任务标记为已完成。</text><textarea class="field textarea" value="{{comment}}" maxlength="500" bindinput="changeComment" placeholder="填写审批意见，驳回时必填" disabled="{{busy}}" /><view class="actions"><button class="secondary" data-decision="rejected" bindtap="review" disabled="{{busy}}">驳回修改</button><button class="primary" data-decision="approved" bindtap="review" disabled="{{busy}}" loading="{{busy}}">通过并公开</button></view></view>
+  </block>
+  <view wx:if="{{loading}}" class="state">正在读取…</view><view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="retry">重试</button></view><text wx:if="{{actionError}}" class="error">{{actionError}}</text>
+</view>

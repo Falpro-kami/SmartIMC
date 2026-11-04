@@ -5,10 +5,10 @@ const MODULES = {
   finance: { title: '财务报销', icon: 'finance', description: '报销申请与办理记录将在这里展示' },
   weekly: { title: '周报', weeklyMode: true },
   activities: { title: '文娱活动', icon: 'activities', description: '实验室活动与报名信息将在这里展示' },
-  'ai-challenge': { title: 'AI挑战赛', icon: 'ai-challenge', description: '挑战赛题目与参赛信息将在这里展示' },
+  'ai-challenge': { title: 'AI挑战赛', challengeMode: true },
   leave: { title: '请假', icon: 'leave' },
   knowledge: { title: '团队知识库', icon: 'knowledge' },
-  'weekly-sharing': { title: '每周分享', icon: 'weekly-sharing' },
+  'weekly-sharing': { title: '每周分享', sharingMode: true },
   'my-equipment': { title: '我的设备', uiIcon: 'monitor' },
   'my-submissions': { title: '我的提交', uiIcon: 'file' },
   'my-favorites': { title: '我的收藏', uiIcon: 'star' },
@@ -33,7 +33,7 @@ Page(require('../../utils/member-page')({
     const weeklyChooseTemplate = weeklyView === 'templates' && options.choose === '1';
     this.setData({ ...module, ...(module.weeklyMode ? { weeklyPeriod, weeklyView, weeklyOwner, weeklyTemplate, weeklyChooseTemplate } : {}), ...(module.announcementsMode ? {
       announcementId: /^ann_[a-f0-9]{32}$/.test(options.announcement || '') ? options.announcement : '', composeAnnouncement: options.compose === '1'
-    } : {}) });
+    } : {}), ...(module.sharingMode ? { sharingTask: /^sh_20\d{6}$/.test(options.task || '') ? options.task : '' } : {}), ...(module.challengeMode ? { challengeEvent: /^ce_[a-f0-9]{32}$/.test(options.event || '') ? options.event : '' } : {}) });
     const weeklyTitle = { publish: '发布周报', settings: '周期设置', templates: '表单模板', 'template-edit': weeklyTemplate === 'new' ? '新建模板' : '编辑模板', 'template-preview': '周报预览', 'submission-preview': '周报预览', 'period-form': '编辑本期表单' }[weeklyView];
     wx.setNavigationBarTitle({ title: module.weeklyMode ? weeklyTitle || (weeklyPeriod ? weeklyView === 'team' ? '团队提交' : weeklyOwner ? '成员周报' : '周报详情' : module.title) : module.title });
     if (module.adminMode) this.loadAdminData();
@@ -43,6 +43,8 @@ Page(require('../../utils/member-page')({
   async onPullDownRefresh() { try {
     const weekly = this.data.weeklyMode && this.selectComponent('#weekly-panel');
     if (weekly) await weekly.refresh(true);
+    else if (this.data.sharingMode) { const sharing = this.selectComponent('#sharing-panel'); if (sharing) await sharing.refresh(); }
+    else if (this.data.challengeMode) { const challenge = this.selectComponent('#challenge-panel'); if (challenge) await challenge.refresh(); }
     else if (this.data.adminMode) await this.loadAdminData(true);
   } finally { wx.stopPullDownRefresh(); } },
   openSettingsRedirect() {

@@ -1,0 +1,134 @@
+{
+  "source": "Ai周报值班表(1).xlsx",
+  "sheet": "Sheet1",
+  "sha256": "9de27bd9386a3dbe81dd5e19b8138206d8deb0605ca7559ac436764bc955a889",
+  "firstYear": 2026,
+  "weeks": [
+    {
+      "weekStart": "2026-10-26",
+      "endDate": "2026-11-01",
+      "assigneeNames": [
+        "罗锦宏",
+        "张徐楠"
+      ],
+      "sourceRange": "A4:D4"
+    },
+    {
+      "weekStart": "2026-11-02",
+      "endDate": "2026-11-08",
+      "assigneeNames": [
+        "敖家俊",
+        "罗杰文"
+      ],
+      "sourceRange": "A6:D6"
+    },
+    {
+      "weekStart": "2026-11-09",
+      "endDate": "2026-11-15",
+      "assigneeNames": [
+        "曹洋",
+        "柯越"
+      ],
+      "sourceRange": "A8:D8"
+    },
+    {
+      "weekStart": "2026-11-16",
+      "endDate": "2026-11-22",
+      "assigneeNames": [
+        "廖雪凡",
+        "衷诚"
+      ],
+      "sourceRange": "A10:D10"
+    },
+    {
+      "weekStart": "2026-11-23",
+      "endDate": "2026-11-29",
+      "assigneeNames": [
+        "陈帅康",
+        "陈欣怡"
+      ],
+      "sourceRange": "A12:D12"
+    },
+    {
+      "weekStart": "2026-11-30",
+      "endDate": "2026-12-06",
+      "assigneeNames": [
+        "高创",
+        "李潇"
+      ],
+      "sourceRange": "A14:D14"
+    },
+    {
+      "weekStart": "2026-12-07",
+      "endDate": "2026-12-13",
+      "assigneeNames": [
+        "袁龙涛",
+        "周铸辉"
+      ],
+      "sourceRange": "A16:D16"
+    },
+    {
+      "weekStart": "2026-12-14",
+      "endDate": "2026-12-20",
+      "assigneeNames": [
+        "罗锦宏",
+        "张徐楠"
+      ],
+      "sourceRange": "A18:D18"
+    },
+    {
+      "weekStart": "2026-12-21",
+      "endDate": "2026-12-27",
+      "assigneeNames": [
+        "敖家俊",
+        "罗杰文"
+      ],
+      "sourceRange": "A20:D20"
+    },
+    {
+      "weekStart": "2026-12-28",
+      "endDate": "2027-01-03",
+      "assigneeNames": [
+        "曹洋",
+        "柯越"
+      ],
+      "sourceRange": "A22:D22"
+    },
+    {
+      "weekStart": "2027-01-04",
+      "endDate": "2027-01-10",
+      "assigneeNames": [
+        "廖雪凡",
+        "衷诚"
+      ],
+      "sourceRange": "A24:D24"
+    },
+    {
+      "weekStart": "2027-01-11",
+      "endDate": "2027-01-17",
+      "assigneeNames": [
+        "陈帅康",
+        "陈欣怡"
+      ],
+      "sourceRange": "A26:D26"
+    },
+    {
+      "weekStart": "2027-01-18",
+      "endDate": "2027-01-24",
+      "assigneeNames": [
+        "高创",
+        "李潇"
+      ],
+      "sourceRange": "A28:D28"
+    },
+    {
+      "weekStart": "2027-01-25",
+      "endDate": "2027-01-31",
+      "assigneeNames": [
+        "袁龙涛",
+        "周铸辉"
+      ],
+      "sourceRange": "A30:D30"
+    }
+  ]
+}
