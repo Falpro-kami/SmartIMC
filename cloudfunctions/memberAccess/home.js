@@ -4,7 +4,7 @@ const sharingTodos = require('./sharing-home');
 const sync = require('./sync');
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
-module.exports = function home(db, access, approvals) {
+module.exports = function home(db, access, approvals, leave) {
   async function authorize(id, manage = false, store = db) {
     const member = document(await store.collection('teamMembers').doc(id).get());
     if (!member || member.teamId !== access.TEAM_ID || member.status !== 'active') reject('MEMBERSHIP_REQUIRED', '通过 IMC 成员审核后才能查看团队内容。');
@@ -46,7 +46,8 @@ module.exports = function home(db, access, approvals) {
     const weekly = await weeklyTodos(db, id);
     const sharing = await sharingTodos(db, access, id);
     await authorize(id);
-    return { ok: true, todos: todos.concat(weekly, sharing), announcements: result.announcements.slice(0, 3), canManage: result.canManage };
+    const leaveTodos = leave ? await leave.todos(id) : [];
+    return { ok: true, todos: todos.concat(leaveTodos, weekly, sharing), announcements: result.announcements.slice(0, 3), canManage: result.canManage };
   }
   async function get(id, event) {
     await authorize(id);

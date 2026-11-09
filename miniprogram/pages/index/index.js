@@ -32,6 +32,7 @@ Page(require('../../utils/member-page')({
     if (todo && /^user_[a-f0-9]{32}$/.test(todo.memberId)) wx.navigateTo({ url: '/pages/members/index?id=' + encodeURIComponent(todo.memberId) });
     else if (todo && /^wp_[a-f0-9]{32}$/.test(todo.periodId)) wx.navigateTo({ url: '/pages/module/index?id=weekly&period=' + todo.periodId });
     else if (todo && /^sh_20\d{6}$/.test(todo.sharingTaskId)) wx.navigateTo({ url: '/pages/module/index?id=weekly-sharing&task=' + todo.sharingTaskId });
+    else if (todo && /^lv_[a-f0-9]{32}$/.test(todo.leaveId)) wx.navigateTo({ url: '/pages/leave/index?id=' + todo.leaveId });
   },
   toggleTodos() { const expandedTodos = !this.data.expandedTodos; this.setData({ expandedTodos, todos: expandedTodos ? this.data.allTodos : this.data.allTodos.slice(0, 5) }); },
   openApprovals() { wx.navigateTo({ url: '/pages/approvals/index?scope=pending' }); },

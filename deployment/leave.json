@@ -1,0 +1,17 @@
+{
+  "description": "请假私有集合与查询索引。先部署新版 adminData，再创建集合，最后部署 memberAccess 与小程序。",
+  "collections": [
+    {
+      "name": "leaveRequests",
+      "permission": "ADMINONLY",
+      "indexes": [
+        { "name": "leave_mine", "fields": { "teamId": 1, "ownerId": 1, "createdMs": -1, "_id": -1 } },
+        { "name": "leave_pending", "fields": { "teamId": 1, "reviewerId": 1, "status": 1, "createdMs": -1, "_id": -1 } },
+        { "name": "leave_done", "fields": { "teamId": 1, "reviewerId": 1, "reviewedBy": 1, "createdMs": -1, "_id": -1 } },
+        { "name": "leave_overlap", "fields": { "teamId": 1, "ownerId": 1, "status": 1, "startMs": 1, "endMs": 1 } }
+      ]
+    },
+    { "name": "leaveAudit", "permission": "ADMINONLY", "indexes": [] },
+    { "name": "leaveLocks", "permission": "ADMINONLY", "indexes": [] }
+  ]
+}

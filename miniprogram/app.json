@@ -11,7 +11,8 @@
     "pages/profile/edit",
     "pages/messages/index",
     "pages/approvals/index",
-    "pages/settings/index"
+    "pages/settings/index",
+    "pages/leave/index"
   ],
   "lazyCodeLoading": "requiredComponents",
   "usingComponents": {

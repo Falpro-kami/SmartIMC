@@ -2,7 +2,7 @@ const GROUPS = [
   {
     id: 'office', title: '办公协作', tools: [
       { id: 'approvals', name: '申请与审批', icon: '/assets/workbench/approvals.png', url: '/pages/approvals/index' },
-      { id: 'leave', name: '请假', icon: '/assets/workbench/leave.png', url: '/pages/module/index?id=leave' },
+      { id: 'leave', name: '请假', icon: '/assets/workbench/leave.png', url: '/pages/leave/index' },
       { id: 'finance', name: '财务报销', icon: '/assets/workbench/finance.png', url: '/pages/module/index?id=finance' },
       { id: 'weekly', name: '周报', icon: '/assets/workbench/weekly.png', url: '/pages/module/index?id=weekly' }
     ]

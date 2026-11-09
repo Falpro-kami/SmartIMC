@@ -6,9 +6,10 @@ const sync = require('./sync');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database({ throwOnNotFound: false });
 const messages = require('./messages')(db, access);
+const leave = require('./leave')(db, access, messages);
 const workbench = require('./workbench')(db, access);
-const approvals = require('./approvals')(db, access, messages);
-const home = require('./home')(db, access, approvals);
+const approvals = require('./approvals')(db, access, messages, leave);
+const home = require('./home')(db, access, approvals, leave);
 
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
@@ -36,6 +37,11 @@ exports.main = async (event = {}) => {
     if (event.action === 'saveAnnouncement') return await home.save(id, event);
     if (event.action === 'withdrawAnnouncement') return await home.withdraw(id, event);
     if (event.action === 'approvals') return await approvals.list(id, event);
+    if (event.action === 'leaveReviewers') return await leave.reviewers(id);
+    if (event.action === 'leaveList') return await leave.list(id, { scope: 'mine', offset: event.offset });
+    if (event.action === 'leaveDetail') return await leave.detail(id, event);
+    if (event.action === 'leaveSubmit') return await leave.submit(id, event);
+    if (['leaveReview', 'leaveWithdraw', 'leaveCancel', 'leaveReassign'].includes(event.action)) return await leave.change(id, event);
     if (event.action === 'workbenchUsage') return await workbench.get(id);
     if (event.action === 'recordToolOpen') return await workbench.record(id, event);
     if (event.action === 'messages') return await messages.list(id, event);

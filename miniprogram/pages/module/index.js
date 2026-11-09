@@ -6,7 +6,6 @@ const MODULES = {
   weekly: { title: '周报', weeklyMode: true },
   activities: { title: '文娱活动', icon: 'activities', description: '实验室活动与报名信息将在这里展示' },
   'ai-challenge': { title: 'AI挑战赛', challengeMode: true },
-  leave: { title: '请假', icon: 'leave' },
   knowledge: { title: '团队知识库', icon: 'knowledge' },
   'weekly-sharing': { title: '每周分享', sharingMode: true },
   'my-equipment': { title: '我的设备', uiIcon: 'monitor' },
@@ -19,6 +18,11 @@ Page(require('../../utils/member-page')({
   data: { title: '', icon: '', uiIcon: 'folder', description: '', settingsTarget: '', settingsRedirectError: false, weeklyMode: false, weeklyPeriod: '', weeklyView: 'detail', weeklyOwner: '', weeklyTemplate: '', weeklyChooseTemplate: false, announcementsMode: false, announcementId: '', composeAnnouncement: false, adminMode: '', adminLoading: false, adminError: '',
     billing: null, expiryLabel: '-', expiryWarning: false, backups: [], password: '', passwordConfirm: '', creating: false, downloading: '', progress: 0, exportedId: '' },
   onLoad(options = {}) {
+    if (options.id === 'leave') {
+      this.setData({ settingsTarget: '/pages/leave/index' });
+      this.openSettingsRedirect();
+      return;
+    }
     if (Object.prototype.hasOwnProperty.call(SETTINGS_VIEWS, options.id)) {
       this.setData({ settingsTarget: '/pages/settings/index' + (SETTINGS_VIEWS[options.id] ? '?view=' + SETTINGS_VIEWS[options.id] : '') });
       this.openSettingsRedirect();

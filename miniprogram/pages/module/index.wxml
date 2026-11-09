@@ -1,6 +1,6 @@
 <block wx:if="{{membershipAllowed}}">
 <view class="module-page imc-theme {{weeklyView === 'template-preview' || weeklyView === 'submission-preview' ? 'document-page' : ''}}">
-  <view wx:if="{{settingsTarget}}"><view wx:if="{{settingsRedirectError}}" class="admin-error"><text>设置页面打开失败，请重试。</text><button bindtap="openSettingsRedirect">重试</button></view><view wx:else class="admin-state">正在打开设置…</view></view>
+  <view wx:if="{{settingsTarget}}"><view wx:if="{{settingsRedirectError}}" class="admin-error"><text>页面打开失败，请重试。</text><button bindtap="openSettingsRedirect">重试</button></view><view wx:else class="admin-state">正在打开页面…</view></view>
   <team-announcements wx:elif="{{announcementsMode}}" initial-id="{{announcementId}}" compose="{{composeAnnouncement}}" />
   <weekly-reports id="weekly-panel" wx:elif="{{weeklyMode}}" initial-period="{{weeklyPeriod}}" initial-view="{{weeklyView}}" initial-owner="{{weeklyOwner}}" initial-template="{{weeklyTemplate}}" choose-template="{{weeklyChooseTemplate}}" />
   <weekly-sharing id="sharing-panel" wx:elif="{{sharingMode}}" initial-task="{{sharingTask}}" />
@@ -20,7 +20,7 @@
       <block wx:if="{{adminMode === 'backup'}}">
         <view class="admin-card">
           <view class="admin-title"><text>创建备份</text></view>
-          <text class="backup-count">小程序备份不包含每周分享和AI挑战赛私密数据。</text>
+          <text class="backup-count">小程序备份不包含请假、每周分享和AI挑战赛私密数据。</text>
           <text class="backup-label">备份密码</text>
           <input class="backup-password" password maxlength="128" value="{{password}}" bindinput="onBackupPassword" placeholder="12至128个字符" disabled="{{creating}}" />
           <text class="backup-label password-confirm-label">确认密码</text>

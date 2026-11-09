@@ -4,9 +4,9 @@ const TABLE = 'adminBackups';
 const PREFIX = 'admin-backups/';
 const CHUNK = 128 * 1024;
 const LIMIT = 32 * 1024 * 1024;
-const PRIVATE_TABLES = new Set(['sharingTasks', 'sharingFiles', 'sharingAudit', 'challengeEvents', 'challengeTeams', 'challengeFiles', 'challengeClaims', 'challengeSettings', 'challengeAudit']);
+const PRIVATE_TABLES = new Set(['sharingTasks', 'sharingFiles', 'sharingAudit', 'challengeEvents', 'challengeTeams', 'challengeFiles', 'challengeClaims', 'challengeSettings', 'challengeAudit', 'leaveRequests', 'leaveAudit', 'leaveLocks']);
 const PRIVATE_PATH = /^(sharing|challenge)-(files|uploads)\//;
-const SCOPE_VERSION = 2;
+const SCOPE_VERSION = 3;
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function document(result) { return Array.isArray(result.data) ? result.data[0] : result.data; }
 function createService({ db, cloud, access, resources, envId, now = Date.now }) {
@@ -135,7 +135,7 @@ function createService({ db, cloud, access, resources, envId, now = Date.now }) 
     if (!/^backup_[a-f0-9-]{36}$/.test(event.id || '') || !Number.isSafeInteger(event.offset) || event.offset < 0 || event.offset % CHUNK !== 0) reject('INVALID_INPUT', '备份参数不正确。');
     const backup = document(await db.collection(TABLE).doc(event.id).get());
     if (!backup || backup.status !== 'ready' || backup.bytes > LIMIT * 2) reject('BACKUP_NOT_FOUND', '备份不存在或尚未完成。');
-    if (backup.scopeVersion !== SCOPE_VERSION) reject('BACKUP_SCOPE_CHANGED', '请创建新备份后导出。旧备份未隔离分享和挑战赛的私密数据。');
+    if (backup.scopeVersion !== SCOPE_VERSION) reject('BACKUP_SCOPE_CHANGED', '旧备份未应用当前私密数据隔离规则，请创建新备份后导出。');
     if (event.offset >= backup.bytes || !backup.fileID?.endsWith('/' + PREFIX + event.id + '.imcbak')) reject('INVALID_INPUT', '备份参数不正确。');
     const response = await cloud.downloadFile({ fileID: backup.fileID });
     const buffer = response.fileContent;

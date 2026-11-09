@@ -8,8 +8,8 @@
   <view wx:if="{{error}}" class="error"><text>{{error}}</text><button bindtap="loadApprovals">重试</button></view>
   <view wx:if="{{!loading && !error && !requests.length}}" class="state">{{emptyText}}</view>
   <view wx:if="{{requests.length}}" class="requests-card"><block wx:for="{{requests}}" wx:key="id">
-    <button wx:if="{{activeTab === 'pending' || item.sharingTaskId}}" class="request-row" data-id="{{item.id}}" bindtap="openApproval">
-      <view class="request-info"><text class="request-name">{{item.title}}</text><text class="request-type">{{item.type}}</text><text wx:if="{{item.dateLabel}}" class="request-date">{{item.dateLabel}}</text></view>
+    <button wx:if="{{activeTab === 'pending' || item.sharingTaskId || item.leaveId}}" class="request-row" data-id="{{item.id}}" bindtap="openApproval">
+      <view class="request-info"><text class="request-name">{{item.title}}</text><text class="request-type">{{item.type}}</text><text wx:if="{{item.timeRange || item.dateLabel}}" class="request-date">{{item.timeRange || item.dateLabel}}</text></view>
       <text class="request-status status-{{item.statusTone}}">{{item.statusLabel}}</text><text class="arrow">›</text>
     </button>
     <view wx:else class="request-row">

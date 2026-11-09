@@ -9,13 +9,13 @@ function dateLabel(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 Page(require('../../utils/member-page')({
-  data: { loading: true, error: '', requests: [], canReviewMembers: false, canReviewSharing: false,
-    source: 'members', sources: [{ id: 'members', label: '成员入组' }, { id: 'sharing', label: '每周分享' }],
+  data: { loading: true, error: '', requests: [], canReviewMembers: false, canReviewSharing: false, canReviewLeave: false,
+    source: 'members', sources: [{ id: 'members', label: '成员入组' }, { id: 'sharing', label: '每周分享' }, { id: 'leave', label: '请假' }],
     activeTab: 'mine', emptyText: EMPTY.mine,
     tabs: [{ id: 'mine', label: '我的申请' }, { id: 'pending', label: '待我审批' }, { id: 'done', label: '我已审批' }] },
   onLoad(options = {}) {
     if (this.data.tabs.some(tab => tab.id === options.scope)) this.setData({ activeTab: options.scope, emptyText: EMPTY[options.scope] });
-    if (options.source === 'sharing') this.setData({ source: 'sharing' });
+    if (this.data.sources.some(source => source.id === options.source)) this.setData({ source: options.source });
   },
   onShow() {
     if (!this._unsubscribeLive && access.subscribeChanges) this._unsubscribeLive = access.subscribeChanges('approvals', () => {
@@ -52,8 +52,9 @@ Page(require('../../utils/member-page')({
       if (!currentRequest()) return;
       const canReviewMembers = access.can(current.member, 'members.manage');
       const canReviewSharing = !!current.member && current.member.status === 'active' && current.member.id === sharingConfig.reviewerId && (current.member.roles || []).includes('sharing_reviewer');
-      this.setData({ canReviewMembers, canReviewSharing });
-      if (tab !== 'mine' && !(source === 'sharing' ? canReviewSharing : canReviewMembers)) { delete this._views[viewKey]; this.setData({ requests: [] }); return; }
+      const canReviewLeave = !!current.member && current.member.status === 'active' && (current.member.roles || []).includes('leader');
+      this.setData({ canReviewMembers, canReviewSharing, canReviewLeave });
+      if (tab !== 'mine' && !(source === 'leave' ? canReviewLeave : source === 'sharing' ? canReviewSharing : canReviewMembers)) { delete this._views[viewKey]; this.setData({ requests: [] }); return; }
       const requests = new Map();
       let offset = 0;
       let hasMore = true;
@@ -75,6 +76,9 @@ Page(require('../../utils/member-page')({
   },
   openApproval(event) {
     const request = this.data.requests.find(item => item.id === event.currentTarget.dataset.id);
+    if (request && /^lv_[a-f0-9]{32}$/.test(request.leaveId || '')) {
+      wx.navigateTo({ url: '/pages/leave/index?id=' + request.leaveId }); return;
+    }
     if (request && /^sh_20\d{6}$/.test(request.sharingTaskId || '')) {
       wx.navigateTo({ url: '/pages/module/index?id=weekly-sharing&task=' + request.sharingTaskId }); return;
     }

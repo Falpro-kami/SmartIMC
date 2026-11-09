@@ -1,0 +1,32 @@
+.leave-page { min-height: 100vh; box-sizing: border-box; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+.leave-panel { background: #fff; border: 1px solid #e9edf5; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.leave-list { padding: 0 14px; }
+.leave-heading { margin: 16px 0 8px; font-size: 17px; font-weight: 600; }
+.leave-primary, .leave-secondary { margin: 0; min-height: 44px; padding: 8px 14px; font-size: 14px; line-height: 28px; border-radius: 10px; }
+.leave-primary { color: #fff; background: #2860cf; }
+.leave-secondary { color: #2860cf; background: #edf2ff; }
+.leave-selected { box-shadow: inset 0 0 0 1px #2860cf; font-weight: 600; }
+.leave-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 0; margin: 0; border-radius: 0; text-align: left; background: #fff; border-bottom: 1px solid #e9edf5; }
+.leave-row:last-child { border-bottom: 0; }
+.leave-main { flex: 1; min-width: 0; }
+.leave-row-title, .leave-meta, .leave-label, .leave-body, .leave-state { display: block; }
+.leave-row-title { font-size: 15px; font-weight: 600; line-height: 24px; }
+.leave-meta, .leave-meta-inline { color: #6b788a; font-size: 12px; line-height: 20px; }
+.leave-status { flex: none; padding: 2px 8px; border-radius: 6px; font-size: 12px; color: #375a91; background: #edf2ff; white-space: nowrap; }
+.status-success { color: #25744a; background: #edf7ef; }
+.status-rejected { color: #ad4037; background: #fff0ed; }
+.leave-detail-header, .leave-info { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.leave-detail-header .leave-heading { margin: 0; }
+.leave-info { margin-top: 12px; font-size: 14px; }
+.leave-info text:first-child { color: #6b788a; white-space: nowrap; }
+.leave-label { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+.leave-label:first-child { margin-top: 0; }
+.leave-field { min-height: 44px; box-sizing: border-box; padding: 9px 10px; background: #f3f5f9; border-radius: 8px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.leave-textarea { width: 100%; min-height: 82px; height: 82px; box-sizing: border-box; background: #f3f5f9; border-radius: 8px; padding: 10px; font-size: 14px; }
+.leave-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.leave-options button { flex: 1; min-width: 86px; }
+.leave-date-row { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; }
+.leave-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.leave-state { padding: 28px 0; text-align: center; color: #6b788a; font-size: 14px; }
+.leave-error { display: block; color: #ad4037; background: #fff6f4; border-radius: 8px; margin-top: 10px; padding: 10px 12px; font-size: 14px; }
+.leave-error button { margin-top: 8px; }

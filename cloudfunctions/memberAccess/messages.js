@@ -86,6 +86,12 @@ module.exports = function messages(db, access) {
       if (message.kind === 'challenge' && /^ce_[a-f0-9]{32}$/.test(message.subjectId || '')) {
         url = '/pages/module/index?id=ai-challenge&event=' + message.subjectId;
       }
+      if (message.kind === 'leave' && /^lv_[a-f0-9]{32}$/.test(message.subjectId || '')) {
+        const row = document(await transaction.collection('leaveRequests').doc(message.subjectId).get());
+        if (row && row.teamId === access.TEAM_ID && (row.ownerId === id || row.reviewerId === id && (member.roles || []).includes('leader'))) {
+          url = '/pages/leave/index?id=' + message.subjectId;
+        }
+      }
       if (markRead && !(message.readBy || []).includes(id)) {
         await reference.update({ data: { readBy: db.command.addToSet(id) } });
         await sync.bump(transaction, ['messages']);

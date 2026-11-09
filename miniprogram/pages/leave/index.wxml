@@ -1,0 +1,69 @@
+<view wx:if="{{membershipAllowed}}" class="leave-page">
+  <block wx:if="{{mode === 'list'}}">
+    <button class="leave-primary" bindtap="newRequest">发起请假</button>
+    <view class="leave-heading">我的请假</view>
+    <view wx:if="{{rows.length}}" class="leave-panel leave-list">
+      <button wx:for="{{rows}}" wx:key="id" class="leave-row" data-id="{{item.id}}" bindtap="openRequest">
+        <view class="leave-main"><text class="leave-row-title">{{item.title}}</text><text class="leave-meta">{{item.timeRange}}</text></view>
+        <text class="leave-status status-{{item.statusTone}}">{{item.statusLabel}}</text>
+      </button>
+    </view>
+    <text wx:elif="{{!loading && !error}}" class="leave-state">暂无请假记录</text>
+    <button wx:if="{{hasMore && !error}}" class="leave-secondary" loading="{{loading}}" disabled="{{loading}}" bindtap="loadMore">加载更多</button>
+  </block>
+  <block wx:elif="{{mode === 'new'}}">
+    <view class="leave-panel">
+      <text class="leave-label">请假类型</text>
+      <picker mode="selector" range="{{types}}" disabled="{{saving}}" bindchange="changeType"><view class="leave-field">{{form.leaveType}}<text class="leave-meta-inline">选择</text></view></picker>
+      <text class="leave-label">请假时段（北京时间）</text>
+      <view class="leave-options">
+        <button class="leave-secondary {{form.allDay ? 'leave-selected' : ''}}" data-mode="day" bindtap="changeDuration" disabled="{{saving}}">全天</button>
+        <button class="leave-secondary {{!form.allDay ? 'leave-selected' : ''}}" data-mode="time" bindtap="changeDuration" disabled="{{saving}}">指定时间</button>
+      </view>
+      <view class="leave-date-row"><text>开始</text><picker mode="date" value="{{form.startDate}}" data-field="startDate" bindchange="changeField" disabled="{{saving}}"><view class="leave-field">{{form.startDate}}</view></picker>
+        <picker wx:if="{{!form.allDay}}" mode="time" value="{{form.startTime}}" data-field="startTime" bindchange="changeField" disabled="{{saving}}"><view class="leave-field">{{form.startTime}}</view></picker></view>
+      <view class="leave-date-row"><text>结束</text><picker mode="date" value="{{form.endDate}}" start="{{form.startDate}}" data-field="endDate" bindchange="changeField" disabled="{{saving}}"><view class="leave-field">{{form.endDate}}</view></picker>
+        <picker wx:if="{{!form.allDay}}" mode="time" value="{{form.endTime}}" data-field="endTime" bindchange="changeField" disabled="{{saving}}"><view class="leave-field">{{form.endTime}}</view></picker></view>
+      <text class="leave-label">简要事由</text>
+      <textarea class="leave-textarea" value="{{form.reason}}" data-field="reason" maxlength="300" bindinput="changeField" disabled="{{saving}}" placeholder="简要说明即可，无需填写诊断或上传证明" />
+      <text class="leave-label">审批人</text>
+      <picker mode="selector" range="{{reviewers}}" range-key="name" value="{{reviewerIndex >= 0 ? reviewerIndex : 0}}" disabled="{{saving || !reviewers.length}}" bindchange="changeReviewer">
+        <view class="leave-field">{{reviewerIndex >= 0 ? reviewers[reviewerIndex].name : loading ? '正在读取审批人…' : reviewers.length ? '请选择领导' : '暂无可审批的其他领导'}}</view>
+      </picker>
+    </view>
+    <button class="leave-primary" bindtap="submit" loading="{{saving}}" disabled="{{saving || loading || !reviewers.length}}">提交申请</button>
+  </block>
+  <block wx:elif="{{detail}}">
+    <view class="leave-panel">
+      <view class="leave-detail-header"><text class="leave-heading">{{detail.leaveType}}</text><text class="leave-status status-{{detail.statusTone}}">{{detail.statusLabel}}</text></view>
+      <text class="leave-meta">{{detail.timeRange}}（北京时间）</text>
+      <text wx:if="{{detail.retroactive}}" class="leave-meta">补提申请</text>
+      <view class="leave-info"><text>申请人</text><text>{{detail.ownerName}}</text></view>
+      <view class="leave-info"><text>审批人</text><text>{{detail.reviewerName}}</text></view>
+      <text class="leave-label">请假事由</text><text class="leave-body">{{detail.reason}}</text>
+      <block wx:if="{{detail.decisionNote}}"><text class="leave-label">审批意见</text><text class="leave-body">{{detail.decisionNote}}</text></block>
+      <block wx:if="{{detail.cancellationReason}}"><text class="leave-label">取消原因</text><text class="leave-body">{{detail.cancellationReason}}</text></block>
+      <block wx:if="{{detail.cancellationNote}}"><text class="leave-label">取消审批意见</text><text class="leave-body">{{detail.cancellationNote}}</text></block>
+    </view>
+    <view wx:if="{{!dialog}}" class="leave-options">
+      <button wx:if="{{detail.canReview && detail.canApprove}}" class="leave-primary" data-action="approve" bindtap="openAction" disabled="{{saving || loading}}">{{detail.approveLabel}}</button>
+      <button wx:if="{{detail.canReview}}" class="leave-secondary" data-action="reject" bindtap="openAction" disabled="{{saving || loading}}">驳回</button>
+      <button wx:if="{{detail.canWithdraw}}" class="leave-secondary" data-action="withdraw" bindtap="openAction" disabled="{{saving || loading}}">{{detail.withdrawalLabel}}</button>
+      <button wx:if="{{detail.canCancel && !detail.canReassign}}" class="leave-secondary" data-action="cancel" bindtap="openAction" disabled="{{saving || loading}}">申请取消</button>
+      <button wx:if="{{detail.canReassign}}" class="leave-secondary" data-action="reassign" bindtap="openAction" disabled="{{saving || loading}}">更换审批人</button>
+    </view>
+    <text wx:if="{{detail.canReview && !detail.canApprove}}" class="leave-meta">请假已开始，无法批准取消，可驳回取消申请。</text>
+    <view wx:if="{{dialog}}" class="leave-panel">
+      <text class="leave-label">{{dialog === 'reassign' ? '选择新的审批领导' : dialog === 'reject' ? '驳回原因' : '取消原因'}}</text>
+      <picker wx:if="{{dialog === 'reassign'}}" mode="selector" range="{{reviewers}}" range-key="name" value="{{reviewerIndex >= 0 ? reviewerIndex : 0}}" disabled="{{saving || !reviewers.length}}" bindchange="changeReviewer">
+        <view class="leave-field">{{reviewerIndex >= 0 ? reviewers[reviewerIndex].name : reviewers.length ? '请选择领导' : '暂无可审批的其他领导'}}</view>
+      </picker>
+      <textarea wx:else class="leave-textarea" value="{{note}}" maxlength="300" bindinput="updateNote" placeholder="请输入原因" disabled="{{saving}}" />
+      <view class="leave-options"><button class="leave-secondary" bindtap="closeAction" disabled="{{saving}}">返回</button><button class="leave-primary" bindtap="confirmAction" loading="{{saving}}" disabled="{{saving || loading || (dialog === 'reassign' && !reviewers.length)}}">确认提交</button></view>
+    </view>
+  </block>
+  <view wx:if="{{error}}" class="leave-error"><text>{{error}}</text><button class="leave-secondary" bindtap="load">重试</button></view>
+  <text wx:if="{{actionError}}" class="leave-error">{{actionError}}</text>
+  <text wx:if="{{loading && (mode === 'detail' && !detail || mode === 'list' && !rows.length)}}" class="leave-state">正在读取…</text>
+</view>
+<membership-gate wx:else />
