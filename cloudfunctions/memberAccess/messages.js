@@ -9,6 +9,7 @@ module.exports = function messages(db, access) {
   function filter(id, member, unreadOnly = false) {
     const recipients = [id];
     if (access.allowed(member, 'members.manage')) recipients.push('role:super_admin');
+    // This is the existing message audience key, independent of member roles.
     if (sharingPolicy.reviewer(member)) recipients.push('role:sharing_reviewer');
     return { teamId: access.TEAM_ID, recipientKey: db.command.in(recipients),
       ...(unreadOnly ? { readBy: db.command.nin([id]) } : {}) };

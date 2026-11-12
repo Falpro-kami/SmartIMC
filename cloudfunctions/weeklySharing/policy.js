@@ -3,7 +3,7 @@ const NEVER = Number.MAX_SAFE_INTEGER;
 const REVIEWER_ID = 'user_1db996e0b87233a509a73b4bd6434874';
 const active = member => !!member && member.teamId === 'IMC' && member.status === 'active';
 // Private submissions require an explicitly assigned reviewer, including for super administrators.
-const reviewer = member => active(member) && (member._id || member.id) === REVIEWER_ID && (member.roles || []).includes('sharing_reviewer');
+const reviewer = member => active(member) && (member._id || member.id) === REVIEWER_ID && (member.roles || []).includes('academic_admin');
 const manager = reviewer;
 function reject(code, message) { const error = new Error(message); error.businessCode = code; throw error; }
 function week(value) {

@@ -50,7 +50,7 @@ module.exports = function sharing(db, cloud, access, clock = Date.now, storage =
     }
     if (event.filter === 'completed') filter.reviewState = 'approved';
     if (event.filter === 'review') {
-      if (!policy.reviewer(await authorize(id))) reject('FORBIDDEN', '仅分享审批人可以查看待审批任务。');
+      if (!policy.reviewer(await authorize(id))) reject('FORBIDDEN', '仅负责每周分享的学术管理员可以查看待审批任务。');
       filter.reviewState = 'pending';
     }
     if (['pending', 'incomplete'].includes(event.filter)) {
@@ -224,7 +224,7 @@ module.exports = function sharing(db, cloud, access, clock = Date.now, storage =
     const comment = typeof event.comment === 'string' ? event.comment.trim() : '';
     if (!['approved', 'rejected'].includes(event.decision) || !Number.isSafeInteger(event.revision) || !Number.isSafeInteger(event.version) || comment.length > 500 || (event.decision === 'rejected' && !comment)) reject('INVALID_INPUT', '驳回时请填写原因，审批意见不超过500字。');
     await db.runTransaction(async tx => {
-      if (!policy.reviewer(await authorize(id, tx))) reject('FORBIDDEN', '仅分享审批人（高创）可以审批。');
+      if (!policy.reviewer(await authorize(id, tx))) reject('FORBIDDEN', '仅负责每周分享的学术管理员可以审批。');
       const row = await task(tx, event.taskId), previous = row.submission;
       if (!previous || previous.version !== event.version) reject('CONFLICT', '提交版本已变化，请重新打开。');
       if (previous.state === event.decision && previous.reviewedBy === id && previous.reviewComment === comment) return;

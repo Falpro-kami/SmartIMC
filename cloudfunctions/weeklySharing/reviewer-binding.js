@@ -11,7 +11,7 @@ module.exports = async (db, actorId) => db.runTransaction(async tx => {
   await securityRef.update({ data: { sharingReviewerId: actorId } });
   const auditRef = tx.collection('memberAudit').doc('sharing_reviewer_initial_binding');
   if (!document(await auditRef.get())) await auditRef.set({ data: { actorId, targetId: actorId, action: 'sharing.reviewer.bind',
-    before: { status: member.status, roles: member.roles.filter(role => role !== 'sharing_reviewer') },
+    before: { status: member.status, roles: member.roles },
     after: { status: member.status, roles: member.roles }, createdAt: db.serverDate() } });
   await sync.bump(tx, ['members', 'home', 'weekly', 'approvals', 'messages']);
   return { ok: true };

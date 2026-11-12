@@ -1,7 +1,8 @@
 const { createHash } = require('node:crypto');
-const GAO = 'user_1db996e0b87233a509a73b4bd6434874';
+const sharing = require('./policy');
+const GAO = sharing.REVIEWER_ID;
 const active = member => !!member && member.teamId === 'IMC' && member.status === 'active';
-const manage = member => active(member) && member._id === GAO && (member.roles || []).includes('sharing_reviewer');
+const manage = sharing.manager;
 const review = (member, settings) => manage(member) || active(member) && !!settings.teacherId && member._id === settings.teacherId;
 const owns = (team, id) => !!team && team.participantIds.includes(id);
 const phase = (event, now) => now >= event.endMs ? 'closed' : now < event.startMs ? 'upcoming' : 'open';

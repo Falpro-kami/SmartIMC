@@ -17,7 +17,7 @@ function fixture() {
   let now = timestamp('2026-11-02T08:00:00');
   const member = roles => ({ teamId: 'IMC', status: 'active', roles, revision: 0 });
   const db = createDatabase({
-    teamMembers: { [OWNER]: member([]), [GAO]: member(['sharing_reviewer']), [OTHER]: member([]), [ADMIN]: member(['academic_admin']), [SUPER]: member(['super_admin']) },
+    teamMembers: { [OWNER]: member([]), [GAO]: member(['academic_admin']), [OTHER]: member([]), [ADMIN]: member(['academic_admin']), [SUPER]: member(['super_admin']) },
     userProfiles: { [OWNER]: { name: '值班同学' }, [GAO]: { name: '高创' } },
     teamSync: { IMC: { home: 'h', messages: 'm', approvals: 'a', weekly: 'w', members: 'u' } }
   });
@@ -357,7 +357,7 @@ test('过滤按任务状态分页且列表不暴露私密内容', async () => {
   assert.equal((await f.call(OTHER, 'list', { filter: 'pending' })).tasks.length, 0);
   assert.equal(policy.manager(f.member(['academic_admin'])), false);
 });
-test('成员管理仅能将分享维护角色绑定到高创的固定账号', async () => {
+test('成员管理拒绝旧角色，学术管理员身份仅给原授权账号保留分享权限', async () => {
   const f = fixture();
   f.db.put('teamSecurity', 'IMC', { superAdminIds: [SUPER], sharingReviewerId: GAO });
   const filename = require.resolve('../cloudfunctions/memberAccess/index');
@@ -366,11 +366,15 @@ test('成员管理仅能将分享维护角色绑定到高创的固定账号', as
   const requireWithFixtures = name => name === 'wx-server-sdk' ? sdk : name === './access' ? { ...access, identity: () => SUPER } : localRequire(name);
   new Function('require', 'exports', fs.readFileSync(filename, 'utf8'))(requireWithFixtures, exports);
   const assign = (id, roles, revision) => exports.main({ action: 'set', id, roles, revision, status: 'active' });
-  assert.equal((await assign(OTHER, ['sharing_reviewer'], 0)).code, 'FORBIDDEN');
+  assert.equal((await assign(OTHER, ['sharing_reviewer'], 0)).code, 'INVALID_INPUT');
+  assert.equal((await assign(GAO, ['sharing_reviewer'], 0)).code, 'INVALID_INPUT');
   assert.equal((await assign(GAO, [], 0)).ok, true);
   assert.equal(policy.reviewer(f.db.rows('teamMembers').find(row => row._id === GAO)), false);
-  assert.equal((await assign(OTHER, ['sharing_reviewer'], 0)).code, 'FORBIDDEN');
-  assert.equal((await assign(GAO, ['sharing_reviewer'], 1)).ok, true);
+  assert.equal((await assign(OTHER, ['academic_admin'], 0)).ok, true);
+  assert.equal(policy.reviewer(f.db.rows('teamMembers').find(row => row._id === OTHER)), false);
+  assert.equal((await assign(GAO, ['academic_admin'], 1)).ok, true);
+  assert.equal(policy.reviewer(f.db.rows('teamMembers').find(row => row._id === GAO)), true);
+  assert.equal(policy.reviewer({ ...f.member(['sharing_reviewer']), _id: GAO }), false);
   assert.equal(f.db.rows('teamSecurity')[0].sharingReviewerId, GAO);
 });
 test('双人共同值班：两人收到提醒、仅一份提交，未审批内容对搭档保密', async () => {

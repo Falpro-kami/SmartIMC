@@ -19,7 +19,7 @@ test('文件规则仅收紧分享目录，保留其他目录的既有读写规�
   assert.deepEqual(repeated.rule, rule);
 });
 function setupFixture(failAction, acl = 'CUSTOM', privateRule = null) {
-  const db = createDatabase({ teamMembers: { [REVIEWER_ID]: { teamId: 'IMC', status: 'active', roles: ['sharing_reviewer'] } }, teamSecurity: { IMC: { superAdminIds: [] } },
+  const db = createDatabase({ teamMembers: { [REVIEWER_ID]: { teamId: 'IMC', status: 'active', roles: ['academic_admin'] } }, teamSecurity: { IMC: { superAdminIds: [] } },
     teamSync: { IMC: { home: 'h', messages: 'm', approvals: 'a', weekly: 'w', members: 'u' } } });
   let rule = protectStorage({ AclTag: 'PRIVATE' }).rule;
   const manager = {

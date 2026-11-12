@@ -51,7 +51,7 @@ Page(require('../../utils/member-page')({
       const current = await access.get();
       if (!currentRequest()) return;
       const canReviewMembers = access.can(current.member, 'members.manage');
-      const canReviewSharing = !!current.member && current.member.status === 'active' && current.member.id === sharingConfig.reviewerId && (current.member.roles || []).includes('sharing_reviewer');
+      const canReviewSharing = !!current.member && current.member.status === 'active' && current.member.id === sharingConfig.reviewerId && (current.member.roles || []).includes('academic_admin');
       const canReviewLeave = !!current.member && current.member.status === 'active' && (current.member.roles || []).includes('leader');
       this.setData({ canReviewMembers, canReviewSharing, canReviewLeave });
       if (tab !== 'mine' && !(source === 'leave' ? canReviewLeave : source === 'sharing' ? canReviewSharing : canReviewMembers)) { delete this._views[viewKey]; this.setData({ requests: [] }); return; }

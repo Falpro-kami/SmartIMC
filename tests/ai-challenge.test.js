@@ -17,7 +17,7 @@ const PDF = Buffer.from('%PDF-1.7\nchallenge-work');
 function fixture() {
   let now = START + 3600000, fileNumber = 0, duringSlice;
   const member = roles => ({ teamId: 'IMC', status: 'active', roles, revision: 0 });
-  const db = createDatabase({ teamMembers: { [GAO]: member(['sharing_reviewer']), [A]: member([]), [B]: member([]), [C]: member([]), [CHEN]: member(['leader']), [SUPER]: member(['super_admin']) },
+  const db = createDatabase({ teamMembers: { [GAO]: member(['academic_admin']), [A]: member(['academic_admin']), [B]: member([]), [C]: member([]), [CHEN]: member(['leader']), [SUPER]: member(['super_admin']) },
     userProfiles: { [GAO]: { name: '高创' }, [A]: { name: '甲同学' }, [B]: { name: '乙同学' }, [C]: { name: '丙同学' }, [CHEN]: { name: '陈老师' }, [SUPER]: { name: '管理员' } },
     teamSync: { IMC: { home: 'h', weekly: 'w', messages: 'm', members: 'u', approvals: 'a' } } });
   const files = new Map(), deleted = [];
