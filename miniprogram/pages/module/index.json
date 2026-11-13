@@ -8,6 +8,7 @@
     "team-announcements": "/components/team-announcements/index",
     "weekly-reports": "/components/weekly-reports/index",
     "weekly-sharing": "/components/weekly-sharing/index",
-    "ai-challenge": "/components/ai-challenge/index"
+    "ai-challenge": "/components/ai-challenge/index",
+    "finance-claims": "/components/finance-claims/index"
   }
 }

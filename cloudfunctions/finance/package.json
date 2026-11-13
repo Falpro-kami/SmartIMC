@@ -1,0 +1,10 @@
+{
+  "name": "imc-finance",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "wx-server-sdk": "4.0.2",
+    "jszip": "3.10.1",
+    "exceljs": "4.4.0"
+  }
+}

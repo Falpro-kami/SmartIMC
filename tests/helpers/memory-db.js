@@ -4,17 +4,20 @@ const operation = (op, value) => ({ op, value });
 function matches(actual, expected) {
   if (!expected || typeof expected !== 'object' || !expected.op) return Array.isArray(actual) ? actual.includes(expected) : actual === expected;
   const { op, value } = expected;
+  if (op === 'and') return value.every(condition => matches(actual, condition));
   if (op === 'in') return Array.isArray(actual) ? actual.some(item => value.includes(item)) : value.includes(actual);
   if (op === 'nin') return Array.isArray(actual) ? actual.every(item => !value.includes(item)) : !value.includes(actual);
   if (op === 'neq') return actual !== value;
   if (op === 'lte') return actual <= value;
+  if (op === 'lt') return actual < value;
   if (op === 'gt') return actual > value;
+  if (op === 'gte') return actual >= value;
   throw new Error('Unsupported query operation: ' + op);
 }
 module.exports = function memoryDatabase(seed = {}) {
   let tables = clone(seed), queue = Promise.resolve(), failTable = '';
   const db = {
-    command: Object.fromEntries(['in', 'nin', 'neq', 'lte', 'gt', 'addToSet', 'and', 'or'].map(op => [op, value => operation(op, value)])),
+    command: Object.fromEntries(['in', 'nin', 'neq', 'lt', 'lte', 'gt', 'gte', 'addToSet', 'and', 'or'].map(op => [op, value => operation(op, value)])),
     serverDate: () => new Date(),
     rows: table => Object.entries(tables[table] || {}).map(([id, row]) => ({ ...clone(row), _id: id })),
     put(table, id, data) { tables[table] ||= {}; tables[table][id] = clone(data); },

@@ -5,6 +5,7 @@
   <weekly-reports id="weekly-panel" wx:elif="{{weeklyMode}}" initial-period="{{weeklyPeriod}}" initial-view="{{weeklyView}}" initial-owner="{{weeklyOwner}}" initial-template="{{weeklyTemplate}}" choose-template="{{weeklyChooseTemplate}}" />
   <weekly-sharing id="sharing-panel" wx:elif="{{sharingMode}}" initial-task="{{sharingTask}}" />
   <ai-challenge id="challenge-panel" wx:elif="{{challengeMode}}" initial-event="{{challengeEvent}}" />
+  <finance-claims id="finance-panel" wx:elif="{{financeMode}}" initial-claim="{{financeClaim}}" />
   <block wx:elif="{{adminMode}}">
     <view wx:if="{{adminLoading}}" class="admin-state">正在读取…</view>
     <view wx:elif="{{adminError}}" class="admin-error"><text>{{adminError}}</text><button bindtap="loadAdminData">重试</button></view>

@@ -3,6 +3,14 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
+      "name": "finance",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "memorySize": 512,
+      "timeout": 60,
+      "installDependency": true
+    },
+    {
       "name": "weeklySharing",
       "runtime": "Nodejs20.19",
       "handler": "index.main",

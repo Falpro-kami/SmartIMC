@@ -1,0 +1,57 @@
+@import "../../styles/list.wxss";
+.finance { color: #101b2b; }
+.card { margin-bottom: 14px; padding: 16px; border: 1px solid #e9edf5; border-radius: 14px; background: #fff; }
+.tabs, .filters, .attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tabs button, .filters button, .back, .minor { margin: 0; padding: 7px 12px; border-radius: 9px; color: #526173; background: #eaf0f8; font-size: 14px; line-height: 24px; }
+.tabs button.active, .filters button.active { color: #1f52ba; background: #dce8ff; font-weight: 600; }
+.back { margin-bottom: 12px; }
+.primary, .secondary { width: 100%; min-height: 44px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; color: #fff; background: #2860cf; font-size: 15px; line-height: 24px; }
+.secondary, .minor { color: #2860cf; background: #edf2ff; }
+.card > .primary, .card > .secondary { margin: 12px 0 0; }
+button[disabled] { opacity: .55; }
+button::after { border: 0; }
+.claim-row, .group-title, .pick, .select-row { display: flex; align-items: center; gap: 10px; }
+.claim-row { min-height: 42px; padding: 10px 0; border-bottom: 1px solid #edf0f4; }
+.claim-row:last-child { border-bottom: 0; }
+.claim-main, .select-row { flex: 1; min-width: 0; }
+.claim-name, .muted, .title { display: block; overflow-wrap: anywhere; }
+.claim-name { font-size: 15px; font-weight: 500; }
+.muted { color: #526173; font-size: 13px; line-height: 1.55; }
+.badge { flex-shrink: 0; padding: 3px 7px; border-radius: 6px; color: #2257c0; background: #edf2ff; font-size: 12px; }
+.warning, .attention { color: #9a4628; background: #fff2e9; }
+.attention { margin: 10px 0; padding: 10px; border-radius: 8px; font-size: 14px; overflow-wrap: anywhere; }
+.attention > text { display: block; }
+.title { font-size: 17px; font-weight: 600; }
+.group-title, .pick { justify-content: space-between; }
+.group-title { margin-bottom: 5px; }
+.amount { color: #2257c0; font-weight: 600; }
+.step { display: flex; align-items: center; gap: 12px; padding: 6px 0; color: #526173; font-size: 15px; }
+.step-dot { width: 10px; height: 10px; border-radius: 50%; background: #dde4ef; }
+.step.complete .step-dot { background: #2860cf; }
+.step.current { color: #2257c0; font-weight: 600; }
+.pick, input, textarea { box-sizing: border-box; width: 100%; padding: 10px; min-height: 42px; border: 1px solid #e4e8ef; border-radius: 8px; color: #101b2b; background: #fafbfd; font-size: 14px; }
+.pick > text { color: #526173; font-size: 13px; }
+textarea { height: 82px; margin-top: 5px; }
+.field-label, .description { display: block; margin: 12px 0 4px; font-size: 14px; }
+.sync, .transfer { margin: 8px 0; }
+.attachments { margin: 8px 0; }
+.attachments .secondary { width: auto; flex: 1; margin: 0; }
+.inbox-person { margin-top: 12px; }
+
+.student-heading { min-height: 40px; margin-bottom: 12px; }
+.desk-category, .desk-summary { margin-bottom: 12px; }
+.desk-summary { margin-top: 12px; }
+.desk-actions { display: flex; gap: 8px; margin-top: 12px; }
+.desk-actions button { width: auto; margin: 0; }
+.desk-actions .primary { flex: 1; }
+.category-picker { padding: 7px 11px; border: 1px solid #e4e8ef; border-radius: 8px; color: #2859b7; background: #fff; font-size: 14px; }
+.category-picker > text { margin-left: 6px; color: #526173; }
+.claim-main > .amount { display: block; margin-top: 3px; font-size: 14px; }
+.finance-check { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 14px; }
+.finance-check checkbox { flex-shrink: 0; }
+.material-item { margin-top: 12px; padding-top: 12px; border-top: 1px solid #edf0f4; }
+.student-form { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+.student-form-footer { position: fixed; z-index: 15; bottom: 0; left: 0; right: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #e5eaf1; background: #fff; }
+.student-form-actions { display: flex; gap: 10px; }
+.student-form-actions button { flex: 1; width: auto; margin: 0; }
+.submit-error { display: block; max-height: 84px; overflow-y: auto; margin-bottom: 8px; }

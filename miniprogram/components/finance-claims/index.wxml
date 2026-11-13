@@ -1,0 +1,288 @@
+<template name="claimRow">
+  <view class="claim-row" data-id="{{row.id}}" bindtap="openClaim">
+    <view class="claim-main">
+      <text class="claim-name">{{student ? row.category || '报销记录' : (showName ? row.ownerName + ' · ' : '') + row.category}}</text>
+      <text wx:if="{{student && (row.number || row.registered)}}" class="muted">{{row.number}}{{row.number && row.registered ? ' · ' : ''}}{{row.registered}}</text>
+      <text wx:if="{{student && row.amount}}" class="amount">¥{{row.amount}}</text>
+      <text wx:if="{{!student}}" class="muted">{{row.invoiceCount}} 张发票 · ¥{{row.amount}}</text>
+      <text wx:if="{{row.submission}}" class="muted">{{row.submission}}</text>
+    </view>
+    <text class="badge {{row.reviewState === 'needs' ? 'warning' : ''}}">{{row.label}}</text>
+    <text class="arrow">›</text>
+  </view>
+</template>
+
+<view class="finance {{mode === 'form' && studentOnly ? 'student-form' : ''}}">
+  <view wx:if="{{mode === 'list' && studentOnly && !current.financeDesk}}" class="group-title student-heading">
+    <text class="title">我的报销</text>
+    <picker wx:if="{{current.id}}" range="{{categoryChoices}}" value="{{categoryIndex}}" bindchange="changeStudentCategory">
+      <view class="category-picker">{{categoryChoices[categoryIndex]}} <text>▾</text></view>
+    </picker>
+  </view>
+  <view wx:elif="{{mode === 'list'}}" class="tabs">
+    <button wx:if="{{current.financeDesk}}" class="{{section === 'desk' ? 'active' : ''}}" data-section="desk" bindtap="changeSection">报销管理</button>
+    <button class="{{section === 'mine' ? 'active' : ''}}" data-section="mine" bindtap="changeSection">我的报销</button>
+    <button wx:if="{{!studentOnly && current.finance}}" class="{{section === 'queue' ? 'active' : ''}}" data-section="queue" bindtap="changeSection">收件核验</button>
+    <button wx:if="{{!studentOnly && (current.finance || current.reviewer)}}" class="{{section === 'week' ? 'active' : ''}}" data-section="week" bindtap="changeSection">周度归档</button>
+  </view>
+  <button wx:else class="back" bindtap="back" disabled="{{busy}}">‹ 返回</button>
+
+  <view wx:if="{{error && !(mode === 'form' && studentOnly)}}" class="error">
+    <text>{{error}}</text>
+    <button wx:if="{{mode !== 'form' && !returning}}" bindtap="retry" disabled="{{busy}}">刷新</button>
+  </view>
+  <view wx:if="{{loading}}" class="state">正在读取报销记录…</view>
+  <view wx:if="{{busy && progress !== null}}" class="transfer">{{progress ? '下载中 ' + progress + '%' : '正在准备 ZIP…'}}</view>
+
+  <block wx:if="{{mode === 'list' && !loading}}">
+    <block wx:if="{{section === 'mine'}}">
+      <picker wx:if="{{current.financeDesk}}" class="desk-category" range="{{categoryChoices}}" value="{{categoryIndex}}" bindchange="changeStudentCategory" disabled="{{busy}}">
+        <view class="category-picker">{{categoryChoices[categoryIndex]}} <text>▾</text></view>
+      </picker>
+      <button wx:if="{{current.id && !error && (!studentOnly || studentRules.length)}}" class="primary" bindtap="startForm">提交报销</button>
+      <view wx:if="{{claims.length}}" class="card">
+        <template wx:for="{{claims}}" wx:key="id" is="claimRow" data="{{row: item, student: studentOnly, showName: false}}" />
+      </view>
+      <view wx:elif="{{!error}}" class="state">{{studentOnly ? (categoryIndex ? '该类别暂无报销记录' : '暂无报销记录，登记后可在这里查看进度。') : '暂无报销申请'}}</view>
+    </block>
+
+    <block wx:elif="{{section === 'desk'}}">
+      <view class="card">
+        <picker mode="date" value="{{week}}" end="{{deskPickerEnd}}" bindchange="changeWeek" disabled="{{busy}}">
+          <view class="pick">
+            <view><text class="claim-name">{{deskWeekLabel}}</text><text class="muted">{{deskWeekRange}}</text></view>
+            <text>更换周次 ›</text>
+          </view>
+        </picker>
+        <text wx:if="{{claims.length}}" class="muted desk-summary">{{hasMore ? '已加载 ' : ''}}{{groups.length}} 人 · {{claims.length}} 笔 · {{submittedCount}} 笔有发票 · {{paidCount}} 笔已到账</text>
+        <view class="desk-actions">
+          <button class="primary" bindtap="exportWeek" disabled="{{busy || !claims.length}}">导出所选周 ZIP</button>
+          <button class="secondary" bindtap="retry" disabled="{{busy}}">刷新</button>
+        </view>
+      </view>
+      <view wx:for="{{groups}}" wx:key="id" wx:for-item="person" class="card">
+        <view class="group-title">
+          <view class="claim-main"><text class="title">{{person.displayName}}</text>
+            <text class="muted">{{person.claims.length}} 笔 · {{person.submitted}} 笔有发票</text>
+          </view>
+          <button class="minor" bindtap="exportWeek" data-owner="{{person.id}}" disabled="{{busy}}">导出此人 ZIP</button>
+        </view>
+        <template wx:for="{{person.claims}}" wx:key="id" is="claimRow" data="{{row: item, student: true}}" />
+      </view>
+      <view wx:if="{{!groups.length && !error}}" class="state">该周暂无报销申请</view>
+    </block>
+
+    <block wx:elif="{{section === 'queue'}}">
+      <button class="primary" data-kind="proxy" bindtap="startForm">代同学录入</button>
+      <view class="filters">
+        <button class="{{queue === 'review' ? 'active' : ''}}" data-queue="review" bindtap="changeQueue">待核验</button>
+        <button class="{{queue === 'needs' ? 'active' : ''}}" data-queue="needs" bindtap="changeQueue">待补件</button>
+        <button class="{{queue === 'report' ? 'active' : ''}}" data-queue="report" bindtap="changeQueue">待报送</button>
+        <button class="{{queue === 'all' ? 'active' : ''}}" data-queue="all" bindtap="changeQueue">全部</button>
+      </view>
+      <view wx:if="{{queue === 'report' && claims.length}}" class="card">
+        <picker mode="date" value="{{week}}" end="{{today}}" bindchange="changeWeek" disabled="{{busy}}">
+          <view class="pick">报送周 · {{week}} 起 <text>更换 ›</text></view>
+        </picker>
+        <checkbox-group bindchange="selectClaims">
+          <view wx:for="{{claims}}" wx:key="id" class="claim-row">
+            <label class="select-row"><checkbox value="{{item.id}}" checked="{{item.checked}}" disabled="{{busy}}" color="#2860cf" />
+              <view class="claim-main"><text class="claim-name">{{item.ownerName}} · {{item.category}}</text><text class="muted">{{item.invoiceCount}} 张发票 · ¥{{item.amount}}</text></view>
+            </label>
+            <button class="minor" bindtap="openClaim" data-id="{{item.id}}">详情</button>
+          </view>
+        </checkbox-group>
+        <view wx:for="{{reportGroups}}" wx:key="id" class="muted">{{item.name}} · {{item.invoices}} 张 · ¥{{item.amount}}</view>
+        <button class="primary" bindtap="sendWeek" disabled="{{busy || !reportCount}}">报送 {{reportCount}} 笔 · ¥{{selectedAmount}}</button>
+      </view>
+      <view wx:elif="{{claims.length}}" class="card">
+        <template wx:for="{{claims}}" wx:key="id" is="claimRow" data="{{row: item, showName: true}}" />
+      </view>
+      <view wx:elif="{{!error}}" class="state">暂无符合条件的申请</view>
+    </block>
+
+    <block wx:else>
+      <view class="card">
+        <picker mode="date" value="{{week}}" end="{{today}}" bindchange="changeWeek" disabled="{{busy}}">
+          <view class="pick">报送周 · {{week}} 起 <text>更换 ›</text></view>
+        </picker>
+        <view wx:if="{{claims.length && feishuEnabled}}" class="muted sync">
+          <text>{{syncLabel ? '最近成功同步 ' + syncLabel : '等待飞书同步'}}</text>
+          <text wx:if="{{pendingSync}}"> · {{pendingSync}} 笔待同步</text>
+          <text wx:if="{{syncErrors}}"> · {{syncErrors}} 笔失败</text>
+        </view>
+        <button wx:if="{{claims.length}}" class="primary" bindtap="exportWeek" disabled="{{busy}}">导出本周完整材料 ZIP</button>
+        <button wx:if="{{claims.length && current.finance && feishuEnabled}}" class="secondary" bindtap="syncWeek" disabled="{{busy}}">同步飞书进度</button>
+      </view>
+      <view wx:for="{{groups}}" wx:key="id" wx:for-item="person" class="card">
+        <view class="group-title"><text class="title">{{person.name}}</text><text class="muted">{{person.invoices}} 张 · ¥{{person.amount}}</text></view>
+        <template wx:for="{{person.claims}}" wx:key="id" is="claimRow" data="{{row: item, showName: false}}" />
+      </view>
+      <view wx:if="{{!groups.length && !error}}" class="state">本周暂无已报送申请</view>
+      <view wx:if="{{inboxGroups.length}}" class="card">
+        <text class="title">该周收件 · 未报送</text>
+        <view wx:for="{{inboxGroups}}" wx:key="id" wx:for-item="person" class="inbox-person">
+          <view class="group-title"><text class="claim-name">{{person.name}}</text><text class="muted">{{person.invoices}} 张 · ¥{{person.amount}}</text></view>
+          <template wx:for="{{person.claims}}" wx:key="id" is="claimRow" data="{{row: item, showName: false}}" />
+        </view>
+        <text wx:if="{{hasMoreInbox}}" class="muted">另有更多收件，可在收件核验中查看。</text>
+      </view>
+    </block>
+    <button wx:if="{{hasMore}}" class="more" bindtap="more" disabled="{{busy}}">加载更多</button>
+  </block>
+
+  <block wx:elif="{{mode === 'detail' && detail && !loading}}">
+    <view class="card">
+      <view class="group-title"><text class="title">{{studentOnly ? detail.category || '报销记录' : detail.ownerName + ' · ' + detail.category}}</text><text wx:if="{{detail.amount}}" class="amount">¥{{detail.amount}}</text></view>
+      <text wx:if="{{section === 'desk' && detail.ownerName}}" class="muted">报销人 {{detail.ownerName}}</text>
+      <text wx:if="{{studentOnly && detail.number}}" class="muted">报销单编号 {{detail.number}}</text>
+      <text wx:if="{{studentOnly && detail.registered}}" class="muted">登记时间 {{detail.registered}}</text>
+      <text wx:if="{{detail.invoiceDate}}" class="muted">开票日期 {{detail.invoiceDate}}</text>
+      <text wx:if="{{detail.transport}}" class="muted">{{detail.transportLabel}} · {{detail.transport.origin}} → {{detail.transport.destination}}</text>
+      <text wx:if="{{detail.updated || detail.weekStart}}" class="muted">{{detail.updated ? '更新于 ' + detail.updated : ''}}{{detail.weekStart ? (detail.updated ? ' · ' : '') + '报送周 ' + detail.weekStart : ''}}</text>
+      <text wx:if="{{detail.description}}" class="description">{{detail.description}}</text>
+    </view>
+    <view class="card">
+      <view class="group-title"><text class="title">报销进度</text><text class="badge {{detail.reviewState === 'needs' ? 'warning' : ''}}">{{detail.label}}</text></view>
+      <view wx:for="{{steps}}" wx:key="label" class="step {{item.done ? 'complete' : ''}} {{item.current ? 'current' : ''}}">
+        <text class="step-dot"></text><text>{{item.label}}</text>
+      </view>
+      <view wx:if="{{detail.reason && detail.reviewState !== 'ready'}}" class="attention"><text>补件要求</text><text>{{detail.reason}}</text></view>
+    </view>
+    <view wx:if="{{section === 'desk' && current.financeDesk && detail.progressVersion}}" class="card">
+      <text class="title">更新报销进度</text>
+      <text class="field-label">目标状态</text>
+      <picker range="{{stages}}" value="{{progressStage}}" bindchange="selectProgress" disabled="{{busy}}">
+        <view class="pick">{{stages[progressStage]}} <text>更换 ›</text></view>
+      </picker>
+      <button class="primary" bindtap="saveProgress" disabled="{{busy || progressStage === detail.stage}}">保存进度</button>
+    </view>
+    <view wx:if="{{!studentOnly || detail.files.length}}" class="card">
+      <text class="title">{{studentOnly ? '报销材料' : '已提交材料'}}</text>
+      <view wx:for="{{detail.files}}" wx:key="id" class="claim-row" bindtap="previewFile" data-id="{{item.id}}">
+        <view class="claim-main"><text class="claim-name">{{item.kindLabel}}</text><text class="muted">{{item.name}}</text></view><text class="arrow">›</text>
+      </view>
+      <button wx:if="{{canSupplement}}" class="primary" data-kind="supplement" bindtap="startForm" disabled="{{busy}}">补传材料</button>
+    </view>
+    <view wx:if="{{!studentOnly && (current.finance || current.reviewer) && detail.stage < 5}}" class="card">
+      <text class="title">办理操作</text>
+      <button wx:if="{{current.finance && detail.reviewState === 'review'}}" class="primary" bindtap="review" data-pass="yes" disabled="{{busy}}">材料齐全，确认已核验</button>
+      <button wx:if="{{(current.finance || (current.reviewer && !feishuEnabled && detail.weekStart)) && detail.reviewState !== 'needs'}}" class="secondary" bindtap="toggleReturn" disabled="{{busy}}">{{returning ? '取消补件要求' : '要求补件'}}</button>
+      <block wx:if="{{returning}}">
+        <textarea maxlength="300" value="{{reason}}" bindinput="inputReason" placeholder="说明缺少的材料" disabled="{{busy}}" />
+        <button class="primary" bindtap="review" data-pass="no" disabled="{{busy || !reason}}">发送补件要求</button>
+      </block>
+      <button wx:if="{{current.reviewer && !feishuEnabled && detail.weekStart && detail.reviewState === 'ready' && detail.stage >= 1 && detail.stage < 4}}"
+        class="primary" data-stage="{{detail.stage + 1}}" bindtap="advance" disabled="{{busy}}">标记{{stages[detail.stage + 1]}}</button>
+      <text wx:if="{{current.reviewer && feishuEnabled && detail.weekStart && detail.stage < 4}}" class="muted description">在飞书更新办理进度，小程序会同步。</text>
+      <button wx:if="{{current.finance && detail.stage === 4 && detail.reviewState === 'ready'}}" class="primary" data-stage="5" bindtap="advance" disabled="{{busy}}">登记同学已到账</button>
+    </view>
+  </block>
+
+  <block wx:elif="{{mode === 'form' && studentOnly}}">
+    <view class="card">
+      <text class="title">提交报销</text>
+      <text class="muted description">每笔申请对应一张 PDF 发票。</text>
+      <text class="field-label">报销类别</text>
+      <picker range="{{formCategoryChoices}}" value="{{formCategoryIndex}}" bindchange="changeCategory" disabled="{{busy}}">
+        <view class="pick">{{form.category || '选择类别'}} <text>›</text></view>
+      </picker>
+      <text wx:if="{{formRule}}" class="muted description">{{formRule.hint}}</text>
+      <text class="field-label">单张发票金额（元）</text>
+      <input type="digit" value="{{form.amount}}" maxlength="10" bindinput="inputAmount" placeholder="输入发票金额" disabled="{{busy}}" />
+      <text wx:if="{{mealWarning}}" class="attention">本张餐饮发票金额超过建议的 2,000 元。</text>
+      <text class="field-label">开票日期</text>
+      <picker mode="date" value="{{form.invoiceDate || today}}" end="{{today}}" data-field="invoiceDate" bindchange="inputStudentField" disabled="{{busy}}">
+        <view class="pick">{{form.invoiceDate || '选择开票日期'}} <text>›</text></view>
+      </picker>
+      <text class="field-label">{{formRule.purpose || '报销用途'}}</text>
+      <textarea value="{{form.description}}" maxlength="200" bindinput="inputDescription" placeholder="请简要填写" disabled="{{busy}}" />
+      <checkbox-group wx:if="{{formRule.confirmation}}" bindchange="confirmRule">
+        <label class="finance-check"><checkbox color="#2860cf" value="confirmed" checked="{{form.confirmed}}" disabled="{{busy}}" />{{formRule.confirmation}}</label>
+      </checkbox-group>
+      <block wx:if="{{form.category === '交通费'}}">
+        <text class="field-label">乘车方式</text>
+        <picker range="{{transportModes}}" range-key="label" value="{{transportIndex}}" bindchange="changeTransport" disabled="{{busy}}">
+          <view class="pick">{{transportModes[transportIndex].label}} <text>›</text></view>
+        </picker>
+        <text class="field-label">出发地</text>
+        <input value="{{form.origin}}" maxlength="80" data-field="origin" bindinput="inputStudentField" disabled="{{busy}}" />
+        <text class="field-label">目的地</text>
+        <input value="{{form.destination}}" maxlength="80" data-field="destination" bindinput="inputStudentField" disabled="{{busy}}" />
+        <checkbox-group wx:if="{{form.transportMode === 'ride'}}" bindchange="confirmTransport">
+          <label class="finance-check" wx:for="{{transportChecks}}" wx:key="id">
+            <checkbox color="#2860cf" value="{{item.id}}" checked="{{form[item.id]}}" disabled="{{busy}}" />{{item.label}}
+          </label>
+        </checkbox-group>
+      </block>
+    </view>
+    <view class="card">
+      <text class="title">报销材料</text>
+      <text class="muted description">单份不超过 8 MB，合计不超过 16 MB。</text>
+      <view wx:for="{{materialChoices}}" wx:key="id" class="material-item">
+        <view class="group-title"><text class="claim-name">{{item.label}}</text><text class="muted">{{item.required ? '必交' : '可选'}}</text></view>
+        <view wx:if="{{item.id !== 'invoice'}}" class="attachments">
+          <button wx:if="{{item.id !== 'photo'}}" class="secondary" data-source="chat" data-kind="{{item.id}}" bindtap="addFile"
+            disabled="{{busy || form.files.length >= 12}}">选聊天文件</button>
+          <button class="secondary" data-source="image" data-kind="{{item.id}}" bindtap="addFile"
+            disabled="{{busy || form.files.length >= 12}}">选相册图片</button>
+        </view>
+        <view wx:for="{{item.files}}" wx:for-item="file" wx:key="id" class="claim-row">
+          <text class="claim-main muted">{{file.name}}</text>
+          <button class="minor" data-id="{{file.id}}" bindtap="removeFile" disabled="{{busy}}">移除</button>
+        </view>
+      </view>
+    </view>
+    <view class="student-form-footer">
+      <text wx:if="{{error}}" class="error submit-error" role="alert">{{error}}</text>
+      <view class="student-form-actions">
+        <button class="secondary" data-source="chat" data-kind="invoice" bindtap="addFile" disabled="{{busy}}">{{materialChoices[0].files.length ? '更换 PDF 发票' : '上传 PDF 发票'}}</button>
+        <button class="primary" bindtap="submit" disabled="{{busy}}" loading="{{busy}}">提交申请</button>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{mode === 'form'}}">
+    <view class="card">
+      <text class="title">{{formKind === 'supplement' ? '补传材料' : formKind === 'proxy' ? '代同学录入' : '提交报销'}}</text>
+      <view wx:if="{{formKind === 'supplement'}}" class="attention"><text>补件要求</text><text>{{detail.reason}}</text></view>
+      <block wx:else>
+        <text wx:if="{{formKind === 'proxy'}}" class="field-label">报销人</text>
+        <picker wx:if="{{formKind === 'proxy'}}" range="{{members}}" range-key="label" bindchange="changeOwner" disabled="{{busy || !members.length}}">
+          <view class="pick">{{form.ownerName || (members.length ? '选择报销人' : '正在读取成员')}} <text>›</text></view>
+        </picker>
+        <text class="field-label">报销分类</text>
+        <picker range="{{categories}}" bindchange="changeCategory" disabled="{{busy}}">
+          <view class="pick">{{form.category || '选择分类'}} <text>›</text></view>
+        </picker>
+        <text class="field-label">金额（元）</text>
+        <input type="digit" value="{{form.amount}}" maxlength="10" bindinput="inputAmount" placeholder="输入本笔申请总额" disabled="{{busy}}" />
+        <text class="field-label">报销说明（可选）</text>
+        <textarea value="{{form.description}}" maxlength="200" bindinput="inputDescription" placeholder="填写报销用途" disabled="{{busy}}" />
+      </block>
+    </view>
+    <view class="card">
+      <text class="title">报销材料</text>
+      <block wx:if="{{formKind === 'supplement'}}">
+        <text class="muted description">替换材料时，可移除对应旧附件。</text>
+        <view wx:for="{{previousFiles}}" wx:key="id" class="claim-row">
+          <view class="claim-main"><text class="claim-name">{{item.kindLabel}}</text><text class="muted">{{item.name}}</text></view>
+          <button class="minor" bindtap="togglePreviousFile" data-id="{{item.id}}" disabled="{{busy}}">{{item.removed ? '保留' : '移除旧件'}}</button>
+        </view>
+      </block>
+      <text class="muted description">所有申请需上传电子发票。满 500 元需加支付和购买记录截图；打车需另传行程单。</text>
+      <picker range="{{fileKinds}}" range-key="label" value="{{form.kindIndex}}" bindchange="changeKind" disabled="{{busy}}">
+        <view class="pick">{{fileKinds[form.kindIndex].label}} <text>选择材料类型 ›</text></view>
+      </picker>
+      <view class="attachments">
+        <button class="secondary" data-source="chat" bindtap="addFile" disabled="{{busy || form.files.length >= 12}}">选聊天文件</button>
+        <button class="secondary" data-source="image" bindtap="addFile" disabled="{{busy || form.files.length >= 12}}">选相册图片</button>
+      </view>
+      <view wx:for="{{form.files}}" wx:key="id" class="claim-row">
+        <view class="claim-main"><text class="claim-name">{{item.kindLabel}}</text><text class="muted">{{item.name}}</text></view>
+        <button class="minor" bindtap="removeFile" data-id="{{item.id}}" disabled="{{busy}}">移除</button>
+      </view>
+      <button class="primary" bindtap="submit" disabled="{{busy || !form.files.length}}" loading="{{busy}}">{{formKind === 'supplement' ? '提交补件' : '提交申请'}}</button>
+    </view>
+  </block>
+</view>

@@ -10,6 +10,7 @@ module.exports = function messages(db, access) {
     const recipients = [id];
     if (access.allowed(member, 'members.manage')) recipients.push('role:super_admin');
     if (sharingPolicy.reviewer(member)) recipients.push('role:sharing_reviewer');
+    if ((member.roles || []).includes('finance_admin')) recipients.push('role:finance_admin');
     return { teamId: access.TEAM_ID, recipientKey: db.command.in(recipients),
       ...(unreadOnly ? { readBy: db.command.nin([id]) } : {}) };
   }
@@ -23,7 +24,8 @@ module.exports = function messages(db, access) {
     return message && message.teamId === access.TEAM_ID && (message.recipientKey === id ||
       Array.isArray(message.recipientKey) && message.recipientKey.includes(id) ||
       message.recipientKey === 'role:super_admin' && access.allowed(member, 'members.manage') ||
-      message.recipientKey === 'role:sharing_reviewer' && sharingPolicy.reviewer(member));
+      message.recipientKey === 'role:sharing_reviewer' && sharingPolicy.reviewer(member) ||
+      message.recipientKey === 'role:finance_admin' && (member.roles || []).includes('finance_admin'));
   }
   async function readAll(id, event) {
     const now = Date.now(), readBeforeMs = event.readBeforeMs === undefined ? now : event.readBeforeMs;
@@ -85,6 +87,9 @@ module.exports = function messages(db, access) {
       }
       if (message.kind === 'challenge' && /^ce_[a-f0-9]{32}$/.test(message.subjectId || '')) {
         url = '/pages/module/index?id=ai-challenge&event=' + message.subjectId;
+      }
+      if (message.kind === 'finance' && /^fc_[a-f0-9]{32}$/.test(message.subjectId || '')) {
+        url = '/pages/module/index?id=finance&claim=' + message.subjectId;
       }
       if (markRead && !(message.readBy || []).includes(id)) {
         await reference.update({ data: { readBy: db.command.addToSet(id) } });

@@ -1,0 +1,20 @@
+{
+  "description": "完整报销流程的部署清单。当前学生端和财务专员端使用 financeClaims、financeFiles、financeArchives、financeAudit、finance_by_owner、finance_by_team 和现有消息集合，见 docs/finance.md。",
+  "collections": [
+    { "name": "financeClaims", "permission": "ADMINONLY", "indexes": [
+      { "name": "finance_by_owner", "fields": { "teamId": 1, "ownerId": 1, "createdMs": -1, "_id": -1 } },
+      { "name": "finance_by_team", "fields": { "teamId": 1, "createdMs": -1, "_id": -1 } },
+      { "name": "finance_review_queue", "fields": { "teamId": 1, "reviewState": 1, "createdMs": -1, "_id": -1 } },
+      { "name": "finance_report_queue", "fields": { "teamId": 1, "reviewState": 1, "weekStart": 1, "createdMs": -1, "_id": -1 } },
+      { "name": "finance_week_inbox", "fields": { "teamId": 1, "collectedWeek": 1, "weekStart": 1, "createdMs": -1, "_id": -1 } },
+      { "name": "finance_week_claims", "fields": { "teamId": 1, "weekStart": 1, "_id": 1 } },
+      { "name": "finance_sync_due", "fields": { "teamId": 1, "syncActive": 1, "syncAttemptMs": 1 } }
+    ] },
+    { "name": "financeFiles", "permission": "ADMINONLY", "indexes": [] },
+    { "name": "financeWeeks", "permission": "ADMINONLY", "indexes": [] },
+    { "name": "financeArchives", "permission": "ADMINONLY", "indexes": [] },
+    { "name": "financeAudit", "permission": "ADMINONLY", "indexes": [] }
+  ],
+  "function": "finance",
+  "trigger": { "name": "finance-sync-minute", "type": "timer", "config": "0 * * * * * *" }
+}

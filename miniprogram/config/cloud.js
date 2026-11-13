@@ -6,5 +6,6 @@ module.exports = {
   adminDataFunction: 'adminData',
   accessFunction: 'memberAccess',
   weeklyFunction: 'weeklyReport',
-  sharingFunction: 'weeklySharing'
+  sharingFunction: 'weeklySharing',
+  financeFunction: 'finance'
 };
